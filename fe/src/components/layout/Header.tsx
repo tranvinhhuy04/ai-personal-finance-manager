@@ -1,0 +1,103 @@
+import { useState } from 'react';
+import { ArrowLeft, ArrowRight, HelpCircle, Mail, Bell, Share2, ChevronRight, Menu } from 'lucide-react';
+import { motion } from 'motion/react';
+import { NotificationDropdown } from './NotificationDropdown';
+import { UserMenuDropdown } from './UserMenuDropdown';
+import { ShareModal } from './ShareModal';
+
+interface HeaderProps {
+  onMenuClick?: () => void;
+}
+
+export const Header = ({ onMenuClick }: HeaderProps) => {
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+
+  return (
+    <motion.header 
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.5, delay: 0.1 }}
+      className="h-20 px-4 md:px-8 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10"
+    >
+      {/* Breadcrumbs & Mobile Menu */}
+      <div className="flex items-center gap-4">
+        <button 
+          onClick={onMenuClick}
+          className="md:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="hidden sm:flex items-center gap-1">
+          <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all">
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all">
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="hidden sm:flex items-center gap-2 text-sm">
+          <span className="text-gray-500 font-medium">OripioFin</span>
+          <ChevronRight className="w-4 h-4 text-gray-400" />
+          <span className="text-gray-900 font-semibold">Bảng điều khiển</span>
+        </div>
+      </div>
+
+      {/* Actions & Profile */}
+      <div className="flex items-center gap-2 md:gap-4">
+        <div className="flex items-center gap-1 md:gap-2">
+          <button className="hidden sm:block p-2.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all border border-gray-200 bg-white">
+            <HelpCircle className="w-4 h-4" />
+          </button>
+          <button className="hidden sm:block p-2.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all border border-gray-200 bg-white">
+            <Mail className="w-4 h-4" />
+          </button>
+          <div className="relative">
+            <button 
+              onClick={() => setIsNotifOpen(!isNotifOpen)}
+              className="p-2.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all border border-gray-200 bg-white relative"
+            >
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-2 right-2.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white"></span>
+            </button>
+            <NotificationDropdown isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} />
+          </div>
+        </div>
+
+        <div className="h-8 w-px bg-gray-200 mx-1 hidden sm:block"></div>
+
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="relative">
+            <button 
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
+              <img
+                src="https://i.pravatar.cc/150?img=11"
+                alt="User avatar"
+                className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm"
+                referrerPolicy="no-referrer"
+              />
+              <div className="flex flex-col items-start hidden sm:flex">
+                <ChevronRight className="w-3 h-3 text-gray-400 rotate-90" />
+                <ChevronRight className="w-3 h-3 text-gray-400 -rotate-90 -mt-1" />
+              </div>
+            </button>
+            <UserMenuDropdown isOpen={isUserMenuOpen} onClose={() => setIsUserMenuOpen(false)} />
+          </div>
+          
+          <button 
+            onClick={() => setIsShareOpen(true)}
+            className="hidden sm:flex items-center gap-2 bg-gradient-to-br from-emerald-700 via-emerald-800 to-teal-900 hover:brightness-110 text-white px-4 py-2.5 rounded-full text-sm font-medium transition-all shadow-lg shadow-emerald-900/40"
+          >
+            <span>Chia sẻ</span>
+            <Share2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
+    </motion.header>
+  );
+};
