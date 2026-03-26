@@ -1,0 +1,65 @@
+version: '3.9'
+services:
+  postgres-db:
+    image: postgres:15
+    container_name: postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: oripiofin
+      POSTGRES_PASSWORD: oripiofin_pw
+      POSTGRES_DB: oripiofin_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - oripiofin_net
+
+  redis-cache:
+    image: redis:7
+    container_name: redis-cache
+    restart: always
+    networks:
+      - oripiofin_net
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    restart: always
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis-cache
+    env_file:
+      - .env
+    networks:
+      - oripiofin_net
+
+  service-identity:
+    build: ./service-identity
+    container_name: service-identity
+    restart: always
+    expose:
+      - "3001"
+    depends_on:
+      - postgres-db
+    env_file:
+      - .env
+    networks:
+      - oripiofin_net
+
+  service-wallet:
+    build: ./service-wallet
+    container_name: service-wallet
+    restart: always
+    expose:
+      - "3002"
+    env_file:
+      - .env
+    networks:
+      - oripiofin_net
+
+volumes:
+  pgdata:
+
+networks:
+  oripiofin_net:
+    driver: bridge
