@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../store/useAuthStore';
 import {
   LayoutDashboard, LineChart, ArrowRightLeft, FileText,
   Layers, ShieldCheck, MessageSquare, Settings, HelpCircle, LogOut, Search, Sparkles
@@ -56,15 +57,9 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const logout = useAuthStore((state) => state.logout);
   const handleLogout = () => {
-    // Clear auth data
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('authUser');
-    // Optional: localStorage.clear();
-
-    // Redirect back to auth page
+    logout();
     navigate('/auth');
   };
 

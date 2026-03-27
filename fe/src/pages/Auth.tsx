@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, ArrowRight, Sparkles } from 'lucide-react';
+import { useAuthStore } from '../store/useAuthStore';
 
 const AUTH_API_BASE = 'http://localhost:5000/api/auth';
 
@@ -46,36 +47,29 @@ export const Auth = () => {
     }
   }
 
+  const setLogin = useAuthStore((state) => state.setLogin);
+  const setMockLogin = useAuthStore((state) => state.setMockLogin);
+
   async function handleRealLogin(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
     try {
-      // FIX: clear all stale demo tokens/user before real login
-      localStorage.clear();
-
-      // REAL API LOGIN: call identity-service via API Gateway
       const response = await fetch(`${AUTH_API_BASE}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-
       const data = (await response.json()) as AuthApiResponse;
       if (!response.ok) {
         throw new Error(data?.message || 'Sai email hoặc mật khẩu');
       }
-
       const token = data.accessToken ?? data.token;
       if (!token) {
         throw new Error('Đăng nhập thành công nhưng không nhận được token');
       }
-
       const mappedUser = normalizeUser(data.user);
-      persistAuth(token, mappedUser);
-      // Also persist under common keys used across the app
-      if (mappedUser) localStorage.setItem('user', JSON.stringify(mappedUser));
+      setLogin(mappedUser, token);
       navigate('/dashboard');
     } catch (err: any) {
       setError(err?.message || 'Sai email hoặc mật khẩu');
@@ -116,17 +110,8 @@ export const Auth = () => {
   function handleMockLogin() {
     setError('');
     setIsLoading(true);
-
     try {
-      // MOCK LOGIN: skip API call, inject demo account + fake token
-      const fakeToken = `mock-token-${Date.now()}`;
-      const mockUser = {
-        id: 'mock-user-id',
-        email: 'demo@fintech.app',
-        fullName: 'Demo Fintech User',
-      };
-
-      persistAuth(fakeToken, mockUser);
+      setMockLogin();
       navigate('/dashboard');
     } finally {
       setIsLoading(false);
