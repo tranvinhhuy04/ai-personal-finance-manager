@@ -1,24 +1,21 @@
-version: '3.9'
 services:
-  postgres-db:
-    image: postgres:15
-    container_name: postgres-db
+  mongo-db:
+    image: mongo:7
+    container_name: mongo-db
     restart: always
-    environment:
-      POSTGRES_USER: oripiofin
-      POSTGRES_PASSWORD: oripiofin_pw
-      POSTGRES_DB: oripiofin_db
+    ports:
+      - "27017:27017"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mongodata:/data/db
     networks:
-      - oripiofin_net
+      - fintech_net
 
   redis-cache:
     image: redis:7
     container_name: redis-cache
     restart: always
     networks:
-      - oripiofin_net
+      - fintech_net
 
   api-gateway:
     build: ./api-gateway
@@ -31,7 +28,7 @@ services:
     env_file:
       - .env
     networks:
-      - oripiofin_net
+      - fintech_net
 
   service-identity:
     build: ./service-identity
@@ -40,11 +37,14 @@ services:
     expose:
       - "3001"
     depends_on:
-      - postgres-db
+      - mongo-db
     env_file:
       - .env
+    environment:
+      IDENTITY_PORT: 3001
+      MONGO_URI: mongodb://mongo-db:27017/fintech_auth
     networks:
-      - oripiofin_net
+      - fintech_net
 
   service-wallet:
     build: ./service-wallet
@@ -55,11 +55,11 @@ services:
     env_file:
       - .env
     networks:
-      - oripiofin_net
+      - fintech_net
 
 volumes:
-  pgdata:
+  mongodata:
 
 networks:
-  oripiofin_net:
+  fintech_net:
     driver: bridge

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, LineChart, ArrowRightLeft, FileText,
   Layers, ShieldCheck, MessageSquare, Settings, HelpCircle, LogOut, Search, Sparkles
@@ -54,6 +54,19 @@ interface SidebarProps {
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // Clear auth data
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('authUser');
+    // Optional: localStorage.clear();
+
+    // Redirect back to auth page
+    navigate('/auth');
+  };
 
   return (
     <>
@@ -131,7 +144,10 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             <Sparkles className="w-4 h-4 text-emerald-300" />
             <span>Nâng cấp Pro</span>
           </button>
-          <button className="flex items-center gap-3 w-full px-4 py-3 text-gray-500 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-all duration-200">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-4 py-3 text-gray-500 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-all duration-200 cursor-pointer"
+          >
             <LogOut className="w-5 h-5 text-gray-400" />
             <span className="font-medium text-sm">Đăng xuất</span>
           </button>

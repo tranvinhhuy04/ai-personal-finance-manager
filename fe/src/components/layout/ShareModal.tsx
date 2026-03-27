@@ -69,7 +69,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose }) => {
             <div className="flex items-center gap-2 mt-2">
               <div className="flex-1 flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
                 <Link className="w-4 h-4 text-gray-400 shrink-0" />
-                <span className="text-sm text-gray-600 truncate">https://oripiofin.app/share/x8y2z9</span>
+                <span className="text-sm text-gray-600 truncate">https://fintech.app/share/x8y2z9</span>
               </div>
               <button className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm rounded-xl transition-colors shrink-0">
                 Sao chép
