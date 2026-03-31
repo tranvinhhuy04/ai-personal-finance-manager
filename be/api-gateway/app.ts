@@ -23,7 +23,11 @@ const redisClient = createClient({
 redisClient.connect().catch(console.error);
 
 app.use(cors());
-app.use(express.json());
+// NOTE: Do NOT use express.json() globally in the gateway.
+// If express.json() parses the body BEFORE http-proxy-middleware runs, it
+// consumes the readable stream. The proxy then tries to pipe an already-drained
+// stream to the upstream — which causes the upstream to hang waiting for a body
+// that never arrives, resulting in a frozen request on the front-end.
 app.use(morgan('dev'));
 
 // Rate limiting (global, using Redis)

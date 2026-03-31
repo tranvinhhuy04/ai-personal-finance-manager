@@ -18,26 +18,19 @@ const User_1 = __importDefault(require("../src/models/User"));
 const UserSettings_1 = __importDefault(require("../src/models/UserSettings"));
 const jwt_1 = require("../utils/jwt");
 const totp_1 = require("../utils/totp");
-function validationError(message) {
-    const err = new Error(message);
-    err.code = 'VALIDATION_ERROR';
-    return err;
-}
-function unauthorizedError(message) {
-    const err = new Error(message);
-    err.code = 'UNAUTHORIZED';
-    return err;
-}
-function requireString(value, fieldName) {
+const AppError_1 = require("../src/errors/AppError");
+// ─── Validation helpers ───────────────────────────────────────────────────────
+function assertString(value, fieldName) {
     if (typeof value !== 'string' || value.trim().length === 0) {
-        throw validationError(`${fieldName} is required`);
+        throw new AppError_1.AppError(`${fieldName} is required`, 400);
     }
 }
-function requireMinLength(value, min, fieldName) {
+function assertMinLength(value, min, fieldName) {
     if (value.length < min) {
-        throw validationError(`${fieldName} must be at least ${min} characters`);
+        throw new AppError_1.AppError(`${fieldName} must be at least ${min} characters`, 400);
     }
 }
+// ─── Serialisation ────────────────────────────────────────────────────────────
 function toSafeUser(row) {
     return {
         userId: row.id ?? row._id?.toString(),
@@ -50,17 +43,18 @@ function toSafeUser(row) {
     };
 }
 async function register({ email, password, fullName, phone }) {
-    requireString(email, 'email');
-    requireMinLength(password, 8, 'password');
-    requireString(fullName, 'fullName');
+    assertString(email, 'email');
+    assertString(password, 'password');
+    assertMinLength(password, 8, 'password');
+    assertString(fullName, 'fullName');
     if (phone != null && typeof phone !== 'string')
-        throw validationError('phone must be a string');
+        throw new AppError_1.AppError('phone must be a string', 400);
     const emailNorm = email.trim().toLowerCase();
     const fullNameNorm = fullName.trim();
     const phoneNorm = phone ? phone.trim() : null;
     const existing = await User_1.default.findOne({ email: emailNorm }).lean();
     if (existing) {
-        throw { code: 'EMAIL_EXISTS', message: 'Email already exists' };
+        throw new AppError_1.AppError('Email already exists', 409);
     }
     const passwordHash = await bcryptjs_1.default.hash(password, 10);
     try {
@@ -92,22 +86,23 @@ async function register({ email, password, fullName, phone }) {
     }
     catch (err) {
         if (err?.code === 11000) {
-            throw { code: 'EMAIL_EXISTS', message: 'Email already exists' };
+            throw new AppError_1.AppError('Email already exists', 409);
         }
+        throw err;
         throw err;
     }
 }
 async function login({ email, password, twoFactorCode }) {
-    requireString(email, 'email');
-    requireString(password, 'password');
+    assertString(email, 'email');
+    assertString(password, 'password');
     const emailNorm = email.trim().toLowerCase();
     const userDoc = await User_1.default.findOne({ email: emailNorm }).lean();
     if (!userDoc || userDoc.status !== 1) {
-        throw unauthorizedError('Invalid credentials');
+        throw new AppError_1.AppError('Invalid credentials', 401);
     }
     const ok = await bcryptjs_1.default.compare(password, userDoc.passwordHash);
     if (!ok)
-        throw unauthorizedError('Invalid credentials');
+        throw new AppError_1.AppError('Invalid credentials', 401);
     const settings = await UserSettings_1.default.findOne({ userId: userDoc._id }).lean();
     const twoFactorEnabled = Boolean(settings?.twoFactorEnabled);
     if (twoFactorEnabled) {
@@ -122,10 +117,10 @@ async function login({ email, password, twoFactorCode }) {
         }
         const secret = settings?.twoFactorSecret;
         if (!secret)
-            throw unauthorizedError('2FA not configured');
+            throw new AppError_1.AppError('2FA not configured', 400);
         const verified = (0, totp_1.verifyTotpCode)(secret, twoFactorCode);
         if (!verified)
-            throw unauthorizedError('Invalid 2FA code');
+            throw new AppError_1.AppError('Invalid 2FA code', 401);
         return {
             user: toSafeUser(userDoc),
             twoFactorEnabled: true,
@@ -141,32 +136,32 @@ async function login({ email, password, twoFactorCode }) {
     };
 }
 async function loginWith2FA({ twoFactorToken, code }) {
-    requireString(twoFactorToken, 'twoFactorToken');
-    requireString(code, 'code');
+    assertString(twoFactorToken, 'twoFactorToken');
+    assertString(code, 'code');
     let decoded;
     try {
         decoded = (0, jwt_1.verifyToken)(twoFactorToken);
     }
     catch {
-        throw unauthorizedError('Invalid or expired 2FA token');
+        throw new AppError_1.AppError('Invalid or expired 2FA token', 401);
     }
     if (decoded?.type !== '2fa_pending' || typeof decoded?.sub !== 'string') {
-        throw unauthorizedError('Invalid or expired 2FA token');
+        throw new AppError_1.AppError('Invalid or expired 2FA token', 401);
     }
     const userId = decoded.sub;
     if (!mongoose_1.Types.ObjectId.isValid(userId)) {
-        throw unauthorizedError('Invalid or expired 2FA token');
+        throw new AppError_1.AppError('Invalid or expired 2FA token', 401);
     }
     const settings = await UserSettings_1.default.findOne({ userId }).lean();
     if (!settings?.twoFactorEnabled || !settings?.twoFactorSecret) {
-        throw unauthorizedError('2FA not configured');
+        throw new AppError_1.AppError('2FA not configured', 400);
     }
     const verified = (0, totp_1.verifyTotpCode)(settings.twoFactorSecret, code);
     if (!verified)
-        throw unauthorizedError('Invalid 2FA code');
+        throw new AppError_1.AppError('Invalid 2FA code', 401);
     const userDoc = await User_1.default.findById(userId).lean();
     if (!userDoc)
-        throw unauthorizedError('User not found');
+        throw new AppError_1.AppError('User not found', 401);
     return {
         user: toSafeUser(userDoc),
         twoFactorEnabled: true,
@@ -175,24 +170,24 @@ async function loginWith2FA({ twoFactorToken, code }) {
     };
 }
 async function refreshTokens({ refreshToken }) {
-    requireString(refreshToken, 'refreshToken');
+    assertString(refreshToken, 'refreshToken');
     let decoded;
     try {
         decoded = (0, jwt_1.verifyToken)(refreshToken);
     }
     catch {
-        throw unauthorizedError('Invalid or expired token');
+        throw new AppError_1.AppError('Invalid or expired token', 401);
     }
     if (decoded?.type !== 'refresh' || typeof decoded?.sub !== 'string') {
-        throw unauthorizedError('Invalid token');
+        throw new AppError_1.AppError('Invalid token', 401);
     }
     const userId = decoded.sub;
     if (!mongoose_1.Types.ObjectId.isValid(userId)) {
-        throw unauthorizedError('Invalid token');
+        throw new AppError_1.AppError('Invalid token', 401);
     }
     const userDoc = await User_1.default.findById(userId).lean();
     if (!userDoc)
-        throw unauthorizedError('Invalid token');
+        throw new AppError_1.AppError('Invalid token', 401);
     return {
         user: toSafeUser(userDoc),
         accessToken: (0, jwt_1.signAccessToken)(userId),
@@ -203,13 +198,13 @@ async function logout() {
     return { success: true };
 }
 async function getMe(userId) {
-    requireString(userId, 'userId');
+    assertString(userId, 'userId');
     if (!mongoose_1.Types.ObjectId.isValid(userId)) {
-        throw unauthorizedError('User not found');
+        throw new AppError_1.AppError('User not found', 404);
     }
     const userDoc = await User_1.default.findById(userId).lean();
     if (!userDoc)
-        throw unauthorizedError('User not found');
+        throw new AppError_1.AppError('User not found', 404);
     const settings = await UserSettings_1.default.findOne({ userId }).lean();
     return {
         user: toSafeUser(userDoc),
@@ -219,13 +214,13 @@ async function getMe(userId) {
     };
 }
 async function setup2FA(userId) {
-    requireString(userId, 'userId');
+    assertString(userId, 'userId');
     if (!mongoose_1.Types.ObjectId.isValid(userId)) {
-        throw unauthorizedError('User not found');
+        throw new AppError_1.AppError('User not found', 404);
     }
     const user = await User_1.default.findById(userId).lean();
     if (!user)
-        throw unauthorizedError('User not found');
+        throw new AppError_1.AppError('User not found', 404);
     const secret = (0, totp_1.generateTotpSecret)();
     const otpauthUrl = (0, totp_1.buildOtpAuthUrl)(secret, user.email, 'OripioFin');
     await UserSettings_1.default.findOneAndUpdate({ userId }, {
@@ -239,17 +234,17 @@ async function setup2FA(userId) {
     return { otpauthUrl, secret };
 }
 async function verify2FA(userId, code) {
-    requireString(userId, 'userId');
+    assertString(userId, 'userId');
     if (typeof code !== 'string')
-        throw validationError('code is required');
+        throw new AppError_1.AppError('code is required', 400);
     if (!mongoose_1.Types.ObjectId.isValid(userId))
-        throw unauthorizedError('User not found');
+        throw new AppError_1.AppError('User not found', 404);
     const settings = await UserSettings_1.default.findOne({ userId }).lean();
     if (!settings?.twoFactorSecret)
-        throw validationError('2FA secret not configured');
+        throw new AppError_1.AppError('2FA secret not configured', 400);
     const verified = (0, totp_1.verifyTotpCode)(settings.twoFactorSecret, code);
     if (!verified)
-        throw unauthorizedError('Invalid 2FA code');
+        throw new AppError_1.AppError('Invalid 2FA code', 401);
     await UserSettings_1.default.findOneAndUpdate({ userId }, {
         $set: {
             twoFactorEnabled: true,
@@ -260,7 +255,7 @@ async function verify2FA(userId, code) {
     return { success: true, twoFactorEnabled: true };
 }
 async function get2FAStatus(userId) {
-    requireString(userId, 'userId');
+    assertString(userId, 'userId');
     if (!mongoose_1.Types.ObjectId.isValid(userId)) {
         return { twoFactorEnabled: false };
     }

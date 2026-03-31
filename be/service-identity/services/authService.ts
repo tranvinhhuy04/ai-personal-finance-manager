@@ -9,52 +9,47 @@ import {
   verifyToken,
 } from '../utils/jwt';
 import { buildOtpAuthUrl, generateTotpSecret, verifyTotpCode } from '../utils/totp';
+import { AppError } from '../src/errors/AppError';
 
-type RegisterInput = {
+// ─── Input types ─────────────────────────────────────────────────────────────
+
+export type RegisterInput = {
   email: string;
   password: string;
   fullName: string;
   phone?: string;
 };
 
-type LoginInput = {
+export type LoginInput = {
   email: string;
   password: string;
   twoFactorCode?: string;
 };
 
-type LoginWith2FAInput = {
+export type LoginWith2FAInput = {
   twoFactorToken: string;
   code: string;
 };
 
-type RefreshInput = {
+export type RefreshInput = {
   refreshToken: string;
 };
 
-function validationError(message: string) {
-  const err: any = new Error(message);
-  err.code = 'VALIDATION_ERROR';
-  return err;
-}
+// ─── Validation helpers ───────────────────────────────────────────────────────
 
-function unauthorizedError(message: string) {
-  const err: any = new Error(message);
-  err.code = 'UNAUTHORIZED';
-  return err;
-}
-
-function requireString(value: unknown, fieldName: string) {
+function assertString(value: unknown, fieldName: string): asserts value is string {
   if (typeof value !== 'string' || value.trim().length === 0) {
-    throw validationError(`${fieldName} is required`);
+    throw new AppError(`${fieldName} is required`, 400);
   }
 }
 
-function requireMinLength(value: string, min: number, fieldName: string) {
+function assertMinLength(value: string, min: number, fieldName: string): void {
   if (value.length < min) {
-    throw validationError(`${fieldName} must be at least ${min} characters`);
+    throw new AppError(`${fieldName} must be at least ${min} characters`, 400);
   }
 }
+
+// ─── Serialisation ────────────────────────────────────────────────────────────
 
 function toSafeUser(row: any) {
   return {
@@ -69,10 +64,11 @@ function toSafeUser(row: any) {
 }
 
 export async function register({ email, password, fullName, phone }: RegisterInput) {
-  requireString(email, 'email');
-  requireMinLength(password, 8, 'password');
-  requireString(fullName, 'fullName');
-  if (phone != null && typeof phone !== 'string') throw validationError('phone must be a string');
+  assertString(email, 'email');
+  assertString(password, 'password');
+  assertMinLength(password, 8, 'password');
+  assertString(fullName, 'fullName');
+  if (phone != null && typeof phone !== 'string') throw new AppError('phone must be a string', 400);
 
   const emailNorm = email.trim().toLowerCase();
   const fullNameNorm = fullName.trim();
@@ -80,7 +76,7 @@ export async function register({ email, password, fullName, phone }: RegisterInp
 
   const existing = await User.findOne({ email: emailNorm }).lean();
   if (existing) {
-    throw { code: 'EMAIL_EXISTS', message: 'Email already exists' };
+    throw new AppError('Email already exists', 409);
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
@@ -116,25 +112,26 @@ export async function register({ email, password, fullName, phone }: RegisterInp
     };
   } catch (err: any) {
     if (err?.code === 11000) {
-      throw { code: 'EMAIL_EXISTS', message: 'Email already exists' };
+      throw new AppError('Email already exists', 409);
     }
+    throw err;
     throw err;
   }
 }
 
 export async function login({ email, password, twoFactorCode }: LoginInput) {
-  requireString(email, 'email');
-  requireString(password, 'password');
+  assertString(email, 'email');
+  assertString(password, 'password');
 
   const emailNorm = email.trim().toLowerCase();
   const userDoc = await User.findOne({ email: emailNorm }).lean();
 
   if (!userDoc || userDoc.status !== 1) {
-    throw unauthorizedError('Invalid credentials');
+    throw new AppError('Invalid credentials', 401);
   }
 
   const ok = await bcrypt.compare(password, userDoc.passwordHash);
-  if (!ok) throw unauthorizedError('Invalid credentials');
+  if (!ok) throw new AppError('Invalid credentials', 401);
 
   const settings = await UserSettings.findOne({ userId: userDoc._id }).lean();
   const twoFactorEnabled = Boolean(settings?.twoFactorEnabled);
@@ -151,10 +148,10 @@ export async function login({ email, password, twoFactorCode }: LoginInput) {
     }
 
     const secret = settings?.twoFactorSecret;
-    if (!secret) throw unauthorizedError('2FA not configured');
+    if (!secret) throw new AppError('2FA not configured', 400);
 
     const verified = verifyTotpCode(secret, twoFactorCode);
-    if (!verified) throw unauthorizedError('Invalid 2FA code');
+    if (!verified) throw new AppError('Invalid 2FA code', 401);
 
     return {
       user: toSafeUser(userDoc),
@@ -173,35 +170,35 @@ export async function login({ email, password, twoFactorCode }: LoginInput) {
 }
 
 export async function loginWith2FA({ twoFactorToken, code }: LoginWith2FAInput) {
-  requireString(twoFactorToken, 'twoFactorToken');
-  requireString(code, 'code');
+  assertString(twoFactorToken, 'twoFactorToken');
+  assertString(code, 'code');
 
   let decoded: any;
   try {
     decoded = verifyToken(twoFactorToken);
   } catch {
-    throw unauthorizedError('Invalid or expired 2FA token');
+    throw new AppError('Invalid or expired 2FA token', 401);
   }
 
   if (decoded?.type !== '2fa_pending' || typeof decoded?.sub !== 'string') {
-    throw unauthorizedError('Invalid or expired 2FA token');
+    throw new AppError('Invalid or expired 2FA token', 401);
   }
 
   const userId = decoded.sub;
   if (!Types.ObjectId.isValid(userId)) {
-    throw unauthorizedError('Invalid or expired 2FA token');
+    throw new AppError('Invalid or expired 2FA token', 401);
   }
 
   const settings = await UserSettings.findOne({ userId }).lean();
   if (!settings?.twoFactorEnabled || !settings?.twoFactorSecret) {
-    throw unauthorizedError('2FA not configured');
+    throw new AppError('2FA not configured', 400);
   }
 
   const verified = verifyTotpCode(settings.twoFactorSecret, code);
-  if (!verified) throw unauthorizedError('Invalid 2FA code');
+  if (!verified) throw new AppError('Invalid 2FA code', 401);
 
   const userDoc = await User.findById(userId).lean();
-  if (!userDoc) throw unauthorizedError('User not found');
+  if (!userDoc) throw new AppError('User not found', 401);
 
   return {
     user: toSafeUser(userDoc),
@@ -212,26 +209,26 @@ export async function loginWith2FA({ twoFactorToken, code }: LoginWith2FAInput) 
 }
 
 export async function refreshTokens({ refreshToken }: RefreshInput) {
-  requireString(refreshToken, 'refreshToken');
+  assertString(refreshToken, 'refreshToken');
 
   let decoded: any;
   try {
     decoded = verifyToken(refreshToken);
   } catch {
-    throw unauthorizedError('Invalid or expired token');
+    throw new AppError('Invalid or expired token', 401);
   }
 
   if (decoded?.type !== 'refresh' || typeof decoded?.sub !== 'string') {
-    throw unauthorizedError('Invalid token');
+    throw new AppError('Invalid token', 401);
   }
 
   const userId = decoded.sub;
   if (!Types.ObjectId.isValid(userId)) {
-    throw unauthorizedError('Invalid token');
+    throw new AppError('Invalid token', 401);
   }
 
   const userDoc = await User.findById(userId).lean();
-  if (!userDoc) throw unauthorizedError('Invalid token');
+  if (!userDoc) throw new AppError('Invalid token', 401);
 
   return {
     user: toSafeUser(userDoc),
@@ -245,13 +242,13 @@ export async function logout() {
 }
 
 export async function getMe(userId: string) {
-  requireString(userId, 'userId');
+  assertString(userId, 'userId');
   if (!Types.ObjectId.isValid(userId)) {
-    throw unauthorizedError('User not found');
+    throw new AppError('User not found', 404);
   }
 
   const userDoc = await User.findById(userId).lean();
-  if (!userDoc) throw unauthorizedError('User not found');
+  if (!userDoc) throw new AppError('User not found', 404);
 
   const settings = await UserSettings.findOne({ userId }).lean();
   return {
@@ -263,13 +260,13 @@ export async function getMe(userId: string) {
 }
 
 export async function setup2FA(userId: string) {
-  requireString(userId, 'userId');
+  assertString(userId, 'userId');
   if (!Types.ObjectId.isValid(userId)) {
-    throw unauthorizedError('User not found');
+    throw new AppError('User not found', 404);
   }
 
   const user = await User.findById(userId).lean();
-  if (!user) throw unauthorizedError('User not found');
+  if (!user) throw new AppError('User not found', 404);
 
   const secret = generateTotpSecret();
   const otpauthUrl = buildOtpAuthUrl(secret, user.email, 'OripioFin');
@@ -291,15 +288,15 @@ export async function setup2FA(userId: string) {
 }
 
 export async function verify2FA(userId: string, code: unknown) {
-  requireString(userId, 'userId');
-  if (typeof code !== 'string') throw validationError('code is required');
-  if (!Types.ObjectId.isValid(userId)) throw unauthorizedError('User not found');
+  assertString(userId, 'userId');
+  if (typeof code !== 'string') throw new AppError('code is required', 400);
+  if (!Types.ObjectId.isValid(userId)) throw new AppError('User not found', 404);
 
   const settings = await UserSettings.findOne({ userId }).lean();
-  if (!settings?.twoFactorSecret) throw validationError('2FA secret not configured');
+  if (!settings?.twoFactorSecret) throw new AppError('2FA secret not configured', 400);
 
   const verified = verifyTotpCode(settings.twoFactorSecret, code);
-  if (!verified) throw unauthorizedError('Invalid 2FA code');
+  if (!verified) throw new AppError('Invalid 2FA code', 401);
 
   await UserSettings.findOneAndUpdate(
     { userId },
@@ -316,7 +313,7 @@ export async function verify2FA(userId: string, code: unknown) {
 }
 
 export async function get2FAStatus(userId: string) {
-  requireString(userId, 'userId');
+  assertString(userId, 'userId');
   if (!Types.ObjectId.isValid(userId)) {
     return { twoFactorEnabled: false };
   }

@@ -13,6 +13,13 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: admin123
     networks:
       - fintech_net
+    # Health check: ping MongoDB every 10s; mark healthy after 3 successes
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   # Cache: Redis
   redis-cache:
@@ -23,6 +30,11 @@ services:
       - "6379:6379"
     networks:
       - fintech_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   # Message Broker: RabbitMQ
   rabbitmq:
@@ -39,6 +51,12 @@ services:
       - rabbitmqdata:/var/lib/rabbitmq
     networks:
       - fintech_net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # API Gateway (Port 3000)
   api-gateway:
@@ -48,10 +66,14 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - redis-cache
-      - service-identity
-      - service-wallet
-      - service-transaction
+      redis-cache:
+        condition: service_healthy
+      service-identity:
+        condition: service_started
+      service-wallet:
+        condition: service_started
+      service-transaction:
+        condition: service_started
     env_file:
       - .env
     environment:
@@ -64,60 +86,54 @@ services:
   service-identity:
     build: ./service-identity
     container_name: service-identity
-    restart: always
+    restart: on-failure
     ports:
       - "3001:3001"
     depends_on:
-      - mongo-db
+      mongo-db:
+        condition: service_healthy
     env_file:
       - .env
     environment:
-      PORT: 3001
       NODE_ENV: development
-      MONGODB_URI: mongodb://admin:admin123@mongo-db:27017/identity-service?authSource=admin
-      JWT_SECRET: your-jwt-secret-key-phase1
     networks:
       - fintech_net
 
-  # Wallet Service (Port 3002) - NEW
+  # Wallet Service (Port 3002)
   service-wallet:
     build: ./service-wallet
     container_name: service-wallet
-    restart: always
+    restart: on-failure
     ports:
       - "3002:3002"
     depends_on:
-      - mongo-db
-      - rabbitmq
+      mongo-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     env_file:
       - .env
     environment:
-      PORT: 3002
       NODE_ENV: development
-      MONGODB_URI: mongodb://admin:admin123@mongo-db:27017/wallet-service?authSource=admin
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      JWT_SECRET: your-jwt-secret-key-phase1
     networks:
       - fintech_net
 
-  # Transaction Service (Port 3003) - NEW
+  # Transaction Service (Port 3003)
   service-transaction:
     build: ./service-transaction
     container_name: service-transaction
-    restart: always
+    restart: on-failure
     ports:
       - "3003:3003"
     depends_on:
-      - mongo-db
-      - rabbitmq
+      mongo-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     env_file:
       - .env
     environment:
-      PORT: 3003
       NODE_ENV: development
-      MONGODB_URI: mongodb://admin:admin123@mongo-db:27017/transaction-service?authSource=admin
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      JWT_SECRET: your-jwt-secret-key-phase1
     networks:
       - fintech_net
 
