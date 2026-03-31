@@ -1,8 +1,10 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { mockAnalyticsPie, mockAnalyticsLine } from '@/lib/mockData';
 import { formatVND } from '@/lib/utils';
+
+const analyticsData: { name: string; value: number; color: string }[] = [];
+const trendData: { month: string; asset: number }[] = [];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -36,7 +38,7 @@ export const Analytics = () => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={mockAnalyticsPie}
+                  data={analyticsData}
                   cx="50%"
                   cy="50%"
                   innerRadius={80}
@@ -44,7 +46,7 @@ export const Analytics = () => {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {mockAnalyticsPie.map((entry, index) => (
+                  {analyticsData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -64,7 +66,7 @@ export const Analytics = () => {
           <h2 className="text-lg font-bold text-gray-900 mb-6">Xu hướng tài sản (6 tháng)</h2>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={mockAnalyticsLine} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <LineChart data={trendData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 
                   dataKey="month" 

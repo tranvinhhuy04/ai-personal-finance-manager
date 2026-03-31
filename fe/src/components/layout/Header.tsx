@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, HelpCircle, Mail, Bell, Share2, ChevronRight, Menu } from 'lucide-react';
+import { ArrowLeft, ArrowRight, HelpCircle, Mail, Bell, Share2, ChevronRight, Menu, UserCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { NotificationDropdown } from './NotificationDropdown';
 import { UserMenuDropdown } from './UserMenuDropdown';
 import { ShareModal } from './ShareModal';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -13,6 +14,7 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const user = useAuthStore((s) => s.user);
 
   return (
     <motion.header 
@@ -73,12 +75,18 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity"
             >
-              <img
-                src="https://i.pravatar.cc/150?img=11"
-                alt="User avatar"
-                className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm"
-                referrerPolicy="no-referrer"
-              />
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt="User avatar"
+                  className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-emerald-100 border-2 border-white shadow-sm flex items-center justify-center text-emerald-700 font-semibold text-sm select-none">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : <UserCircle className="w-5 h-5" />}
+                </div>
+              )}
               <div className="flex flex-col items-start hidden sm:flex">
                 <ChevronRight className="w-3 h-3 text-gray-400 rotate-90" />
                 <ChevronRight className="w-3 h-3 text-gray-400 -rotate-90 -mt-1" />

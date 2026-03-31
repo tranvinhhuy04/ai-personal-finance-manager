@@ -2,11 +2,18 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { FileText, Download, Eye, MoreHorizontal } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
-import { mockTransactions } from '@/lib/mockData';
+
+interface Invoice {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  status: string;
+  category: string;
+}
 
 export const Invoices = () => {
-  // Lọc ra các giao dịch có thể coi là hóa đơn (chi tiêu, tiện ích)
-  const invoices = mockTransactions.filter(tx => tx.amount < 0);
+  const invoices: Invoice[] = [];
 
   return (
     <motion.div
@@ -24,6 +31,15 @@ export const Invoices = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {invoices.length === 0 && (
+          <div className="col-span-3 flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+              <FileText className="w-8 h-8 text-gray-400" />
+            </div>
+            <p className="text-gray-500 font-medium">Chưa có hóa đơn nào</p>
+            <p className="text-sm text-gray-400 mt-1">Các hóa đơn sẽ xuất hiện tại đây sau khi bạn tạo</p>
+          </div>
+        )}
         {invoices.map((invoice) => (
           <div key={invoice.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
             <div className="flex items-start justify-between mb-4">

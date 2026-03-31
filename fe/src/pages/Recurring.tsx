@@ -2,7 +2,17 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Layers, Plus, Calendar, ArrowRight } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
-import { mockSubscriptions } from '@/lib/mockData';
+
+interface Subscription {
+  id: string;
+  name: string;
+  amount: number;
+  nextBilling: string;
+  status: string;
+  category: string;
+}
+
+const subscriptions: Subscription[] = [];
 
 export const Recurring = () => {
   return (
@@ -21,7 +31,16 @@ export const Recurring = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {mockSubscriptions.map((sub) => (
+        {subscriptions.length === 0 && (
+          <div className="col-span-3 flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+              <Layers className="w-8 h-8 text-gray-400" />
+            </div>
+            <p className="text-gray-500 font-medium">Chưa có giao dịch định kỳ</p>
+            <p className="text-sm text-gray-400 mt-1">Thêm giao dịch định kỳ để theo dõi các khoản chi cố định</p>
+          </div>
+        )}
+        {subscriptions.map((sub) => (
           <div key={sub.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-bl-full -z-10"></div>
             

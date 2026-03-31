@@ -1,4 +1,5 @@
 services:
+  # Database: MongoDB
   mongo-db:
     image: mongo:7
     container_name: mongo-db
@@ -7,58 +8,122 @@ services:
       - "27017:27017"
     volumes:
       - mongodata:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
     networks:
       - fintech_net
 
+  # Cache: Redis
   redis-cache:
     image: redis:7
     container_name: redis-cache
     restart: always
+    ports:
+      - "6379:6379"
     networks:
       - fintech_net
 
+  # Message Broker: RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"      # AMQP port
+      - "15672:15672"    # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    networks:
+      - fintech_net
+
+  # API Gateway (Port 3000)
   api-gateway:
     build: ./api-gateway
     container_name: api-gateway
     restart: always
     ports:
-      - "5000:5000"
+      - "3000:3000"
     depends_on:
       - redis-cache
+      - service-identity
+      - service-wallet
+      - service-transaction
     env_file:
       - .env
+    environment:
+      PORT: 3000
+      REDIS_URL: redis://redis-cache:6379
     networks:
       - fintech_net
 
+  # Identity Service (Port 3001)
   service-identity:
     build: ./service-identity
     container_name: service-identity
     restart: always
-    expose:
-      - "3001"
+    ports:
+      - "3001:3001"
     depends_on:
       - mongo-db
     env_file:
       - .env
     environment:
-      IDENTITY_PORT: 3001
-      MONGO_URI: mongodb://mongo-db:27017/fintech_auth
+      PORT: 3001
+      NODE_ENV: development
+      MONGODB_URI: mongodb://admin:admin123@mongo-db:27017/identity-service?authSource=admin
+      JWT_SECRET: your-jwt-secret-key-phase1
     networks:
       - fintech_net
 
+  # Wallet Service (Port 3002) - NEW
   service-wallet:
     build: ./service-wallet
     container_name: service-wallet
     restart: always
-    expose:
-      - "3002"
+    ports:
+      - "3002:3002"
+    depends_on:
+      - mongo-db
+      - rabbitmq
     env_file:
       - .env
+    environment:
+      PORT: 3002
+      NODE_ENV: development
+      MONGODB_URI: mongodb://admin:admin123@mongo-db:27017/wallet-service?authSource=admin
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      JWT_SECRET: your-jwt-secret-key-phase1
+    networks:
+      - fintech_net
+
+  # Transaction Service (Port 3003) - NEW
+  service-transaction:
+    build: ./service-transaction
+    container_name: service-transaction
+    restart: always
+    ports:
+      - "3003:3003"
+    depends_on:
+      - mongo-db
+      - rabbitmq
+    env_file:
+      - .env
+    environment:
+      PORT: 3003
+      NODE_ENV: development
+      MONGODB_URI: mongodb://admin:admin123@mongo-db:27017/transaction-service?authSource=admin
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      JWT_SECRET: your-jwt-secret-key-phase1
     networks:
       - fintech_net
 
 volumes:
   mongodata:
+  rabbitmqdata:
 
 networks:
   fintech_net:

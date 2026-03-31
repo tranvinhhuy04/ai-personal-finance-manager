@@ -2,14 +2,14 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
-import path from 'path';
 import routes from './routes';
 import { connectDB } from './config/db';
 
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// Load local .env first; in Docker, vars are already injected by compose
+dotenv.config();
 
 const app = express();
-const PORT = Number(process.env.PORT) === 0 ? 3001 : Number(process.env.IDENTITY_PORT) || 3001;
+const PORT = Number(process.env.IDENTITY_PORT) || 3001;
 
 app.use(cors());
 app.use(express.json());

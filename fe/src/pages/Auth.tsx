@@ -4,7 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, ArrowRight, Sparkles } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 
-const AUTH_API_BASE = 'http://localhost:5000/api/auth';
+// Derive auth base from the same VITE_API_URL used by apiClient, stripping trailing path
+const _apiRoot = (import.meta as unknown as { env: Record<string, string> }).env.VITE_API_URL ?? 'http://localhost:3000/api/v1';
+const AUTH_API_BASE = _apiRoot.replace(/\/api\/v\d+$/, '') + '/api/auth';
 
 type ApiUser = {
   id?: string;
@@ -34,8 +36,11 @@ export const Auth = () => {
   function normalizeUser(user?: ApiUser) {
     if (!user) return null;
     return {
-      ...user,
       id: user.id ?? user._id ?? user.userId ?? '',
+      // Backend may return fullName; map to the 'name' field expected by the auth store
+      name: user.fullName ?? user.email ?? 'Người dùng',
+      email: user.email ?? '',
+      avatar: undefined as string | undefined,
     };
   }
 

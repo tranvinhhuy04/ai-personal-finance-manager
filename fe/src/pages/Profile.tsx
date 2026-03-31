@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { User, Shield, Bell, Camera, Save } from 'lucide-react';
+import { User, Shield, Bell, Camera, Save, UserCircle } from 'lucide-react';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export const Profile = () => {
   const [activeTab, setActiveTab] = useState('general');
+  const user = useAuthStore((s) => s.user);
 
   return (
     <motion.div
@@ -46,7 +48,13 @@ export const Profile = () => {
             <div className="space-y-8">
               <div className="flex items-center gap-6">
                 <div className="relative">
-                  <img src="https://i.pravatar.cc/150?img=11" alt="Avatar" className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md" referrerPolicy="no-referrer" />
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt="Avatar" className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-emerald-100 border-4 border-white shadow-md flex items-center justify-center text-emerald-700 text-3xl font-bold select-none">
+                      {user?.name ? user.name.charAt(0).toUpperCase() : <UserCircle className="w-12 h-12" />}
+                    </div>
+                  )}
                   <button className="absolute bottom-0 right-0 p-2 bg-white rounded-full shadow-md border border-gray-100 text-gray-600 hover:text-emerald-600 transition-colors">
                     <Camera className="w-4 h-4" />
                   </button>

@@ -1,0 +1,16 @@
+{
+  "name": "oriopin-seeds",
+  "version": "1.0.0",
+  "description": "Seed script for OripioFin local/test data",
+  "main": "seed.js",
+  "type": "commonjs",
+  "scripts": {
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^17.0.0",
+    "mongodb": "^6.0.0",
+    "uuid": "^11.0.0"
+  }
+}

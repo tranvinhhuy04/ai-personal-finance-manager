@@ -2,7 +2,17 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck, Plus, CreditCard, AlertCircle } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
-import { mockSubscriptions } from '@/lib/mockData';
+
+interface Subscription {
+  id: string;
+  name: string;
+  amount: number;
+  nextBilling: string;
+  status: string;
+  category: string;
+}
+
+const subscriptions: Subscription[] = [];
 
 export const Subscriptions = () => {
   return (
@@ -25,16 +35,16 @@ export const Subscriptions = () => {
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-gradient-to-br from-emerald-700 via-emerald-800 to-teal-900 p-6 rounded-3xl text-white shadow-lg shadow-emerald-900/20">
             <h3 className="text-emerald-100 font-medium mb-2">Tổng chi phí hàng tháng</h3>
-            <p className="text-3xl font-bold mb-6">{formatVND(mockSubscriptions.reduce((acc, curr) => acc + curr.amount, 0))}</p>
+            <p className="text-3xl font-bold mb-6">{formatVND(subscriptions.reduce((acc, curr) => acc + curr.amount, 0))}</p>
             
             <div className="space-y-3">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-emerald-100">Đang hoạt động</span>
-                <span className="font-medium">{mockSubscriptions.filter(s => s.status === 'Đang hoạt động').length} dịch vụ</span>
+                <span className="font-medium">{subscriptions.filter(s => s.status === 'Đang hoạt động').length} dịch vụ</span>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-emerald-100">Sắp đến hạn</span>
-                <span className="font-medium">{mockSubscriptions.filter(s => s.status === 'Chờ thanh toán').length} dịch vụ</span>
+                <span className="font-medium">{subscriptions.filter(s => s.status === 'Chờ thanh toán').length} dịch vụ</span>
               </div>
             </div>
           </div>
@@ -63,7 +73,16 @@ export const Subscriptions = () => {
             <h2 className="text-lg font-bold text-gray-900">Danh sách dịch vụ</h2>
           </div>
           <div className="divide-y divide-gray-100">
-            {mockSubscriptions.map((sub) => (
+            {subscriptions.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
+                  <ShieldCheck className="w-7 h-7 text-gray-400" />
+                </div>
+                <p className="text-gray-500 font-medium">Chưa có dịch vụ đăng ký</p>
+                <p className="text-sm text-gray-400 mt-1">Thêm dịch vụ để theo dõi chi phí hàng tháng</p>
+              </div>
+            )}
+            {subscriptions.map((sub) => (
               <div key={sub.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">

@@ -33,7 +33,7 @@ export const UserMenuDropdown: React.FC<UserMenuDropdownProps> = ({ isOpen, onCl
             className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden"
           >
             <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-              <p className="text-sm font-semibold text-gray-900">{user?.name || user?.fullName || 'Người dùng'}</p>
+              <p className="text-sm font-semibold text-gray-900">{user?.name || 'Người dùng'}</p>
               <p className="text-xs text-gray-500 truncate">{user?.email || ''}</p>
             </div>
             <div className="p-2">
