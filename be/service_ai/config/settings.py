@@ -50,12 +50,18 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
+RABBITMQ_URL = os.environ.get('RABBITMQ_URL', 'amqp://guest:guest@localhost:5672/')
+
 # MongoDB Atlas
 MONGODB_URI = os.environ.get('MONGODB_URI')
 MONGODB_DBNAME = os.environ.get('MONGODB_DBNAME', 'transaction-service')
 
+
 # JWT Public Key for Identity Service
 IDENTITY_PUBLIC_KEY = os.environ.get('IDENTITY_PUBLIC_KEY')
+
+# OpenAI API Key
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

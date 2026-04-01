@@ -1,10 +1,11 @@
 from rest_framework import serializers
 
-class OCRRequestSerializer(serializers.Serializer):
-    image = serializers.CharField()  # base64 or URL
+class OCRUploadSerializer(serializers.Serializer):
+    image = serializers.ImageField()
 
-class OCRResponseSerializer(serializers.Serializer):
-    invoice_date = serializers.CharField()
-    total_amount = serializers.DecimalField(max_digits=18, decimal_places=2)
-    vendor = serializers.CharField()
-    category = serializers.CharField()
+    def validate_image(self, value):
+        if value.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError("Image size must be < 5MB.")
+        if value.content_type not in ["image/jpeg", "image/png"]:
+            raise serializers.ValidationError("Only JPG/PNG images are supported.")
+        return value
