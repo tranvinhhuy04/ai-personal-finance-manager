@@ -3,7 +3,7 @@ import amqp, { ChannelModel, Channel } from 'amqplib';
 let connection: ChannelModel | null = null;
 let channel: Channel | null = null;
 
-const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
+const RABBITMQ_URL = process.env.RABBITMQ_URL;
 
 // Exchange và Queue names
 export const EXCHANGES = {
@@ -24,6 +24,10 @@ export const ROUTING_KEYS = {
 };
 
 export async function connectRabbitMQ() {
+  if (!RABBITMQ_URL) {
+    throw new Error('Missing required env: RABBITMQ_URL');
+  }
+
   try {
     connection = await amqp.connect(RABBITMQ_URL);
     channel = await connection.createChannel();
@@ -64,6 +68,17 @@ export async function getChannel(): Promise<Channel> {
     throw new Error('RabbitMQ channel not initialized. Call connectRabbitMQ() first.');
   }
   return channel;
+}
+
+export async function publishMessage(
+  exchange: string,
+  routingKey: string,
+  payload: Record<string, unknown>
+) {
+  const ch = await getChannel();
+  return ch.publish(exchange, routingKey, Buffer.from(JSON.stringify(payload)), {
+    persistent: true,
+  });
 }
 
 export async function closeRabbitMQ() {

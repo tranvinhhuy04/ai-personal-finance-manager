@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/useAuthStore';
 
 // Derive auth base from the same VITE_API_URL used by apiClient, stripping trailing path
 const _apiRoot = (import.meta as unknown as { env: Record<string, string> }).env.VITE_API_URL ?? 'http://localhost:3000/api/v1';
-const AUTH_API_BASE = _apiRoot.replace(/\/api\/v\d+$/, '') + '/api/auth';
+const AUTH_API_BASE = _apiRoot.replace(/\/api\/v\d+$/, '') + '/api/v1/auth';
 
 type ApiUser = {
   id?: string;
@@ -74,6 +74,7 @@ export const Auth = () => {
         throw new Error('Đăng nhập thành công nhưng không nhận được token');
       }
       const mappedUser = normalizeUser(data.user);
+      persistAuth(token, data.user ?? null);
       setLogin(mappedUser, token);
       navigate('/dashboard');
     } catch (err: any) {
@@ -116,6 +117,11 @@ export const Auth = () => {
     setError('');
     setIsLoading(true);
     try {
+      persistAuth('mock-token', {
+        id: 'mock-id',
+        email: 'demo@example.com',
+        fullName: 'Demo User',
+      });
       setMockLogin();
       navigate('/dashboard');
     } finally {

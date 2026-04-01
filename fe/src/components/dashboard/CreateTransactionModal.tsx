@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useWalletStore, useTransactionStore } from '@/store/useFinanceStore';
-import { formatVND } from '@/lib/utils';
+import { formatCurrencyVND } from '@/utils/formatters';
 import { Wallet } from '@/store/useFinanceStore';
 
 interface CreateTransactionModalProps {
@@ -16,11 +16,12 @@ export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
   onClose,
 }) => {
   const { wallets, updateWalletBalance } = useWalletStore();
-  const { createTransaction, categories, fetchCategories, isLoading } =
+  const { createTransaction, categories, fetchCategories, isLoading, error: categoryError } =
     useTransactionStore();
 
   const [step, setStep] = useState<Step>(1);
   const [error, setError] = useState('');
+  const hasFetchedCategoriesRef = useRef(false);
   const [formData, setFormData] = useState({
     walletId: '',
     transactionType: 'EXPENSE' as 'INCOME' | 'EXPENSE',
@@ -30,10 +31,21 @@ export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
   });
 
   useEffect(() => {
-    if (isOpen && categories.length === 0) {
-      fetchCategories();
+    if (!isOpen || hasFetchedCategoriesRef.current || categories.length > 0) {
+      return;
     }
-  }, [isOpen, categories.length, fetchCategories]);
+
+    hasFetchedCategoriesRef.current = true;
+    const loadCategories = async () => {
+      try {
+        await fetchCategories();
+      } catch {
+        setError('Không tải được danh mục giao dịch');
+      }
+    };
+
+    void loadCategories();
+  }, [isOpen, categories.length]);
 
   const selectedWallet = wallets.find((w) => w.id === formData.walletId);
   const availableCategories = categories.filter(
@@ -196,7 +208,7 @@ export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
                   <option value="">-- Chọn ví --</option>
                   {wallets.map((wallet) => (
                     <option key={wallet.id} value={wallet.id}>
-                      {wallet.walletName} - {formatVND(parseFloat(wallet.balance))}
+                      {wallet.walletName} - {formatCurrencyVND(parseFloat(wallet.balance))}
                     </option>
                   ))}
                 </select>
@@ -208,7 +220,7 @@ export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
                     Số dư hiện tại
                   </p>
                   <p className="text-2xl font-bold text-emerald-700">
-                    {formatVND(parseFloat(selectedWallet.balance))}
+                    {formatCurrencyVND(parseFloat(selectedWallet.balance))}
                   </p>
                 </div>
               )}
@@ -271,8 +283,11 @@ export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
                   onChange={(e) =>
                     setFormData({ ...formData, categoryId: e.target.value })
                   }
+                  disabled={isLoading}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
                 >
+                  {isLoading && <option value="">Đang tải danh mục...</option>}
+                  {!isLoading && categoryError && <option value="">Lỗi tải danh mục</option>}
                   <option value="">-- Chọn danh mục --</option>
                   {availableCategories.map((category) => (
                     <option key={category.id} value={category.id}>
@@ -280,6 +295,9 @@ export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
                     </option>
                   ))}
                 </select>
+                {!isLoading && categoryError && (
+                  <p className="mt-2 text-xs text-red-600">{categoryError}</p>
+                )}
               </div>
 
               {/* Amount */}
@@ -357,7 +375,7 @@ export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
                 <div className="pt-3 border-t border-gray-200 flex justify-between">
                   <span className="text-gray-600 font-medium">Số tiền</span>
                   <span className="text-2xl font-bold text-emerald-600">
-                    {formatVND(parseFloat(formData.amount) || 0)}
+                    {formatCurrencyVND(parseFloat(formData.amount) || 0)}
                   </span>
                 </div>
               </div>

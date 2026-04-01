@@ -4,13 +4,14 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { connectDB } from './config/db';
 import { connectRabbitMQ } from './config/rabbitmq';
-import walletRoutes from './routes';
-import walletConsumer from './utils/WalletConsumer';
+import walletRoutes from './src/routes';
+import { errorHandler } from './src/middlewares/errorHandler';
+import walletConsumer from './src/messaging/wallet.consumer';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = Number(process.env.WALLET_PORT ?? process.env.PORT) || 3002;
 
 // Middleware
 app.use(cors());
@@ -23,13 +24,10 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/v1', walletRoutes);
+app.use('/api/v1/wallets', walletRoutes);
 
-// Error handling middleware
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ message: 'Internal server error' });
-});
+// Global error handler must be registered last.
+app.use(errorHandler);
 
 // Initialize and start server
 async function start() {
@@ -64,6 +62,14 @@ process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully...');
   await walletConsumer.stop();
   process.exit(0);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[wallet-service] Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[wallet-service] Uncaught Exception:', error);
 });
 
 start();

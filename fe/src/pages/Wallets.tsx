@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Edit, Trash2, Lock, Unlock } from 'lucide-react';
 import { useWalletStore } from '@/store/useFinanceStore';
@@ -7,13 +7,27 @@ import { CreateWalletModal } from '@/components/dashboard/CreateWalletModal';
 import { EditWalletModal } from '@/components/dashboard/EditWalletModal';
 
 export const Wallets = () => {
-  const { wallets, isLoading, fetchWallets } = useWalletStore();
+  const { wallets, isLoading, error, fetchWallets } = useWalletStore();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingWallet, setEditingWallet] = useState<string | null>(null);
+  const [isError, setIsError] = useState(false);
+  const didFetchRef = useRef(false);
 
   useEffect(() => {
-    fetchWallets();
-  }, [fetchWallets]);
+    if (didFetchRef.current) return;
+    didFetchRef.current = true;
+
+    const load = async () => {
+      try {
+        await fetchWallets();
+        setIsError(false);
+      } catch {
+        setIsError(true);
+      }
+    };
+
+    void load();
+  }, []);
 
   const getWalletTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
@@ -67,6 +81,11 @@ export const Wallets = () => {
         {isLoading ? (
           <div className="flex items-center justify-center h-40 text-gray-500">
             Đang tải dữ liệu ví...
+          </div>
+        ) : isError ? (
+          <div className="text-center py-12 bg-red-50 rounded-2xl border border-red-200">
+            <p className="text-red-700 font-medium">Không thể tải danh sách ví</p>
+            <p className="text-red-600 text-sm mt-2">{error ?? 'Vui lòng thử lại sau'}</p>
           </div>
         ) : wallets && wallets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

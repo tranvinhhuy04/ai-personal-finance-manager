@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertCircle, Loader2, X } from 'lucide-react';
 import { useWalletStore } from '@/store/useFinanceStore';
 import type { WalletType } from '@/types/finance';
+import { useVietQRBanks } from '@/hooks/useVietQRBanks';
 
 interface CreateWalletModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
   onClose,
 }) => {
   const { createWallet, isLoading } = useWalletStore();
+
   const [formData, setFormData] = useState<{
     walletType: WalletType;
     walletName: string;
@@ -23,6 +25,20 @@ export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
     spendingLimit: '',
   });
   const [error, setError] = useState('');
+  const [selectedBankCode, setSelectedBankCode] = useState('');
+  const [isBankDropdownOpen, setIsBankDropdownOpen] = useState(false);
+
+  const isCardWallet = formData.walletType === 'CARD';
+  const { banks, isLoading: isLoadingBanks, isError: isErrorBanks, refetch } = useVietQRBanks(isCardWallet);
+
+  const selectedBank = banks.find((bank) => bank.code === selectedBankCode) ?? null;
+
+  useEffect(() => {
+    if (!isCardWallet) {
+      setSelectedBankCode('');
+      setIsBankDropdownOpen(false);
+    }
+  }, [isCardWallet]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +46,11 @@ export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
 
     if (!formData.walletName.trim()) {
       setError('Vui lòng nhập tên ví');
+      return;
+    }
+
+    if (isCardWallet && !selectedBankCode) {
+      setError('Vui lòng chọn ngân hàng cho ví thẻ');
       return;
     }
 
@@ -84,9 +105,14 @@ export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
             </label>
             <select
               value={formData.walletType}
-              onChange={(e) =>
-                setFormData({ ...formData, walletType: e.target.value as WalletType })
-              }
+              onChange={(e) => {
+                const walletType = e.target.value as WalletType;
+                setFormData({
+                  ...formData,
+                  walletType,
+                  walletName: walletType === 'CARD' ? formData.walletName : '',
+                });
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
             >
               <option value="CARD">Thẻ ngân hàng</option>
@@ -95,6 +121,76 @@ export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
               <option value="CASH">Tiền mặt</option>
             </select>
           </div>
+
+          {isCardWallet && (
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ngân hàng <span className="text-red-500">*</span>
+              </label>
+
+              {isLoadingBanks && (
+                <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 flex items-center gap-2 text-gray-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">Đang tải danh sách ngân hàng...</span>
+                </div>
+              )}
+
+              {isErrorBanks && (
+                <div className="w-full p-3 border border-red-200 rounded-lg bg-red-50">
+                  <div className="flex items-center gap-2 text-red-700 text-sm mb-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Không tải được danh sách ngân hàng
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void refetch()}
+                    className="text-sm text-red-700 underline underline-offset-2"
+                  >
+                    Thử lại
+                  </button>
+                </div>
+              )}
+
+              {!isLoadingBanks && !isErrorBanks && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsBankDropdownOpen((prev) => !prev)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-left bg-white hover:border-emerald-400 transition-all"
+                  >
+                    {selectedBank ? (
+                      <span className="flex items-center gap-2">
+                        <img src={selectedBank.logo} alt={selectedBank.shortName} className="w-6 h-6 object-contain" />
+                        <span>{selectedBank.shortName}</span>
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">Chọn ngân hàng</span>
+                    )}
+                  </button>
+
+                  {isBankDropdownOpen && (
+                    <div className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                      {banks.map((bank) => (
+                        <button
+                          key={bank.code}
+                          type="button"
+                          onClick={() => {
+                            setSelectedBankCode(bank.code);
+                            setFormData((prev) => ({ ...prev, walletName: bank.shortName }));
+                            setIsBankDropdownOpen(false);
+                          }}
+                          className="w-full px-3 py-2 flex items-center gap-2 hover:bg-emerald-50 transition-colors"
+                        >
+                          <img src={bank.logo} alt={bank.shortName} className="w-6 h-6 object-contain" />
+                          <span className="text-sm text-gray-800">{bank.shortName}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* Wallet Name */}
           <div>
@@ -107,7 +203,7 @@ export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
               onChange={(e) =>
                 setFormData({ ...formData, walletName: e.target.value })
               }
-              placeholder="VD: Ví tiền lương, Ví tiết kiệm..."
+              placeholder={isCardWallet ? 'Tự động theo ngân hàng hoặc nhập tên riêng' : 'VD: Ví tiền lương, Ví tiết kiệm...'}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
             />
           </div>

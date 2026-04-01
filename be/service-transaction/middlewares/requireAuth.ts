@@ -1,9 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export default function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!JWT_SECRET) {
+    return res.status(500).json({ message: 'JWT_SECRET is not configured' });
+  }
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -11,10 +15,14 @@ export default function requireAuth(req: Request, res: Response, next: NextFunct
   }
 
   const token = authHeader.slice(7); // Remove 'Bearer ' prefix
+  console.log('Token received:', token);
 
   try {
     const decoded: any = jwt.verify(token, JWT_SECRET);
-    (req as any).userId = decoded.userId;
+    (req as any).userId = decoded?.sub ?? decoded?.userId;
+    if (!(req as any).userId) {
+      return res.status(401).json({ message: 'Invalid token payload' });
+    }
     next();
   } catch (err) {
     return res.status(401).json({ message: 'Invalid or expired token' });

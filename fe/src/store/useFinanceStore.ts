@@ -36,6 +36,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch wallets';
       set({ error: message, isLoading: false });
+      throw error;
     }
   },
 
@@ -109,6 +110,7 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch transactions';
       set({ error: message, isLoading: false });
+      throw error;
     }
   },
 
@@ -120,6 +122,7 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch categories';
       set({ error: message, isLoading: false });
+      throw error;
     }
   },
 

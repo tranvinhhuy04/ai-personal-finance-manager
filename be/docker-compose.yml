@@ -78,7 +78,12 @@ services:
       - .env
     environment:
       PORT: 3000
+      REDIS_HOST: redis-cache
+      REDIS_PORT: 6379
       REDIS_URL: redis://redis-cache:6379
+      IDENTITY_SERVICE_URL: http://service-identity:3001
+      WALLET_SERVICE_URL: http://service-wallet:3002
+      TRANSACTION_SERVICE_URL: http://service-transaction:3003
     networks:
       - fintech_net
 
@@ -115,6 +120,9 @@ services:
       - .env
     environment:
       NODE_ENV: development
+      WALLET_PORT: 3002
+      MONGO_URI_WALLET: ${MONGO_URI}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     networks:
       - fintech_net
 
@@ -134,6 +142,9 @@ services:
       - .env
     environment:
       NODE_ENV: development
+      TRANSACTION_PORT: 3003
+      MONGO_URI_TRANSACTION: ${MONGO_URI}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     networks:
       - fintech_net
 

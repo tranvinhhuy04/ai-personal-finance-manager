@@ -44,8 +44,8 @@ app.use(
   })
 );
 
-// Mount routes (proxy + auth)
-app.use('/api', routes);
+// Mount versioned API routes (proxy + auth)
+app.use('/api/v1', routes);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 

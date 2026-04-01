@@ -7,7 +7,8 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "dev": "ts-node-dev --respawn app.ts",
-    "test": "jest"
+    "test": "jest",
+    "seed:categories": "node src/seeds/seed.system.categories.js"
   },
   "keywords": [
     "transaction",

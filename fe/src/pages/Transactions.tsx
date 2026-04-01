@@ -2,16 +2,18 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Search, Filter, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { useTransactionStore, useWalletStore } from '@/store/useFinanceStore';
 import { CreateTransactionModal } from '@/components/dashboard/CreateTransactionModal';
 
 export const Transactions = () => {
-  const { transactions, categories, fetchTransactions, isLoading } =
+  const { transactions, categories, fetchTransactions, isLoading, error } =
     useTransactionStore();
   const { wallets } = useWalletStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isError, setIsError] = useState(false);
+  const didFetchRef = useRef(false);
   const [searchText, setSearchText] = useState('');
   const [filters, setFilters] = useState({
     walletId: '',
@@ -23,8 +25,20 @@ export const Transactions = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
+    if (didFetchRef.current) return;
+    didFetchRef.current = true;
+
+    const load = async () => {
+      try {
+        await fetchTransactions();
+        setIsError(false);
+      } catch {
+        setIsError(true);
+      }
+    };
+
+    void load();
+  }, []);
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> =
@@ -118,6 +132,15 @@ export const Transactions = () => {
             Ghi nhận giao dịch
           </button>
         </div>
+
+        {isError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+            <p className="text-red-700 text-sm font-medium">
+              Không thể tải lịch sử giao dịch
+            </p>
+            <p className="text-red-600 text-xs mt-1">{error ?? 'Vui lòng thử lại sau'}</p>
+          </div>
+        )}
 
         {/* Search & Filter Bar */}
         <div className="flex items-center gap-3">

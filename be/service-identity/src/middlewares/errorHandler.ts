@@ -15,6 +15,11 @@ import { AppError } from '../errors/AppError';
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function errorHandler(err: any, _req: Request, res: Response, _next: NextFunction): void {
+  if (err instanceof SyntaxError && 'body' in err) {
+    if (!res.headersSent) res.status(400).json({ message: 'Malformed JSON body' });
+    return;
+  }
+
   // Mongoose duplicate key (E11000)
   if (err?.code === 11000) {
     const field = Object.keys(err.keyValue ?? {})[0] ?? 'field';

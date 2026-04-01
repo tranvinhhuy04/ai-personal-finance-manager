@@ -4,14 +4,15 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { connectDB } from './config/db';
 import { connectRabbitMQ } from './config/rabbitmq';
-import transactionRoutes from './routes';
-import outboxPublisher from './services/OutboxPublisher';
-import transactionConsumer from './events/TransactionConsumer';
+import transactionRoutes from './src/routes';
+import { outboxPublisher } from './src/messaging/outbox.publisher';
+import transactionConsumer from './src/messaging/transaction.consumer';
+import { errorHandler } from './src/middlewares/errorHandler';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3003;
+const PORT = Number(process.env.TRANSACTION_PORT ?? process.env.PORT) || 3003;
 
 // Middleware
 app.use(cors());
@@ -24,13 +25,9 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/v1', transactionRoutes);
+app.use('/api/v1/transactions', transactionRoutes);
 
-// Error handling middleware
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ message: 'Internal server error' });
-});
+app.use(errorHandler);
 
 // Initialize and start server
 async function start() {
@@ -70,6 +67,14 @@ process.on('SIGINT', async () => {
   await outboxPublisher.stop();
   await transactionConsumer.stop();
   process.exit(0);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[transaction-service] Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[transaction-service] Uncaught Exception:', error);
 });
 
 start();

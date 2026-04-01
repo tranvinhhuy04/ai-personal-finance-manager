@@ -2,60 +2,51 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
-import { connectDB } from './config/db';
+import path from 'path';
 import routes from './routes';
+import { connectDB } from './config/db';
+import { AppError } from './src/errors/AppError';
 import { errorHandler } from './src/middlewares/errorHandler';
 
-// dotenv.config() is a no-op in Docker (vars already injected by compose env_file).
-// For local ts-node-dev it loads the .env file in this directory.
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
 const PORT = Number(process.env.IDENTITY_PORT) || 3001;
 
-// ── Middleware order matters ─────────────────────────────────────────────────
-// 1. CORS must be first so preflight OPTIONS requests succeed
-app.use(cors({ origin: '*' }));
-
-// 2. express.json() parses the request body.
-//    CRITICAL: this MUST be registered before the routes. Without it,
-//    req.body is undefined and login/register always fail silently.
+// Body parsers and CORS must be mounted before routes.
+app.use(cors());
 app.use(express.json());
-
-// 3. Request logger
 app.use(morgan('dev'));
 
-// ── Health check (no auth required) ─────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'identity' }));
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
-// ── Auth routes (mounted at '/' because the api-gateway already strips /api/auth)
-// e.g. POST /api/auth/login → proxied as POST /login to this service
+// Routes (used by api-gateway: /api/auth/* -> service-identity:3001/*)
 app.use('/', routes);
 
-// ── 404 fallback ─────────────────────────────────────────────────────────────
-app.use((_req, res) => {
-  res.status(404).json({ message: 'Route not found' });
+app.use((_req, _res, next) => {
+  next(new AppError('Route not found', 404));
 });
 
-// ── Global error handler ─────────────────────────────────────────────────────
-// MUST be the LAST middleware. MUST have exactly 4 parameters.
-// catchAsync in every route handler feeds errors here via next(err).
+// Global error handler must be the final middleware.
 app.use(errorHandler);
 
-// Surface any promise rejections that somehow escape route handlers
-process.on('unhandledRejection', (reason) => {
-  console.error('[identity-service] unhandledRejection:', reason);
-});
-
-async function start(): Promise<void> {
+async function start() {
   await connectDB();
   app.listen(PORT, () => {
-    console.log(`✓ service-identity running on port ${PORT}`);
+    console.log(`service-identity running on port ${PORT}`);
   });
 }
 
 start().catch((err) => {
-  console.error('✗ Failed to start service-identity', err);
+  console.error('Failed to start service-identity', err);
   process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[identity-service] Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[identity-service] Uncaught Exception:', error);
 });
 

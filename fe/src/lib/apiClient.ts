@@ -1,9 +1,3 @@
-/**
- * API Client for OripioFin Frontend
- * All requests go through API Gateway.
- * Set VITE_API_URL in .env to configure the gateway URL.
- */
-
 import type {
   Wallet,
   Category,
@@ -12,119 +6,130 @@ import type {
   CreateTransactionInput,
   CreateCategoryInput,
 } from '@/types/finance';
+import { axiosClient } from '@/utils/axiosClient';
 
-// Vite exposes custom env vars via import.meta.env.VITE_*
-// Set VITE_API_URL in .env to override the default gateway URL.
-const API_BASE_URL: string =
-  (import.meta as unknown as { env: Record<string, string> }).env.VITE_API_URL ??
-  'http://localhost:3000/api/v1';
-
-interface ApiRequestOptions extends RequestInit {
-  headers?: Record<string, string>;
-}
+type WalletApiResponse = Record<string, any>;
+type TransactionApiResponse = Record<string, any>;
+type CategoryApiResponse = Record<string, any>;
 
 class ApiClient {
-  private baseUrl: string;
-
-  constructor(baseUrl: string = API_BASE_URL) {
-    this.baseUrl = baseUrl;
+  private normalizeWallet(raw: WalletApiResponse): Wallet {
+    return {
+      id: raw.id,
+      userId: raw.userId ?? raw.user_id ?? '',
+      walletType: raw.walletType ?? raw.wallet_type,
+      walletName: raw.walletName ?? raw.wallet_name ?? raw.walletType ?? raw.wallet_type ?? 'Wallet',
+      balance: String(raw.balance ?? '0'),
+      spendingLimit: raw.spendingLimit ?? raw.spending_limit ?? null,
+      status: raw.status ?? 1,
+      version: raw.version ?? 0,
+      createdAt: raw.createdAt ?? new Date().toISOString(),
+      updatedAt: raw.updatedAt ?? new Date().toISOString(),
+    } as Wallet;
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: ApiRequestOptions = {}
-  ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...this.getAuthHeader(),
-      ...options.headers,
-    };
-
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({})) as { message?: string };
-      throw new Error(body.message ?? `API Error: ${response.status}`);
-    }
-
-    return response.json() as Promise<T>;
+  private normalizeTransaction(raw: TransactionApiResponse): Transaction {
+    return {
+      id: raw.id,
+      walletId: raw.walletId ?? raw.wallet_id,
+      userId: raw.userId ?? raw.user_id ?? '',
+      categoryId: raw.categoryId ?? raw.category_id ?? '',
+      transactionType: raw.transactionType ?? raw.transaction_type,
+      amount: String(raw.amount ?? '0'),
+      currency: raw.currency ?? 'VND',
+      status: raw.status ?? 'PENDING',
+      description: raw.description ?? '',
+      occurredAt: raw.occurredAt ?? raw.createdAt ?? new Date().toISOString(),
+      idempotencyKey: raw.idempotencyKey ?? raw.idempotency_key ?? '',
+      createdAt: raw.createdAt ?? new Date().toISOString(),
+    } as Transaction;
   }
 
-  private getAuthHeader(): Record<string, string> {
-    // Auth.tsx saves the JWT under 'accessToken' via localStorage.setItem('accessToken', token)
-    const token =
-      typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    return token ? { Authorization: `Bearer ${token}` } : {};
+  private normalizeCategory(raw: CategoryApiResponse): Category {
+    return {
+      id: raw.id ?? raw._id ?? '',
+      userId: raw.userId ?? raw.user_id ?? '',
+      name: raw.name ?? '',
+      categoryType: raw.categoryType ?? raw.category_type,
+      parentId: raw.parentId ?? raw.parent_id ?? null,
+      isSystem: Boolean(raw.isSystem ?? raw.is_system),
+      status: Number(raw.status ?? 1) as 0 | 1,
+      createdAt: raw.createdAt ?? new Date().toISOString(),
+    } as Category;
   }
 
   // ===== WALLET ENDPOINTS =====
-  
+
   async createWallet(data: CreateWalletInput): Promise<Wallet> {
-    return this.request<Wallet>('/wallets', {
-      method: 'POST',
-      body: JSON.stringify(data),
+    const response = await axiosClient.post('/api/v1/wallets', {
+      wallet_type: data.walletType,
+      wallet_name: data.walletName,
+      spending_limit: data.spendingLimit,
     });
+    return this.normalizeWallet(response.data);
   }
 
   async getWallets(): Promise<Wallet[]> {
-    return this.request<Wallet[]>('/wallets');
+    const response = await axiosClient.get('/api/v1/wallets');
+    return (response.data ?? []).map((item: WalletApiResponse) => this.normalizeWallet(item));
   }
 
   async getWallet(walletId: string): Promise<Wallet> {
-    return this.request<Wallet>(`/wallets/${walletId}`);
+    const response = await axiosClient.get(`/api/v1/wallets/${walletId}`);
+    return this.normalizeWallet(response.data);
   }
 
   async updateWalletStatus(walletId: string, status: number): Promise<Wallet> {
-    return this.request<Wallet>(`/wallets/${walletId}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
+    const response = await axiosClient.patch(`/api/v1/wallets/${walletId}/status`, { status });
+    return this.normalizeWallet(response.data);
   }
 
   async updateWalletSpendingLimit(walletId: string, spendingLimit: string): Promise<Wallet> {
-    return this.request<Wallet>(`/wallets/${walletId}/spending-limit`, {
-      method: 'PATCH',
-      body: JSON.stringify({ spendingLimit }),
+    const response = await axiosClient.patch(`/api/v1/wallets/${walletId}/spending-limit`, {
+      spendingLimit,
     });
+    return this.normalizeWallet(response.data);
   }
 
   async updateWallet(walletId: string, data: { status?: number; spendingLimit?: number | null }): Promise<Wallet> {
-    return this.request<Wallet>(`/wallets/${walletId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+    const response = await axiosClient.put(`/api/v1/wallets/${walletId}`, data);
+    return this.normalizeWallet(response.data);
   }
 
   // ===== TRANSACTION ENDPOINTS =====
 
   async createCategory(data: CreateCategoryInput): Promise<Category> {
-    return this.request<Category>('/categories', {
-      method: 'POST',
-      body: JSON.stringify(data),
+    const response = await axiosClient.post('/api/v1/categories', {
+      name: data.name,
+      category_type: data.categoryType,
+      parent_id: data.parentId ?? null,
     });
+    return this.normalizeCategory(response.data);
   }
 
   async getCategories(): Promise<Category[]> {
-    return this.request<Category[]>('/categories');
+    const response = await axiosClient.get('/api/v1/categories');
+    return (response.data ?? []).map((item: CategoryApiResponse) => this.normalizeCategory(item));
   }
 
   async createTransaction(data: CreateTransactionInput): Promise<Transaction> {
-    return this.request<Transaction>('/transactions', {
-      method: 'POST',
-      body: JSON.stringify(data),
+    const response = await axiosClient.post('/api/v1/transactions', {
+      wallet_id: data.walletId,
+      amount: data.amount,
+      transaction_type: data.transactionType,
+      idempotency_key: crypto.randomUUID(),
     });
+    return this.normalizeTransaction(response.data);
   }
 
   async getTransaction(transactionId: string): Promise<Transaction> {
-    return this.request<Transaction>(`/transactions/${transactionId}`);
+    const response = await axiosClient.get(`/api/v1/transactions/${transactionId}`);
+    return this.normalizeTransaction(response.data);
   }
 
   async getTransactions(limit: number = 50, skip: number = 0): Promise<Transaction[]> {
-    return this.request<Transaction[]>(`/transactions?limit=${limit}&skip=${skip}`);
+    const response = await axiosClient.get(`/api/v1/transactions?limit=${limit}&skip=${skip}`);
+    return (response.data ?? []).map((item: TransactionApiResponse) => this.normalizeTransaction(item));
   }
 
   async getWalletTransactions(
@@ -132,9 +137,10 @@ class ApiClient {
     limit: number = 50,
     skip: number = 0
   ): Promise<Transaction[]> {
-    return this.request<Transaction[]>(
-      `/wallets/${walletId}/transactions?limit=${limit}&skip=${skip}`
+    const response = await axiosClient.get(
+      `/api/v1/transactions/wallets/${walletId}/transactions?limit=${limit}&skip=${skip}`
     );
+    return (response.data ?? []).map((item: TransactionApiResponse) => this.normalizeTransaction(item));
   }
 }
 

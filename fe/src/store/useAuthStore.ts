@@ -34,7 +34,16 @@ export const useAuthStore = create<AuthState>()(
         token: 'mock-token',
         isAuthenticated: true,
       }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      logout: () => {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('token');
+          localStorage.removeItem('authUser');
+          localStorage.removeItem('auth-storage');
+        }
+
+        set({ user: null, token: null, isAuthenticated: false });
+      },
     }),
     {
       name: 'auth-storage',

@@ -16,6 +16,11 @@ const AppError_1 = require("../errors/AppError");
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function errorHandler(err, _req, res, _next) {
+    if (err instanceof SyntaxError && 'body' in err) {
+        if (!res.headersSent)
+            res.status(400).json({ message: 'Malformed JSON body' });
+        return;
+    }
     // Mongoose duplicate key (E11000)
     if (err?.code === 11000) {
         const field = Object.keys(err.keyValue ?? {})[0] ?? 'field';
