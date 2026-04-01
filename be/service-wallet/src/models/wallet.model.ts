@@ -6,8 +6,10 @@ export interface IWallet {
   _id: mongoose.Types.ObjectId;
   user_id: string;
   wallet_type: WalletType;
+  wallet_name: string;
   balance: mongoose.Types.Decimal128;
   spending_limit: mongoose.Types.Decimal128 | null;
+  status: number;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -26,6 +28,11 @@ const walletSchema = new Schema<IWallet>(
       required: true,
       index: true,
     },
+    wallet_name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     balance: {
       type: Schema.Types.Decimal128,
       required: true,
@@ -38,6 +45,11 @@ const walletSchema = new Schema<IWallet>(
     version: {
       type: Number,
       default: 0,
+      index: true,
+    },
+    status: {
+      type: Number,
+      default: 1,
       index: true,
     },
   },

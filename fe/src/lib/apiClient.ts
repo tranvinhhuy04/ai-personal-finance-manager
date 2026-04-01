@@ -80,7 +80,9 @@ class ApiClient {
   }
 
   async updateWalletStatus(walletId: string, status: number): Promise<Wallet> {
-    const response = await axiosClient.patch(`/api/v1/wallets/${walletId}/status`, { status });
+    const payload = { status: Number(status) };
+    console.log('[apiClient.updateWalletStatus] payload =', payload);
+    const response = await axiosClient.put(`/api/v1/wallets/${walletId}/status`, payload);
     return this.normalizeWallet(response.data);
   }
 
@@ -91,9 +93,51 @@ class ApiClient {
     return this.normalizeWallet(response.data);
   }
 
-  async updateWallet(walletId: string, data: { status?: number; spendingLimit?: number | null }): Promise<Wallet> {
-    const response = await axiosClient.put(`/api/v1/wallets/${walletId}`, data);
+  async updateWallet(
+    walletId: string,
+    data: { walletName?: string; spendingLimit?: number | null; status?: number }
+  ): Promise<Wallet> {
+    const payload: Record<string, unknown> = {};
+
+    if (data.walletName !== undefined) {
+      const walletName = String(data.walletName).trim();
+      if (walletName.length > 0) {
+        payload.wallet_name = walletName;
+      }
+    }
+
+    if (data.spendingLimit !== undefined) {
+      if (data.spendingLimit === null) {
+        payload.spending_limit = null;
+      } else if (Number.isFinite(Number(data.spendingLimit))) {
+        payload.spending_limit = Number(data.spendingLimit);
+      }
+    }
+
+    if (data.status !== undefined && Number.isFinite(Number(data.status))) {
+      payload.status = Number(data.status);
+    }
+
+    console.log('[apiClient.updateWallet] payload =', payload);
+
+    const response = await axiosClient.put(`/api/v1/wallets/${walletId}`, payload);
     return this.normalizeWallet(response.data);
+  }
+
+  async deleteWallet(walletId: string): Promise<void> {
+    await axiosClient.delete(`/api/v1/wallets/${walletId}`);
+  }
+
+  async hasWalletTransactions(walletId: string): Promise<boolean> {
+    const response = await axiosClient.get('/api/v1/transactions', {
+      params: {
+        wallet_id: walletId,
+        limit: 1,
+      },
+    });
+
+    const items = Array.isArray(response.data) ? response.data : [];
+    return items.length > 0;
   }
 
   // ===== TRANSACTION ENDPOINTS =====

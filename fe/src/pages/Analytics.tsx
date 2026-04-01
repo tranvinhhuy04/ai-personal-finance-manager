@@ -32,10 +32,10 @@ export const Analytics = () => {
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Biểu đồ phân bổ chi tiêu */}
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm min-w-0">
           <h2 className="text-lg font-bold text-gray-900 mb-6">Phân bổ chi tiêu</h2>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[300px] w-full min-w-0" style={{ width: '100%', height: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={240}>
               <PieChart>
                 <Pie
                   data={analyticsData}
@@ -62,10 +62,10 @@ export const Analytics = () => {
         </div>
 
         {/* Biểu đồ xu hướng tài sản */}
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm min-w-0">
           <h2 className="text-lg font-bold text-gray-900 mb-6">Xu hướng tài sản (6 tháng)</h2>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[300px] w-full min-w-0" style={{ width: '100%', height: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={240}>
               <LineChart data={trendData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 

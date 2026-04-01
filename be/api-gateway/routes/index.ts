@@ -10,6 +10,8 @@ const PROXY_TIMEOUT_MS = 10_000; // 10 seconds
 const IDENTITY_SERVICE_URL    = process.env.IDENTITY_SERVICE_URL    ?? 'http://service-identity:3001';
 const WALLET_SERVICE_URL      = process.env.WALLET_SERVICE_URL      ?? 'http://service-wallet:3002';
 const TRANSACTION_SERVICE_URL = process.env.TRANSACTION_SERVICE_URL ?? 'http://service-transaction:3003';
+const ANALYTICS_SERVICE_URL   = process.env.ANALYTICS_SERVICE_URL   ?? 'http://analytics-service:3004';
+const NOTIFY_SERVICE_URL      = process.env.NOTIFICATION_SERVICE_URL ?? 'http://notification-service:3005';
 
 /** Shared error handler — returns 504 when upstream is unreachable or times out */
 function onProxyError(err: Error, req: IncomingMessage, res: ServerResponse) {
@@ -47,6 +49,16 @@ function rewriteWalletPath(_path: string, req: IncomingMessage) {
 }
 
 function rewriteTransactionPath(_path: string, req: IncomingMessage) {
+  const originalUrl = (req as any).originalUrl as string | undefined;
+  return originalUrl ?? _path;
+}
+
+function rewriteAnalyticsPath(_path: string, req: IncomingMessage) {
+  const originalUrl = (req as any).originalUrl as string | undefined;
+  return originalUrl ?? _path;
+}
+
+function rewriteNotificationPath(_path: string, req: IncomingMessage) {
   const originalUrl = (req as any).originalUrl as string | undefined;
   return originalUrl ?? _path;
 }
@@ -93,6 +105,38 @@ router.use(
     changeOrigin: true,
     // Keep full path unchanged so downstream transaction-service handles /api/v1/transactions.
     pathRewrite: rewriteTransactionPath,
+    proxyTimeout: PROXY_TIMEOUT_MS,
+    timeout: PROXY_TIMEOUT_MS,
+    onProxyReq,
+    onProxyRes,
+    onError: onProxyError as any,
+  })
+);
+
+// /api/v1/analytics/* -> analytics-service (JWT required)
+router.use(
+  '/analytics',
+  verifyToken,
+  createProxyMiddleware({
+    target: ANALYTICS_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: rewriteAnalyticsPath,
+    proxyTimeout: PROXY_TIMEOUT_MS,
+    timeout: PROXY_TIMEOUT_MS,
+    onProxyReq,
+    onProxyRes,
+    onError: onProxyError as any,
+  })
+);
+
+// /api/v1/notifications/* -> notification-service (JWT required)
+router.use(
+  '/notifications',
+  verifyToken,
+  createProxyMiddleware({
+    target: NOTIFY_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: rewriteNotificationPath,
     proxyTimeout: PROXY_TIMEOUT_MS,
     timeout: PROXY_TIMEOUT_MS,
     onProxyReq,

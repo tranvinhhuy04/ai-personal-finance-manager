@@ -9,9 +9,17 @@ exports.registerHandler = (0, catchAsync_1.catchAsync)(async (req, res) => {
     return res.status(201).json(result);
 });
 exports.loginHandler = (0, catchAsync_1.catchAsync)(async (req, res) => {
-    const { email, password, twoFactorCode } = req.body ?? {};
-    const result = await (0, authService_1.login)({ email, password, twoFactorCode });
-    return res.status(200).json(result);
+    try {
+        const { email, password, twoFactorCode } = req.body ?? {};
+        const result = await (0, authService_1.login)({ email, password, twoFactorCode });
+        return res.status(200).json(result);
+    }
+    catch (err) {
+        if (err?.statusCode === 401) {
+            return res.status(401).json({ message: 'Sai email hoặc mật khẩu' });
+        }
+        throw err;
+    }
 });
 exports.login2FAHandler = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const { twoFactorToken, code } = req.body ?? {};

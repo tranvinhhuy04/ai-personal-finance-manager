@@ -74,6 +74,10 @@ services:
         condition: service_started
       service-transaction:
         condition: service_started
+      analytics-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
     env_file:
       - .env
     environment:
@@ -84,6 +88,8 @@ services:
       IDENTITY_SERVICE_URL: http://service-identity:3001
       WALLET_SERVICE_URL: http://service-wallet:3002
       TRANSACTION_SERVICE_URL: http://service-transaction:3003
+      ANALYTICS_SERVICE_URL: http://analytics-service:3004
+      NOTIFICATION_SERVICE_URL: http://notification-service:3005
     networks:
       - fintech_net
 
@@ -144,6 +150,50 @@ services:
       NODE_ENV: development
       TRANSACTION_PORT: 3003
       MONGO_URI_TRANSACTION: ${MONGO_URI}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    networks:
+      - fintech_net
+
+  # Analytics Service (Port 3004)
+  analytics-service:
+    build: ./analytics-service
+    container_name: analytics-service
+    restart: on-failure
+    ports:
+      - "3004:3004"
+    depends_on:
+      mongo-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      ANALYTICS_PORT: 3004
+      MONGO_URI_ANALYTICS: ${MONGO_URI}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    networks:
+      - fintech_net
+
+  # Notification Service (Port 3005)
+  notification-service:
+    build: ./notification-service
+    container_name: notification-service
+    restart: on-failure
+    ports:
+      - "3005:3005"
+    depends_on:
+      mongo-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      NOTIFICATION_PORT: 3005
+      MONGO_URI_NOTIFICATION: ${MONGO_URI}
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     networks:
       - fintech_net

@@ -30,7 +30,7 @@ export const CashFlow = ({ data }: { data: DashboardData['cashFlow'] }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.3 }}
-      className="bg-white p-6 rounded-3xl border border-gray-100 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.03)] h-full flex flex-col"
+      className="bg-white p-6 rounded-3xl border border-gray-100 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.03)] min-h-[360px] min-w-0 flex flex-col"
     >
       <div className="flex items-start justify-between mb-8">
         <div>
@@ -50,8 +50,8 @@ export const CashFlow = ({ data }: { data: DashboardData['cashFlow'] }) => {
         </div>
       </div>
 
-      <div className="flex-1 min-h-[240px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-72 w-full min-w-0" style={{ width: '100%', height: '288px' }}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={240}>
           <BarChart data={data.data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }} barSize={36}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
             <XAxis 

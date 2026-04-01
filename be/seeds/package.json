@@ -5,12 +5,15 @@
   "main": "seed.js",
   "type": "commonjs",
   "scripts": {
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "seed:phase3": "node seed-phase3.js"
   },
   "dependencies": {
+    "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.0.0",
     "mongodb": "^6.0.0",
+    "mongoose": "^8.19.1",
     "uuid": "^11.0.0"
   }
 }

@@ -5,7 +5,13 @@ import { IWallet, WalletModel, WalletType } from '../models/wallet.model';
 type CreateWalletInput = {
   user_id: string;
   wallet_type: WalletType;
+  wallet_name: string;
   spending_limit?: string;
+};
+
+type UpdateWalletInput = {
+  wallet_name?: string;
+  spending_limit?: string | null;
 };
 
 type ApplyTransactionInput = {
@@ -26,15 +32,20 @@ export class WalletService {
   async createWallet(input: CreateWalletInput) {
     if (!input.user_id) throw new AppError('user_id is required', 400);
     if (!input.wallet_type) throw new AppError('wallet_type is required', 400);
+    if (!input.wallet_name || !input.wallet_name.trim()) {
+      throw new AppError('wallet_name is required', 400);
+    }
 
     const wallet = await WalletModel.create({
       user_id: input.user_id,
       wallet_type: input.wallet_type,
+      wallet_name: input.wallet_name.trim(),
       balance: mongoose.Types.Decimal128.fromString('0'),
       spending_limit: input.spending_limit
         ? mongoose.Types.Decimal128.fromString(String(parsePositiveDecimal(input.spending_limit, 'spending_limit')))
         : null,
       version: 0,
+      status: 1,
     });
 
     return this.toResponse(wallet);
@@ -44,6 +55,58 @@ export class WalletService {
     if (!userId) throw new AppError('user_id is required', 400);
     const wallets = await WalletModel.find({ user_id: userId }).sort({ createdAt: -1 }).lean();
     return wallets.map((w) => this.toResponse(w));
+  }
+
+  async updateWalletById(walletId: string, userId: string, payload: UpdateWalletInput) {
+    if (!mongoose.Types.ObjectId.isValid(walletId)) throw new AppError('wallet_id is invalid', 400);
+    if (!userId) throw new AppError('user_id is required', 400);
+
+    const wallet = await WalletModel.findOne({ _id: walletId, user_id: userId });
+    if (!wallet) throw new AppError('Wallet not found', 404);
+
+    if (payload.wallet_name !== undefined) {
+      const walletName = String(payload.wallet_name).trim();
+      if (!walletName) throw new AppError('wallet_name cannot be empty', 400);
+      wallet.wallet_name = walletName;
+    }
+
+    if (payload.spending_limit !== undefined) {
+      if (payload.spending_limit === null || payload.spending_limit === '') {
+        wallet.spending_limit = null;
+      } else {
+        wallet.spending_limit = mongoose.Types.Decimal128.fromString(
+          String(parsePositiveDecimal(payload.spending_limit, 'spending_limit'))
+        );
+      }
+    }
+
+    await wallet.save();
+    return this.toResponse(wallet);
+  }
+
+  async updateWalletStatus(walletId: string, userId: string, status: number) {
+    if (!mongoose.Types.ObjectId.isValid(walletId)) throw new AppError('wallet_id is invalid', 400);
+    if (!userId) throw new AppError('user_id is required', 400);
+    if (![0, 1, 2].includes(status)) throw new AppError('status must be 0, 1 or 2', 400);
+
+    const wallet = await WalletModel.findOneAndUpdate(
+      { _id: walletId, user_id: userId },
+      { $set: { status } },
+      { new: true }
+    ).lean();
+
+    if (!wallet) throw new AppError('Wallet not found', 404);
+    return this.toResponse(wallet);
+  }
+
+  async deleteWallet(walletId: string, userId: string) {
+    if (!mongoose.Types.ObjectId.isValid(walletId)) throw new AppError('wallet_id is invalid', 400);
+    if (!userId) throw new AppError('user_id is required', 400);
+
+    const deleted = await WalletModel.findOneAndDelete({ _id: walletId, user_id: userId }).lean();
+    if (!deleted) throw new AppError('Wallet not found', 404);
+
+    return { success: true };
   }
 
   async applyTransactionWithOptimisticLock(input: ApplyTransactionInput) {
@@ -92,8 +155,10 @@ export class WalletService {
       id: wallet._id.toString(),
       user_id: wallet.user_id,
       wallet_type: wallet.wallet_type,
+      wallet_name: wallet.wallet_name,
       balance: wallet.balance?.toString?.() ?? '0',
       spending_limit: wallet.spending_limit?.toString?.() ?? null,
+      status: wallet.status ?? 1,
       version: wallet.version,
       createdAt: wallet.createdAt,
       updatedAt: wallet.updatedAt,

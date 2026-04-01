@@ -11,7 +11,7 @@ import { MyWallet } from './components/dashboard/MyWallet';
 import { CashFlow } from './components/dashboard/CashFlow';
 import { useDashboardData } from './hooks/useDashboardData';
 import { SmartAIPage } from './pages/SmartAIPage';
-import { Analytics } from './pages/Analytics';
+import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
 import { Invoices } from './pages/Invoices';
 import { Recurring } from './pages/Recurring';
@@ -54,7 +54,7 @@ export default function App() {
                   <Route path="/" element={<DashboardHome />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/wallets" element={<Wallets />} />
-                  <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/analytics" element={<Dashboard />} />
                   <Route path="/transactions" element={<Transactions />} />
                   <Route path="/invoices" element={<Invoices />} />
                   <Route path="/recurring" element={<Recurring />} />

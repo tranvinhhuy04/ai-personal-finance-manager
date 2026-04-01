@@ -14,7 +14,7 @@ const AppError_1 = require("./src/errors/AppError");
 const errorHandler_1 = require("./src/middlewares/errorHandler");
 dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../.env') });
 const app = (0, express_1.default)();
-const PORT = Number(process.env.IDENTITY_PORT ?? process.env.PORT) || 3001;
+const PORT = Number(process.env.IDENTITY_PORT) || 3001;
 // Body parsers and CORS must be mounted before routes.
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());

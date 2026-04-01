@@ -19,9 +19,16 @@ export const registerHandler = catchAsync(async (req: Request, res: Response) =>
 });
 
 export const loginHandler = catchAsync(async (req: Request, res: Response) => {
-  const { email, password, twoFactorCode } = req.body ?? {};
-  const result = await login({ email, password, twoFactorCode });
-  return res.status(200).json(result);
+  try {
+    const { email, password, twoFactorCode } = req.body ?? {};
+    const result = await login({ email, password, twoFactorCode });
+    return res.status(200).json(result);
+  } catch (err: any) {
+    if (err?.statusCode === 401) {
+      return res.status(401).json({ message: 'Sai email hoặc mật khẩu' });
+    }
+    throw err;
+  }
 });
 
 export const login2FAHandler = catchAsync(async (req: Request, res: Response) => {

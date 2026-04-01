@@ -24,10 +24,12 @@ export const createTransaction = catchAsync(async (req: Request, res: Response) 
 export const listTransactions = catchAsync(async (req: Request, res: Response) => {
   const limit = Number.parseInt(String(req.query.limit ?? '50'), 10);
   const skip = Number.parseInt(String(req.query.skip ?? '0'), 10);
+  const walletId = req.query.wallet_id ? String(req.query.wallet_id) : undefined;
 
   const data = await transactionService.listTransactions(
     Number.isNaN(limit) ? 50 : limit,
-    Number.isNaN(skip) ? 0 : skip
+    Number.isNaN(skip) ? 0 : skip,
+    walletId
   );
 
   return res.status(200).json(data);

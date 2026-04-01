@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, HelpCircle, Mail, Bell, Share2, ChevronRight, Menu, UserCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, HelpCircle, Mail, Share2, ChevronRight, Menu, UserCircle } from 'lucide-react';
 import { motion } from 'motion/react';
-import { NotificationDropdown } from './NotificationDropdown';
+import { NotificationBell } from './NotificationBell';
 import { UserMenuDropdown } from './UserMenuDropdown';
 import { ShareModal } from './ShareModal';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -11,7 +11,6 @@ interface HeaderProps {
 }
 
 export const Header = ({ onMenuClick }: HeaderProps) => {
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const user = useAuthStore((s) => s.user);
@@ -55,16 +54,7 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
           <button className="hidden sm:block p-2.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all border border-gray-200 bg-white">
             <Mail className="w-4 h-4" />
           </button>
-          <div className="relative">
-            <button 
-              onClick={() => setIsNotifOpen(!isNotifOpen)}
-              className="p-2.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all border border-gray-200 bg-white relative"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-2 right-2.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white"></span>
-            </button>
-            <NotificationDropdown isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} />
-          </div>
+          <NotificationBell />
         </div>
 
         <div className="h-8 w-px bg-gray-200 mx-1 hidden sm:block"></div>

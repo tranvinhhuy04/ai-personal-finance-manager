@@ -64,8 +64,10 @@ class TransactionService {
     await TransactionModel.findByIdAndUpdate(transactionId, { status: 'FAILED' });
   }
 
-  async listTransactions(limit = 50, skip = 0) {
-    const items = await TransactionModel.find({})
+  async listTransactions(limit = 50, skip = 0, walletId?: string) {
+    const filter = walletId ? { wallet_id: walletId } : {};
+
+    const items = await TransactionModel.find(filter)
       .sort({ createdAt: -1 })
       .limit(Math.min(limit, 200))
       .skip(skip)

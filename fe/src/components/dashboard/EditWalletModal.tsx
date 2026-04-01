@@ -39,10 +39,14 @@ export const EditWalletModal: React.FC<EditWalletModalProps> = ({
 
     try {
       setIsLoading(true);
-      await apiClient.updateWallet(walletId, {
+      const payload = {
         status,
         spendingLimit: spendingLimit ? parseFloat(spendingLimit) : null,
-      });
+      };
+
+      console.log('[EditWalletModal.handleSubmit] payload =', payload);
+
+      await apiClient.updateWallet(walletId, payload);
 
       onClose();
     } catch (err) {
