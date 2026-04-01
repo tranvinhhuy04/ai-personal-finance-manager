@@ -1,0 +1,19 @@
+  # AI Service (Django, Port 8000)
+  service_ai:
+    build: ./service_ai
+    container_name: service_ai
+    restart: on-failure
+    ports:
+      - "8000:8000"
+    depends_on:
+      mongo-db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: settings
+      MONGODB_URI: ${MONGO_URI}
+      MONGODB_DBNAME: transaction-service
+      IDENTITY_PUBLIC_KEY: ${IDENTITY_PUBLIC_KEY}
+    networks:
+      - fintech_net

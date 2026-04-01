@@ -86,6 +86,12 @@ services:
       TRANSACTION_SERVICE_URL: http://service-transaction:3003
     networks:
       - fintech_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
 
   # Identity Service (Port 3001)
   service-identity:
@@ -103,6 +109,12 @@ services:
       NODE_ENV: development
     networks:
       - fintech_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
 
   # Wallet Service (Port 3002)
   service-wallet:
@@ -125,6 +137,12 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     networks:
       - fintech_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
 
   # Transaction Service (Port 3003)
   service-transaction:
@@ -147,7 +165,66 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     networks:
       - fintech_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
 
+  # AI Service (Django, Port 3004)
+  service_ai:
+    build: ./service_ai
+    container_name: service_ai
+    restart: on-failure
+    ports:
+      - "3004:3004"
+    depends_on:
+      mongo-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      MONGODB_URI: ${MONGO_URI}
+      MONGODB_DBNAME: transaction-service
+      IDENTITY_PUBLIC_KEY: ${IDENTITY_PUBLIC_KEY}
+    networks:
+      - fintech_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+
+  setup-complete:
+    image: busybox
+    container_name: setup-complete
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      service-identity:
+        condition: service_healthy
+      service-wallet:
+        condition: service_healthy
+      service-transaction:
+        condition: service_healthy
+      service_ai:
+        condition: service_healthy
+    command: >
+      sh -c "echo '------------------------------------------------------' &&
+             echo '✅ [FINTECH SYSTEM] ALL MICROSERVICES DEPLOYED!' &&
+             echo '🔗 Gateway: http://localhost:3000' &&
+              echo '👤 Identity Service: http://localhost:3001' &&
+              echo '💼 Wallet Service: http://localhost:3002' &&
+              echo '💰 Transaction Service: http://localhost:3003' &&
+             echo '🤖 AI Service: http://localhost:3004' &&
+             echo '------------------------------------------------------'"
+    networks:
+      - fintech_net
 volumes:
   mongodata:
   rabbitmqdata:
