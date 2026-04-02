@@ -9,6 +9,9 @@ import type {
   UpdateInvoiceInput,
   ConfirmInvoiceInput,
   AnalyticsDashboardResponse,
+  RecurringRule,
+  CreateRecurringRuleInput,
+  UpdateRecurringRuleInput,
 } from '@/types/finance';
 import { axiosClient } from '@/utils/axiosClient';
 
@@ -17,6 +20,7 @@ type TransactionApiResponse = Record<string, any>;
 type CategoryApiResponse = Record<string, any>;
 type InvoiceApiResponse = Record<string, any>;
 type AnalyticsApiResponse = Record<string, any>;
+type RecurringRuleApiResponse = Record<string, any>;
 
 class ApiClient {
   private normalizeWallet(raw: WalletApiResponse): Wallet {
@@ -62,6 +66,26 @@ class ApiClient {
       status: Number(raw.status ?? 1) as 0 | 1,
       createdAt: raw.createdAt ?? new Date().toISOString(),
     } as Category;
+  }
+
+  private normalizeRecurringRule(raw: RecurringRuleApiResponse): RecurringRule {
+    return {
+      id: String(raw.id ?? raw._id ?? ''),
+      userId: String(raw.userId ?? raw.user_id ?? ''),
+      walletId: String(raw.walletId ?? raw.wallet_id ?? ''),
+      categoryId: raw.categoryId ?? raw.category_id ?? null,
+      transactionType: raw.transactionType ?? raw.transaction_type ?? 'EXPENSE',
+      amount: Number(raw.amount ?? 0),
+      currency: String(raw.currency ?? 'VND'),
+      frequency: raw.frequency ?? 'MONTHLY',
+      dayOfWeek: raw.dayOfWeek ?? raw.day_of_week ?? null,
+      dayOfMonth: raw.dayOfMonth ?? raw.day_of_month ?? null,
+      status: raw.status ?? 'ACTIVE',
+      note: String(raw.note ?? ''),
+      lastRunOn: raw.lastRunOn ?? raw.last_run_on ?? null,
+      createdAt: raw.createdAt ?? new Date().toISOString(),
+      updatedAt: raw.updatedAt ?? new Date().toISOString(),
+    } as RecurringRule;
   }
 
   private normalizeInvoice(raw: InvoiceApiResponse): Invoice {
@@ -278,6 +302,54 @@ class ApiClient {
       params: { wallet_id: walletId, limit, skip },
     });
     return (response.data ?? []).map((item: TransactionApiResponse) => this.normalizeTransaction(item));
+  }
+
+  async getRecurringRules(): Promise<RecurringRule[]> {
+    const response = await axiosClient.get('/api/v1/transactions/recurring-rules');
+    return (response.data ?? []).map((item: RecurringRuleApiResponse) => this.normalizeRecurringRule(item));
+  }
+
+  async createRecurringRule(data: CreateRecurringRuleInput): Promise<RecurringRule> {
+    const response = await axiosClient.post('/api/v1/transactions/recurring-rules', {
+      wallet_id: data.walletId,
+      category_id: data.categoryId,
+      transaction_type: data.transactionType,
+      amount: Number(data.amount),
+      currency: data.currency ?? 'VND',
+      frequency: data.frequency,
+      day_of_week: data.dayOfWeek ?? null,
+      day_of_month: data.dayOfMonth ?? null,
+      status: data.status ?? 'ACTIVE',
+      note: data.note ?? '',
+    });
+
+    return this.normalizeRecurringRule(response.data);
+  }
+
+  async updateRecurringRule(ruleId: string, data: UpdateRecurringRuleInput): Promise<RecurringRule> {
+    const payload: Record<string, unknown> = {};
+
+    if (data.walletId !== undefined) payload.wallet_id = data.walletId;
+    if (data.categoryId !== undefined) payload.category_id = data.categoryId;
+    if (data.transactionType !== undefined) payload.transaction_type = data.transactionType;
+    if (data.amount !== undefined) payload.amount = Number(data.amount);
+    if (data.currency !== undefined) payload.currency = data.currency;
+    if (data.frequency !== undefined) payload.frequency = data.frequency;
+    if (data.dayOfWeek !== undefined) payload.day_of_week = data.dayOfWeek;
+    if (data.dayOfMonth !== undefined) payload.day_of_month = data.dayOfMonth;
+    if (data.status !== undefined) payload.status = data.status;
+    if (data.note !== undefined) payload.note = data.note;
+
+    const response = await axiosClient.put(`/api/v1/transactions/recurring-rules/${ruleId}`, payload);
+    return this.normalizeRecurringRule(response.data);
+  }
+
+  async deleteRecurringRule(ruleId: string): Promise<{ success: boolean; id: string }> {
+    const response = await axiosClient.delete(`/api/v1/transactions/recurring-rules/${ruleId}`);
+    return {
+      success: Boolean(response.data?.success),
+      id: String(response.data?.id ?? ruleId),
+    };
   }
 
   async getAnalyticsDashboard(filters?: { month?: string; walletId?: string }): Promise<AnalyticsDashboardResponse> {

@@ -9,6 +9,12 @@ import {
   updateInvoice,
   uploadInvoice,
 } from '../controllers/invoice.controller';
+import {
+  createRecurringRule,
+  deleteRecurringRule,
+  listRecurringRules,
+  updateRecurringRule,
+} from '../controllers/recurring-rule.controller';
 import { uploadInvoiceImage } from '../middlewares/upload.middleware';
 
 const router = Router();
@@ -24,6 +30,11 @@ router.get('/transactions/categories', listCategories);
 router.post('/transactions/categories', createCategory);
 router.put('/transactions/categories/:id', updateCategory);
 router.delete('/transactions/categories/:id', deleteCategory);
+
+router.get('/transactions/recurring-rules', listRecurringRules);
+router.post('/transactions/recurring-rules', createRecurringRule);
+router.put('/transactions/recurring-rules/:id', updateRecurringRule);
+router.delete('/transactions/recurring-rules/:id', deleteRecurringRule);
 
 router.post('/transactions', createTransaction);
 router.get('/transactions', listTransactions);

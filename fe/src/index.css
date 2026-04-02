@@ -1,6 +1,28 @@
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: rgb(248 250 252);
+  color: rgb(15 23 42);
+  transition: background-color 220ms ease, color 220ms ease;
+}
+
+html.dark body {
+  background-color: rgb(2 6 23);
+  color: rgb(226 232 240);
 }

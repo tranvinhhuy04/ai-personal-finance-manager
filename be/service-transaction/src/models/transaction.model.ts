@@ -10,7 +10,7 @@ export interface ITransaction {
   currency: string;
   description: string | null;
   occurred_at: Date;
-  source: 'MANUAL' | 'INVOICE_CONFIRMATION';
+  source: 'MANUAL' | 'INVOICE_CONFIRMATION' | 'RECURRING';
   status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REVERSED';
   idempotency_key: string;
   createdAt: Date;
@@ -60,7 +60,7 @@ const transactionSchema = new Schema<ITransaction>(
     },
     source: {
       type: String,
-      enum: ['MANUAL', 'INVOICE_CONFIRMATION'],
+      enum: ['MANUAL', 'INVOICE_CONFIRMATION', 'RECURRING'],
       default: 'MANUAL',
     },
     status: {

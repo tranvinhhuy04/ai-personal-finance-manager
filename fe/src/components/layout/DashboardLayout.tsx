@@ -12,7 +12,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] font-sans text-gray-900 flex">
+    <div className="flex min-h-screen bg-[#f8fafc] font-sans text-gray-900 dark:bg-slate-950 dark:text-slate-100">
       {/* Mobile Overlay */}
       <AnimatePresence>
         {isMobileSidebarOpen && (
@@ -30,7 +30,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       
       <div className="flex-1 md:ml-64 flex flex-col min-h-screen w-full">
         <Header onMenuClick={() => setIsMobileSidebarOpen(true)} />
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full">
+        <main className="flex-1 w-full overflow-y-auto p-4 md:p-8 dark:bg-slate-950">
           <div className="max-w-7xl mx-auto w-full">
             {children}
           </div>

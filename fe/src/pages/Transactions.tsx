@@ -24,6 +24,7 @@ export const Transactions = () => {
     dateTo: '',
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
 
   useEffect(() => {
     if (didFetchRef.current) return;
@@ -45,23 +46,23 @@ export const Transactions = () => {
     const badges: Record<string, { bg: string; text: string; label: string }> =
       {
         COMPLETED: {
-          bg: 'bg-emerald-100',
-          text: 'text-emerald-800',
+          bg: 'bg-emerald-100 dark:bg-emerald-950/40',
+          text: 'text-emerald-800 dark:text-emerald-300',
           label: 'Thành công',
         },
         PENDING: {
-          bg: 'bg-yellow-100',
-          text: 'text-yellow-800',
+          bg: 'bg-yellow-100 dark:bg-amber-950/40',
+          text: 'text-yellow-800 dark:text-amber-300',
           label: 'Đang xử lý',
         },
         FAILED: {
-          bg: 'bg-red-100',
-          text: 'text-red-800',
+          bg: 'bg-red-100 dark:bg-red-950/40',
+          text: 'text-red-800 dark:text-red-300',
           label: 'Thất bại',
         },
         REVERSED: {
-          bg: 'bg-gray-100',
-          text: 'text-gray-800',
+          bg: 'bg-gray-100 dark:bg-slate-800',
+          text: 'text-gray-800 dark:text-slate-200',
           label: 'Đã hoàn',
         },
       };
@@ -75,6 +76,21 @@ export const Transactions = () => {
       </span>
     );
   };
+
+  const copyTransactionId = async (transactionId: string) => {
+    try {
+      await navigator.clipboard.writeText(transactionId);
+      setCopiedTxId(transactionId);
+      window.setTimeout(() => {
+        setCopiedTxId((current) => (current === transactionId ? null : current));
+      }, 1600);
+    } catch (error) {
+      console.error('Failed to copy transaction id', error);
+    }
+  };
+
+  const formatTransactionCode = (transactionId: string) =>
+    `TX-${String(transactionId).slice(-6).toUpperCase()}`;
 
   const filteredTransactions = transactions.filter((tx) => {
     if (
@@ -122,20 +138,20 @@ export const Transactions = () => {
         className="space-y-6"
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
             Giao dịch
           </h1>
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => setIsCategoryModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors shadow-sm"
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
             >
               <Settings2 className="w-5 h-5" />
               Quản lý danh mục
             </button>
             <button
               onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-colors shadow-sm"
+              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
             >
               <Plus className="w-5 h-5" />
               Ghi nhận giao dịch
@@ -144,7 +160,7 @@ export const Transactions = () => {
         </div>
 
         {isError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900/60 dark:bg-red-950/40">
             <p className="text-red-700 text-sm font-medium">
               Không thể tải lịch sử giao dịch
             </p>
@@ -161,12 +177,12 @@ export const Transactions = () => {
               placeholder="Tìm kiếm giao dịch..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700 transition-all"
+              className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm text-gray-900 transition-all focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
+            className="flex items-center gap-2 whitespace-nowrap rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
           >
             <Filter className="w-4 h-4" />
             Lọc
@@ -179,7 +195,7 @@ export const Transactions = () => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3"
+            className="space-y-3 rounded-2xl border border-gray-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Wallet Filter */}
@@ -286,7 +302,7 @@ export const Transactions = () => {
                   dateTo: '',
                 })
               }
-              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+              className="text-xs font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
             >
               Xóa bộ lọc
             </button>
@@ -294,16 +310,16 @@ export const Transactions = () => {
         )}
 
         {/* Transaction Table */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
           {isLoading ? (
-            <div className="flex items-center justify-center h-40 text-gray-500">
+            <div className="flex h-40 items-center justify-center text-gray-500 dark:text-slate-300">
               Đang tải giao dịch...
             </div>
           ) : filteredTransactions && filteredTransactions.length > 0 ? (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-gray-50/50 border-b border-gray-100 text-gray-500 font-medium">
+                  <thead className="border-b border-gray-100 bg-gray-50/50 font-medium text-gray-500 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-300">
                     <tr>
                       <th className="px-6 py-4">Mã GD</th>
                       <th className="px-6 py-4">Ngày</th>
@@ -313,31 +329,43 @@ export const Transactions = () => {
                       <th className="px-6 py-4">Trạng thái</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                     {filteredTransactions.map((tx) => {
                       const category = categories.find(
                         (c) => c.id === tx.categoryId
                       );
                       return (
-                        <tr key={tx.id} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="px-6 py-4 font-medium text-gray-900">
-                            {tx.id.substring(0, 8)}...
+                        <tr key={tx.id} className="transition-colors hover:bg-gray-50/50 dark:hover:bg-slate-800/60">
+                          <td className="px-6 py-4">
+                            <button
+                              type="button"
+                              onClick={() => void copyTransactionId(tx.id)}
+                              title={`Nhấp để sao chép toàn bộ ID: ${tx.id}`}
+                              className="inline-flex flex-col items-start rounded-lg border border-transparent px-2 py-1 text-left transition hover:border-emerald-200 hover:bg-emerald-50 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/30"
+                            >
+                              <span className="font-semibold tracking-[0.18em] text-gray-900 dark:text-white">
+                                {formatTransactionCode(tx.id)}
+                              </span>
+                              <span className="text-[11px] text-gray-500 dark:text-slate-400">
+                                {copiedTxId === tx.id ? 'Đã sao chép ID đầy đủ' : 'Bấm để copy ID'}
+                              </span>
+                            </button>
                           </td>
-                          <td className="px-6 py-4 text-gray-500">
+                          <td className="px-6 py-4 text-gray-500 dark:text-slate-300">
                             {new Date(tx.occurredAt).toLocaleDateString('vi-VN')}
                           </td>
-                          <td className="px-6 py-4 font-medium text-gray-900">
+                          <td className="px-6 py-4 font-medium text-gray-900 dark:text-slate-100">
                             {tx.description || '(Không có mô tả)'}
                           </td>
-                          <td className="px-6 py-4 text-gray-500">
+                          <td className="px-6 py-4 text-gray-500 dark:text-slate-300">
                             {category?.name}
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div
                               className={`flex items-center justify-end gap-1 font-medium ${
                                 tx.transactionType === 'INCOME'
-                                  ? 'text-green-600'
-                                  : 'text-red-600'
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : 'text-red-600 dark:text-red-400'
                               }`}
                             >
                               {tx.transactionType === 'INCOME' ? (
@@ -357,12 +385,12 @@ export const Transactions = () => {
                   </tbody>
                 </table>
               </div>
-              <div className="px-6 py-4 border-t border-gray-100 text-sm text-gray-500">
+              <div className="border-t border-gray-100 px-6 py-4 text-sm text-gray-500 dark:border-slate-800 dark:text-slate-300">
                 Hiển thị {filteredTransactions.length} giao dịch
               </div>
             </>
           ) : (
-            <div className="text-center py-12 text-gray-500">
+            <div className="py-12 text-center text-gray-500 dark:text-slate-300">
               Không có giao dịch nào
             </div>
           )}

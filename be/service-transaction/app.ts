@@ -8,6 +8,7 @@ import { connectRabbitMQ } from './src/config/rabbitmq';
 import transactionRoutes from './src/routes';
 import { outboxPublisher } from './src/messaging/outbox.publisher';
 import transactionConsumer from './src/messaging/transaction.consumer';
+import { recurringTransactionsJob } from './src/jobs/recurring-transactions.job';
 import { errorHandler } from './src/middlewares/errorHandler';
 
 dotenv.config();
@@ -48,6 +49,9 @@ async function start() {
     // Start consuming wallet response events
     await transactionConsumer.start();
 
+    // Start recurring transaction scheduler
+    recurringTransactionsJob.start();
+
     // Start Express server
     app.listen(PORT, () => {
       console.log(`✓ Transaction Service running on port ${PORT}`);
@@ -63,6 +67,7 @@ process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully...');
   await outboxPublisher.stop();
   await transactionConsumer.stop();
+  recurringTransactionsJob.stop();
   process.exit(0);
 });
 
@@ -70,6 +75,7 @@ process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully...');
   await outboxPublisher.stop();
   await transactionConsumer.stop();
+  recurringTransactionsJob.stop();
   process.exit(0);
 });
 

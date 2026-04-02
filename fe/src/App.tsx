@@ -27,7 +27,7 @@ function DashboardHome() {
   const { data, isLoading } = useDashboardData();
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] text-emerald-800 font-medium">Đang tải dữ liệu...</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-[#f8fafc] font-medium text-emerald-800 dark:bg-slate-950 dark:text-emerald-300">Đang tải dữ liệu...</div>;
   }
 
   return (

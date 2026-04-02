@@ -24,14 +24,14 @@ const NavItem = ({ icon: Icon, label, to, badge, isActive, onClick }: NavItemPro
       to={to}
       onClick={onClick}
       className={cn(
-        'flex items-center justify-between w-full px-4 py-3 rounded-xl transition-all duration-200 group',
+        'group flex w-full items-center justify-between rounded-xl px-4 py-3 transition-all duration-200',
         isActive
-          ? 'bg-gradient-to-br from-gray-800 via-gray-900 to-black border border-gray-700 shadow-[0_0_15px_rgba(255,255,255,0.05)] text-white'
-          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
+          ? 'border border-gray-700 bg-gradient-to-br from-gray-800 via-gray-900 to-black text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] dark:border-emerald-800/60 dark:from-emerald-700 dark:via-emerald-800 dark:to-slate-950'
+          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
       )}
     >
       <div className="flex items-center gap-3">
-        <Icon className={cn('w-5 h-5', isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600')} />
+        <Icon className={cn('w-5 h-5', isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600 dark:text-slate-400 dark:group-hover:text-slate-200')} />
         <span className="font-medium text-sm">{label}</span>
       </div>
       {badge !== undefined && (
@@ -68,7 +68,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
     <>
       <aside 
         className={cn(
-          "w-64 h-screen bg-white border-r border-gray-100 flex flex-col fixed left-0 top-0 overflow-y-auto z-50 transition-transform duration-300 ease-in-out",
+          "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col overflow-y-auto border-r border-gray-100 bg-white transition-transform duration-300 ease-in-out dark:border-slate-800 dark:bg-slate-950",
           isOpen ? "translate-x-0" : "-translate-x-full",
           "md:translate-x-0"
         )}
@@ -81,7 +81,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="white" fillOpacity="0.5" />
             </svg>
           </div>
-          <span className="text-xl font-bold text-gray-900 tracking-tight">OripioFin</span>
+          <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">OripioFin</span>
         </div>
 
         {/* Search */}
@@ -91,7 +91,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             <input
               type="text"
               placeholder="Tìm kiếm"
-              className="w-full pl-9 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700 transition-all"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-10 text-sm transition-all focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
             />
             <div className="absolute right-3 flex items-center gap-1">
               <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-sans font-medium text-gray-400 bg-white border border-gray-200 rounded-md">⌘</kbd>

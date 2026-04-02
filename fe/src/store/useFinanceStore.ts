@@ -4,10 +4,17 @@
 
 import { create } from 'zustand';
 import { apiClient } from '@/lib/apiClient';
-import type { Wallet, Category, Transaction } from '@/types/finance';
+import type {
+  Wallet,
+  Category,
+  Transaction,
+  RecurringRule,
+  CreateRecurringRuleInput,
+  UpdateRecurringRuleInput,
+} from '@/types/finance';
 
 // Re-export so existing component imports from '@/store/useFinanceStore' keep working
-export type { Wallet, Category, Transaction } from '@/types/finance';
+export type { Wallet, Category, Transaction, RecurringRule } from '@/types/finance';
 
 export interface WalletStore {
   wallets: Wallet[];
@@ -213,5 +220,80 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
 
   refreshTransactions: async () => {
     await get().fetchTransactions();
+  },
+}));
+
+export interface RecurringStore {
+  recurringRules: RecurringRule[];
+  isLoading: boolean;
+  error: string | null;
+  fetchRecurringRules: () => Promise<void>;
+  createRecurringRule: (data: CreateRecurringRuleInput) => Promise<RecurringRule>;
+  updateRecurringRule: (ruleId: string, data: UpdateRecurringRuleInput) => Promise<RecurringRule>;
+  deleteRecurringRule: (ruleId: string) => Promise<void>;
+}
+
+export const useRecurringStore = create<RecurringStore>((set) => ({
+  recurringRules: [],
+  isLoading: false,
+  error: null,
+
+  fetchRecurringRules: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const recurringRules = await apiClient.getRecurringRules();
+      set({ recurringRules: recurringRules || [], isLoading: false });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch recurring rules';
+      set({ error: message, isLoading: false });
+      throw error;
+    }
+  },
+
+  createRecurringRule: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const created = await apiClient.createRecurringRule(data);
+      set((state) => ({
+        recurringRules: [created, ...state.recurringRules],
+        isLoading: false,
+      }));
+      return created;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create recurring rule';
+      set({ error: message, isLoading: false });
+      throw error;
+    }
+  },
+
+  updateRecurringRule: async (ruleId, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updated = await apiClient.updateRecurringRule(ruleId, data);
+      set((state) => ({
+        recurringRules: state.recurringRules.map((item) => (item.id === ruleId ? updated : item)),
+        isLoading: false,
+      }));
+      return updated;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update recurring rule';
+      set({ error: message, isLoading: false });
+      throw error;
+    }
+  },
+
+  deleteRecurringRule: async (ruleId) => {
+    set({ isLoading: true, error: null });
+    try {
+      await apiClient.deleteRecurringRule(ruleId);
+      set((state) => ({
+        recurringRules: state.recurringRules.filter((item) => item.id !== ruleId),
+        isLoading: false,
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete recurring rule';
+      set({ error: message, isLoading: false });
+      throw error;
+    }
   },
 }));

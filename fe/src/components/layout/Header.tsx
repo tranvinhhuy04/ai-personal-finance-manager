@@ -20,7 +20,7 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, delay: 0.1 }}
-      className="h-20 px-4 md:px-8 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10"
+      className="sticky top-0 z-10 flex h-20 items-center justify-between border-b border-transparent bg-white/70 px-4 backdrop-blur-sm md:px-8 dark:border-slate-800 dark:bg-slate-950/80"
     >
       {/* Breadcrumbs & Mobile Menu */}
       <div className="flex items-center gap-4">

@@ -26,7 +26,7 @@ export type CreateTransactionRecordInput = {
   currency?: string;
   description?: string;
   occurred_at?: Date;
-  source?: 'MANUAL' | 'INVOICE_CONFIRMATION';
+  source?: 'MANUAL' | 'INVOICE_CONFIRMATION' | 'RECURRING';
   idempotency_key: string;
   session?: mongoose.ClientSession;
 };

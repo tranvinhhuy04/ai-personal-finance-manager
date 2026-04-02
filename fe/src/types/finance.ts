@@ -49,9 +49,30 @@ export interface Transaction {
   status: TransactionStatus;
   description?: string;
   occurredAt: string;
-  source?: 'MANUAL' | 'INVOICE_CONFIRMATION';
+  source?: 'MANUAL' | 'INVOICE_CONFIRMATION' | 'RECURRING';
   idempotencyKey: string;
   createdAt: string;
+}
+
+export type RecurringFrequency = 'WEEKLY' | 'MONTHLY';
+export type RecurringRuleStatus = 'ACTIVE' | 'PAUSED';
+
+export interface RecurringRule {
+  id: string;
+  userId: string;
+  walletId: string;
+  categoryId: string | null;
+  transactionType: TransactionDirection;
+  amount: number;
+  currency: string;
+  frequency: RecurringFrequency;
+  dayOfWeek: number | null;
+  dayOfMonth: number | null;
+  status: RecurringRuleStatus;
+  note: string;
+  lastRunOn?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
@@ -137,6 +158,21 @@ export interface CreateCategoryInput {
   categoryType: TransactionDirection;
   parentId?: string | null;
 }
+
+export interface CreateRecurringRuleInput {
+  walletId: string;
+  categoryId: string | null;
+  transactionType: TransactionDirection;
+  amount: number | string;
+  currency?: string;
+  frequency: RecurringFrequency;
+  dayOfWeek?: number | null;
+  dayOfMonth?: number | null;
+  status?: RecurringRuleStatus;
+  note?: string;
+}
+
+export interface UpdateRecurringRuleInput extends Partial<CreateRecurringRuleInput> {}
 
 export interface UpdateInvoiceInput {
   imageUrl?: string;
