@@ -179,7 +179,6 @@ service-transaction/
   walletType: 'CARD|MOMO|ZALOPAY|CASH',
   walletName: String,
   balance: Decimal,            // >= 0
-  spendingLimit: Decimal|null, // > 0 or null
   status: 1|0|2,              // indexed
   version: Number,             // optimistic locking
   createdAt: Date,
@@ -261,13 +260,13 @@ Authorization: Bearer <token>
 {
   "walletType": "CARD",
   "walletName": "My Card",
-  "spendingLimit": "5000000"
+  "balance": "5000000"
 }
 
 Response (201):
 {
   "id": "...",
-  "balance": "0",
+  "balance": "5000000",
   "status": 1,
   "version": 0,
   ...

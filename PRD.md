@@ -23,7 +23,7 @@ OripioFin được xây dựng để giải quyết các vấn đề cốt lõi 
 - **Nhu cầu chính:**
   - Quản lý chi tiêu hàng tháng theo danh mục.
   - Nhập giao dịch nhanh, thao tác tối giản.
-  - Cảnh báo khi gần vượt hạn mức chi tiêu.
+  - Nhận thông báo khi số dư ví biến động đáng chú ý.
 - **Nỗi đau (Pain Points):**
   - Không biết chính xác mình đã chi bao nhiêu trong từng nhóm nhu cầu.
   - Dữ liệu rời rạc, khó đối soát cuối tháng.
@@ -51,7 +51,7 @@ Hệ thống phải hỗ trợ tạo và quản lý các loại ví:
 Khả năng chính:
 - Tạo/sửa/đóng băng ví.
 - Gán nhãn ví theo mục đích (Cá nhân, Gia đình, Công việc).
-- Theo dõi số dư, hạn mức và trạng thái ví theo thời gian thực.
+- Theo dõi số dư và trạng thái ví theo thời gian thực.
 
 ### 3.2 Theo dõi dòng tiền (Thu/Chi)
 - Tạo giao dịch thu/chi theo ví cụ thể.
@@ -86,7 +86,7 @@ Khả năng chính:
 4. Là một người dùng, tôi muốn xem báo cáo thu/chi theo tháng để hiểu xu hướng tài chính của bản thân.
 5. Là một người dùng, tôi muốn chụp hóa đơn và để AI tự động trích xuất dữ liệu giao dịch để giảm nhập liệu thủ công.
 6. Là một người dùng, tôi muốn hỏi trợ lý AI bằng ngôn ngữ tự nhiên để tra cứu số liệu tài chính nhanh chóng.
-7. Là một người dùng, tôi muốn nhận cảnh báo khi sắp vượt hạn mức ví để chủ động kiểm soát chi tiêu.
+7. Là một người dùng, tôi muốn nhận thông báo khi ví có biến động quan trọng để chủ động kiểm soát tài chính.
 
 ## 6. Tiêu chí thành công (KPIs)
 1. **MAU Growth:** Tăng trưởng người dùng hoạt động hàng tháng tối thiểu 15% theo quý trong 2 quý đầu sau phát hành.

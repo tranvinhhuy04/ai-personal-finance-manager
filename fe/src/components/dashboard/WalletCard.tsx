@@ -76,7 +76,7 @@ export const WalletCard: React.FC<{ data: WalletCurrency }> = ({ data }) => {
         <h3 className="text-xl font-bold text-gray-900 tracking-tight">
           {formatVND(amount)}
         </h3>
-        <p className="text-xs text-gray-500 mt-1">Hạn mức {limit}</p>
+        <p className="text-xs text-gray-500 mt-1">Số dư khả dụng</p>
       </div>
 
       <div className="flex items-center">

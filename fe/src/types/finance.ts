@@ -13,7 +13,6 @@ export interface Wallet {
   walletType: WalletType;
   walletName: string;
   balance: string;
-  spendingLimit: string | null;
   status: 0 | 1 | 2;
   version: number;
   createdAt: string;
@@ -120,7 +119,7 @@ export interface Invoice {
 export interface CreateWalletInput {
   walletType: WalletType;
   walletName: string;
-  spendingLimit?: string;
+  balance?: string;
 }
 
 export interface CreateTransactionInput {

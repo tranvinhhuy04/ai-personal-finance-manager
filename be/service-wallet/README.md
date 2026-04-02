@@ -19,7 +19,6 @@ Collection: wallets
 ├── walletType: String (CARD|MOMO|ZALOPAY|CASH) (indexed)
 ├── walletName: String
 ├── balance: Decimal128
-├── spendingLimit: Decimal128 (optional)
 ├── status: Number (1: Active, 0: Inactive, 2: Blocked) (indexed)
 ├── version: Number (for optimistic locking)
 ├── createdAt: Date
@@ -90,7 +89,7 @@ Authorization: Bearer <token>
 {
   "walletType": "CARD",
   "walletName": "My First Card",
-  "spendingLimit": "5000000"  # VND
+  "balance": "5000000"
 }
 
 Response:
@@ -99,8 +98,7 @@ Response:
   "userId": "user123",
   "walletType": "CARD",
   "walletName": "My First Card",
-  "balance": "0",
-  "spendingLimit": "5000000",
+  "balance": "5000000",
   "status": 1,
   "version": 0,
   "createdAt": "2024-03-31T...",
@@ -132,13 +130,15 @@ Authorization: Bearer <token>
 }
 ```
 
-**Update Spending Limit**
+**Update Wallet Balance / Info**
 ```bash
-PATCH /api/v1/wallets/:walletId/spending-limit
+PUT /api/v1/wallets/:walletId
 Authorization: Bearer <token>
 
 {
-  "spendingLimit": "10000000"
+  "wallet_name": "Ví chính",
+  "balance": 10000000,
+  "status": 1
 }
 ```
 
@@ -240,7 +240,7 @@ curl -X POST http://localhost:3002/api/v1/wallets \
   -d '{
     "walletType": "CARD",
     "walletName": "Test Wallet",
-    "spendingLimit": "1000000"
+    "balance": "1000000"
   }'
 ```
 

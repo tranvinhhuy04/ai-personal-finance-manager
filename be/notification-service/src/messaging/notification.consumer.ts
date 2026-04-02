@@ -1,6 +1,5 @@
 import { ConsumeMessage } from 'amqplib';
 import { getChannel, QUEUES } from '../../config/rabbitmq';
-import { notificationService } from '../services/notification.service';
 import { WalletBalanceUpdatedEvent } from '../../types/events';
 
 class NotificationConsumer {
@@ -30,14 +29,6 @@ class NotificationConsumer {
         channel.ack(msg);
         return;
       }
-
-      await notificationService.createThresholdAlert({
-        userId: event.userId,
-        walletId: event.walletId,
-        walletName: event.walletName,
-        newBalance: Number(event.newBalance),
-        spendingLimit: event.spendingLimit,
-      });
 
       channel.ack(msg);
     } catch (error) {

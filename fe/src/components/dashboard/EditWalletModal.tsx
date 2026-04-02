@@ -12,19 +12,17 @@ export const EditWalletModal: React.FC<EditWalletModalProps> = ({
   walletId,
   onClose,
 }) => {
-  const { wallets } = useWalletStore();
+  const { wallets, refreshWallets } = useWalletStore();
   const wallet = wallets.find((w) => w.id === walletId);
   const [status, setStatus] = useState<number>(wallet?.status || 1);
-  const [spendingLimit, setSpendingLimit] = useState(
-    wallet?.spendingLimit?.toString() || ''
-  );
+  const [balance, setBalance] = useState(wallet?.balance?.toString() || '0');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (wallet) {
       setStatus(wallet.status);
-      setSpendingLimit(wallet.spendingLimit?.toString() || '');
+      setBalance(wallet.balance?.toString() || '0');
     }
   }, [wallet]);
 
@@ -32,8 +30,8 @@ export const EditWalletModal: React.FC<EditWalletModalProps> = ({
     e.preventDefault();
     setError('');
 
-    if (spendingLimit && isNaN(parseFloat(spendingLimit))) {
-      setError('Hạn mức chi tiêu phải là số');
+    if (balance && (isNaN(parseFloat(balance)) || parseFloat(balance) < 0)) {
+      setError('Số dư ban đầu phải là số không âm');
       return;
     }
 
@@ -41,13 +39,13 @@ export const EditWalletModal: React.FC<EditWalletModalProps> = ({
       setIsLoading(true);
       const payload = {
         status,
-        spendingLimit: spendingLimit ? parseFloat(spendingLimit) : null,
+        balance: balance ? parseFloat(balance) : 0,
       };
 
       console.log('[EditWalletModal.handleSubmit] payload =', payload);
 
       await apiClient.updateWallet(walletId, payload);
-
+      await refreshWallets();
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi khi cập nhật ví');
@@ -105,19 +103,18 @@ export const EditWalletModal: React.FC<EditWalletModalProps> = ({
             </p>
           </div>
 
-          {/* Spending Limit */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Hạn mức chi tiêu
+              Số dư ban đầu
             </label>
             <input
               type="number"
-              value={spendingLimit}
-              onChange={(e) => setSpendingLimit(e.target.value)}
-              placeholder="Để trống nếu không có giới hạn"
+              value={balance}
+              onChange={(e) => setBalance(e.target.value)}
+              placeholder="VD: 5000000"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
               min="0"
-              step="100000"
+              step="1000"
             />
           </div>
 

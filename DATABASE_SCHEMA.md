@@ -65,7 +65,6 @@ Mỗi microservice sở hữu database MongoDB riêng biệt trên MongoDB Atlas
 | wallet_type    | String          | Index     | NOT NULL              | CARD/MOMO/ZALOPAY/CASH             |
 | wallet_name    | String          |           | NOT NULL              | Tên hiển thị ví                |
 | balance        | Decimal128      |           | NOT NULL, default 0   | Số dư hiện tại                 |
-| spending_limit | Decimal128      |           | NULL                  | Hạn mức chi tiêu                |
 | status         | Number (1/0/2)  | Index     | NOT NULL, default 1   | 1: Active, 0: Inactive, 2: Blocked |
 | version        | NumberLong      |           | NOT NULL, default 0   | Version để optimistic locking    |
 | created_at     | Date            |           | NOT NULL, default now | Thời điểm tạo                  |
@@ -74,7 +73,6 @@ Mỗi microservice sở hữu database MongoDB riêng biệt trên MongoDB Atlas
 #### Ràng buộc nghiệp vụ (application logic)
 
 - balance >= 0 nếu không hỗ trợ thấu chi.
-- spending_limit > 0 nếu có giá trị.
 
 #### Chỉ mục đề xuất
 

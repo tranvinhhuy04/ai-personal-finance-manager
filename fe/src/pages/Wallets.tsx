@@ -1,13 +1,105 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Edit, Trash2, Lock, Unlock } from 'lucide-react';
+import { CreditCard, Edit, Landmark, Lock, Plus, Trash2, Unlock, Wallet as WalletIcon } from 'lucide-react';
 import { useWalletStore } from '@/store/useFinanceStore';
-import { formatVND } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { CreateWalletModal } from '@/components/dashboard/CreateWalletModal';
 import { EditWalletModal } from '@/components/dashboard/EditWalletModal';
+import { useVietQRBanks, type VietQRBank } from '@/hooks/useVietQRBanks';
+
+function getWalletLogo(walletType: string, walletName: string, banks: VietQRBank[] = []) {
+  const normalizedType = (walletType || '').toLowerCase();
+  const normalizedName = (walletName || '').toLowerCase();
+
+  if (normalizedType.includes('momo') || normalizedName.includes('momo')) {
+    return '/image/momo-logo.png';
+  }
+
+  if (normalizedType.includes('zalo') || normalizedName.includes('zalopay') || normalizedName.includes('zalo pay')) {
+    return '/image/zalopay-png.png';
+  }
+
+  if (normalizedType.includes('cash') || normalizedName.includes('tiền mặt') || normalizedName.includes('tien mat')) {
+    return '/image/cash-logo.png';
+  }
+
+  if (normalizedType.includes('card') || normalizedType.includes('bank')) {
+    const matchedBank = banks.find((bank) => {
+      const bankName = bank.name.toLowerCase();
+      const shortName = bank.shortName.toLowerCase();
+      const bankCode = bank.code.toLowerCase();
+
+      return normalizedName.includes(bankName) || normalizedName.includes(shortName) || normalizedName.includes(bankCode);
+    });
+
+    return matchedBank?.logo ?? null;
+  }
+
+  return null;
+}
+
+function getWalletStyle(type: string) {
+  const styles: Record<string, { card: string; badge: string; glow: string }> = {
+    CARD: {
+      card: 'border-sky-200/80 bg-gradient-to-br from-sky-50 via-white to-blue-50',
+      badge: 'border-sky-200 bg-sky-50 text-sky-700',
+      glow: 'from-sky-400/25 via-blue-300/10 to-transparent',
+    },
+    MOMO: {
+      card: 'border-fuchsia-200/80 bg-gradient-to-br from-fuchsia-50 via-white to-pink-50',
+      badge: 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700',
+      glow: 'from-fuchsia-400/25 via-pink-300/10 to-transparent',
+    },
+    ZALOPAY: {
+      card: 'border-cyan-200/80 bg-gradient-to-br from-cyan-50 via-white to-blue-50',
+      badge: 'border-cyan-200 bg-cyan-50 text-cyan-700',
+      glow: 'from-cyan-400/25 via-blue-300/10 to-transparent',
+    },
+    CASH: {
+      card: 'border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50',
+      badge: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      glow: 'from-emerald-400/25 via-teal-300/10 to-transparent',
+    },
+  };
+
+  return styles[type] ?? {
+    card: 'border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100',
+    badge: 'border-slate-200 bg-slate-50 text-slate-700',
+    glow: 'from-slate-400/20 via-slate-300/10 to-transparent',
+  };
+}
+
+function getWalletTypeLabel(type: string) {
+  const labels: Record<string, string> = {
+    CARD: 'Ngân hàng',
+    MOMO: 'MoMo',
+    ZALOPAY: 'ZaloPay',
+    CASH: 'Tiền mặt',
+  };
+  return labels[type] || type;
+}
+
+function getStatusBadge(status: number) {
+  if (status === 1) {
+    return <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">Hoạt động</span>;
+  }
+
+  if (status === 2) {
+    return <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">Khóa</span>;
+  }
+
+  return <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">Vô hiệu</span>;
+}
+
+function renderFallbackIcon(type: string) {
+  if (type === 'CARD') return <CreditCard className="h-5 w-5 text-sky-700" />;
+  if (type === 'CASH') return <Landmark className="h-5 w-5 text-emerald-700" />;
+  return <WalletIcon className="h-5 w-5 text-slate-700" />;
+}
 
 export const Wallets = () => {
   const { wallets, isLoading, error, fetchWallets } = useWalletStore();
+  const { banks } = useVietQRBanks(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingWallet, setEditingWallet] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
@@ -27,167 +119,119 @@ export const Wallets = () => {
     };
 
     void load();
-  }, []);
-
-  const getWalletTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      CARD: 'Thẻ ngân hàng',
-      MOMO: 'MoMo',
-      ZALOPAY: 'Zalo Pay',
-      CASH: 'Tiền mặt',
-    };
-    return labels[type] || type;
-  };
-
-  const getWalletTypeColor = (type: string) => {
-    const colors: Record<string, string> = {
-      CARD: 'bg-blue-50 border-blue-200 text-blue-700',
-      MOMO: 'bg-red-50 border-red-200 text-red-700',
-      ZALOPAY: 'bg-cyan-50 border-cyan-200 text-cyan-700',
-      CASH: 'bg-green-50 border-green-200 text-green-700',
-    };
-    return colors[type] || 'bg-gray-50 border-gray-200 text-gray-700';
-  };
-
-  const getStatusBadge = (status: number) => {
-    if (status === 1) {
-      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Hoạt động</span>;
-    } else if (status === 2) {
-      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Khóa</span>;
-    } else {
-      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Vô hiệu</span>;
-    }
-  };
+  }, [fetchWallets]);
 
   return (
     <>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.45 }}
         className="space-y-6"
       >
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Ví của tôi</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Ví của tôi</h1>
+            <p className="mt-1 text-sm text-slate-500">Quản lý số dư ví và trạng thái sử dụng một cách trực quan.</p>
+          </div>
+
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 font-medium text-white shadow-sm transition-colors hover:bg-emerald-700"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="h-5 w-5" />
             Thêm ví mới
           </button>
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center h-40 text-gray-500">
+          <div className="flex h-40 items-center justify-center rounded-2xl border border-slate-100 bg-white text-slate-500 shadow-sm">
             Đang tải dữ liệu ví...
           </div>
         ) : isError ? (
-          <div className="text-center py-12 bg-red-50 rounded-2xl border border-red-200">
-            <p className="text-red-700 font-medium">Không thể tải danh sách ví</p>
-            <p className="text-red-600 text-sm mt-2">{error ?? 'Vui lòng thử lại sau'}</p>
+          <div className="rounded-2xl border border-red-200 bg-red-50 py-12 text-center">
+            <p className="font-medium text-red-700">Không thể tải danh sách ví</p>
+            <p className="mt-2 text-sm text-red-600">{error ?? 'Vui lòng thử lại sau'}</p>
           </div>
         ) : wallets && wallets.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {wallets.map((wallet) => (
-              <motion.div
-                key={wallet.id}
-                whileHover={{ y: -4 }}
-                className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-all"
-              >
-                <div className="space-y-4">
-                  {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">{wallet.walletName}</h3>
-                      <p className={`text-xs font-medium mt-1 px-2 py-1 rounded-md border ${getWalletTypeColor(wallet.walletType)}`}>
-                        {getWalletTypeLabel(wallet.walletType)}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {wallets.map((wallet) => {
+              const style = getWalletStyle(wallet.walletType);
+              const logo = getWalletLogo(wallet.walletType, wallet.walletName, banks);
+
+              return (
+                <motion.div
+                  key={wallet.id}
+                  whileHover={{ y: -6, scale: 1.01 }}
+                  transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+                  className={cn(
+                    'relative overflow-hidden rounded-[28px] border p-5 shadow-[0_18px_50px_-32px_rgba(15,23,42,0.35)] transition-all hover:shadow-[0_26px_60px_-32px_rgba(15,23,42,0.38)]',
+                    style.card,
+                  )}
+                >
+                  <div className={cn('pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-gradient-to-br blur-2xl', style.glow)} />
+
+                  <div className="relative space-y-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-sm backdrop-blur-sm">
+                          {logo ? (
+                            <img src={logo} alt={wallet.walletName} className="h-8 w-8 object-contain" />
+                          ) : (
+                            renderFallbackIcon(wallet.walletType)
+                          )}
+                        </div>
+
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900">{wallet.walletName}</h3>
+                          <p className={cn('mt-1 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold', style.badge)}>
+                            {getWalletTypeLabel(wallet.walletType)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setEditingWallet(wallet.id)}
+                          className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-white/70 hover:text-sky-600"
+                          title="Sửa ví"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-white/70 hover:text-red-600"
+                          title="Xóa ví"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-5 text-center shadow-sm backdrop-blur-sm">
+                      <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Số dư ví</p>
+                      <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 md:text-[32px]">
+                        {formatCurrency(parseFloat(wallet.balance))}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setEditingWallet(wallet.id)}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Sửa ví"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Xóa ví"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
 
-                  {/* Balance */}
-                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-100">
-                    <p className="text-xs text-emerald-600 font-medium mb-1">Số dư</p>
-                    <p className="text-2xl font-bold text-emerald-700">
-                      {formatVND(parseFloat(wallet.balance))}
-                    </p>
-                  </div>
-
-                  {/* Spending Limit */}
-                  {wallet.spendingLimit && (
-                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs text-blue-600 font-medium mb-1">Hạn mức chi tiêu</p>
-                          <p className="text-lg font-bold text-blue-700">
-                            {formatVND(parseFloat(wallet.spendingLimit))}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-blue-600 font-medium mb-1">Còn lại</p>
-                          <p className="text-lg font-bold text-blue-700">
-                            {formatVND(
-                              parseFloat(wallet.spendingLimit) -
-                                parseFloat(wallet.balance)
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      {/* Progress bar */}
-                      <div className="mt-3 w-full bg-blue-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full transition-all"
-                          style={{
-                            width: `${Math.min(
-                              (parseFloat(wallet.balance) /
-                                parseFloat(wallet.spendingLimit)) *
-                                100,
-                              100
-                            )}%`,
-                          }}
-                        />
+                    <div className="flex items-center justify-between border-t border-slate-200/70 pt-2">
+                      <div>{getStatusBadge(wallet.status)}</div>
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        {wallet.status === 1 ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                        v{wallet.version}
                       </div>
                     </div>
-                  )}
-
-                  {/* Status & Info */}
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                    <div>{getStatusBadge(wallet.status)}</div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      {wallet.status === 1 ? (
-                        <Unlock className="w-4 h-4" />
-                      ) : (
-                        <Lock className="w-4 h-4" />
-                      )}
-                      v{wallet.version}
-                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         ) : (
-          <div className="text-center py-12 bg-gray-50 rounded-2xl">
-            <p className="text-gray-500 mb-4">Bạn chưa có ví nào</p>
+          <div className="rounded-2xl bg-slate-50 py-12 text-center">
+            <p className="mb-4 text-slate-500">Bạn chưa có ví nào</p>
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors"
+              className="rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white transition-colors hover:bg-emerald-700"
             >
               Tạo ví đầu tiên
             </button>
@@ -195,17 +239,9 @@ export const Wallets = () => {
         )}
       </motion.div>
 
-      <CreateWalletModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-      />
+      <CreateWalletModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
 
-      {editingWallet && (
-        <EditWalletModal
-          walletId={editingWallet}
-          onClose={() => setEditingWallet(null)}
-        />
-      )}
+      {editingWallet && <EditWalletModal walletId={editingWallet} onClose={() => setEditingWallet(null)} />}
     </>
   );
 };

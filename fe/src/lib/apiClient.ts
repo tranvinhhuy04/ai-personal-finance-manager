@@ -26,7 +26,6 @@ class ApiClient {
       walletType: raw.walletType ?? raw.wallet_type,
       walletName: raw.walletName ?? raw.wallet_name ?? raw.walletType ?? raw.wallet_type ?? 'Wallet',
       balance: String(raw.balance ?? '0'),
-      spendingLimit: raw.spendingLimit ?? raw.spending_limit ?? null,
       status: raw.status ?? 1,
       version: raw.version ?? 0,
       createdAt: raw.createdAt ?? new Date().toISOString(),
@@ -139,7 +138,7 @@ class ApiClient {
     const response = await axiosClient.post('/api/v1/wallets', {
       wallet_type: data.walletType,
       wallet_name: data.walletName,
-      spending_limit: data.spendingLimit,
+      balance: data.balance,
     });
     return this.normalizeWallet(response.data);
   }
@@ -160,16 +159,9 @@ class ApiClient {
     return this.normalizeWallet(response.data);
   }
 
-  async updateWalletSpendingLimit(walletId: string, spendingLimit: string): Promise<Wallet> {
-    const response = await axiosClient.patch(`/api/v1/wallets/${walletId}/spending-limit`, {
-      spendingLimit,
-    });
-    return this.normalizeWallet(response.data);
-  }
-
   async updateWallet(
     walletId: string,
-    data: { walletName?: string; spendingLimit?: number | null; status?: number }
+    data: { walletName?: string; balance?: number | null; status?: number }
   ): Promise<Wallet> {
     const payload: Record<string, unknown> = {};
 
@@ -180,11 +172,11 @@ class ApiClient {
       }
     }
 
-    if (data.spendingLimit !== undefined) {
-      if (data.spendingLimit === null) {
-        payload.spending_limit = null;
-      } else if (Number.isFinite(Number(data.spendingLimit))) {
-        payload.spending_limit = Number(data.spendingLimit);
+    if (data.balance !== undefined) {
+      if (data.balance === null) {
+        payload.balance = 0;
+      } else if (Number.isFinite(Number(data.balance))) {
+        payload.balance = Number(data.balance);
       }
     }
 

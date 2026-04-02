@@ -7,12 +7,12 @@ type CreateWalletInput = {
   user_id: string;
   wallet_type: WalletType;
   wallet_name: string;
-  spending_limit?: string;
+  balance?: string | number;
 };
 
 type UpdateWalletInput = {
   wallet_name?: string;
-  spending_limit?: string | null;
+  balance?: string | number | null;
 };
 
 type ApplyTransactionInput = {
@@ -29,6 +29,14 @@ function parsePositiveDecimal(amount: string, field: string) {
   return value;
 }
 
+function parseNonNegativeDecimal(amount: string, field: string) {
+  const value = Number(amount);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new AppError(field + ' must be a non-negative number', 400);
+  }
+  return value;
+}
+
 export class WalletService {
   async createWallet(input: CreateWalletInput) {
     if (!input.user_id) throw new AppError('user_id is required', 400);
@@ -37,14 +45,16 @@ export class WalletService {
       throw new AppError('wallet_name is required', 400);
     }
 
+    const initialBalance =
+      input.balance !== undefined && input.balance !== null && input.balance !== ''
+        ? parseNonNegativeDecimal(String(input.balance), 'balance')
+        : 0;
+
     const wallet = await walletRepository.create({
       user_id: input.user_id,
       wallet_type: input.wallet_type,
       wallet_name: input.wallet_name.trim(),
-      balance: mongoose.Types.Decimal128.fromString('0'),
-      spending_limit: input.spending_limit
-        ? mongoose.Types.Decimal128.fromString(String(parsePositiveDecimal(input.spending_limit, 'spending_limit')))
-        : null,
+      balance: mongoose.Types.Decimal128.fromString(String(initialBalance)),
       version: 0,
       status: 1,
     });
@@ -71,14 +81,13 @@ export class WalletService {
       wallet.wallet_name = walletName;
     }
 
-    if (payload.spending_limit !== undefined) {
-      if (payload.spending_limit === null || payload.spending_limit === '') {
-        wallet.spending_limit = null;
-      } else {
-        wallet.spending_limit = mongoose.Types.Decimal128.fromString(
-          String(parsePositiveDecimal(payload.spending_limit, 'spending_limit'))
-        );
-      }
+    if (payload.balance !== undefined) {
+      const nextBalance =
+        payload.balance === null || payload.balance === ''
+          ? 0
+          : parseNonNegativeDecimal(String(payload.balance), 'balance');
+
+      wallet.balance = mongoose.Types.Decimal128.fromString(String(nextBalance));
     }
 
     await wallet.save();
@@ -146,7 +155,6 @@ export class WalletService {
       wallet_type: wallet.wallet_type,
       wallet_name: wallet.wallet_name,
       balance: wallet.balance?.toString?.() ?? '0',
-      spending_limit: wallet.spending_limit?.toString?.() ?? null,
       status: wallet.status ?? 1,
       version: wallet.version,
       createdAt: wallet.createdAt,

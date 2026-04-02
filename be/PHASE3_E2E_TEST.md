@@ -174,8 +174,8 @@ Expected in ideal flow:
 
 Actual note with current code:
 
-- With the current implementation, the `4,000,000` expense is useful to verify event propagation, but the warning notification may still not appear.
-- The main reasons are described in the troubleshooting section below: the published wallet event currently misses required fields like `userId`, `walletName`, and `spendingLimit`, and the threshold logic is not aligned with the seeded business scenario.
+- With the current implementation, the `4,000,000` expense is useful to verify event propagation and downstream analytics refresh.
+- The wallet module now follows a balance-only design, so this scenario should focus on data sync and UI refresh instead of threshold-limit alerts.
 
 ## UI Validation Checklist
 
@@ -196,19 +196,13 @@ Symptom:
 
 Common root cause in this repo:
 
-- `notification-service` expects `userId`, `walletName`, and `spendingLimit` inside `WalletBalanceUpdatedEvent`.
-- `wallet-service` currently publishes only `transactionId`, `walletId`, `newBalance`, `newVersion`, and `timestamp`.
+- After removing the wallet limit feature, `notification-service` no longer depends on the legacy limit field in `WalletBalanceUpdatedEvent`.
+- If notification behavior is extended later, keep the shared event contract aligned around fields like `userId`, `walletId`, `walletName`, `newBalance`, and `transactionId`.
 
 Fast fix:
 
-- Publish the full payload from `wallet-service`, for example:
-  - `userId`
-  - `walletId`
-  - `walletName`
-  - `newBalance`
-  - `spendingLimit`
-  - `transactionId`
 - Keep event contracts in one shared file or package to avoid drift.
+- Prefer validating the queue payload with a shared TypeScript type before publishing/consuming.
 
 ### 2. Consumer swallows exception and still `ack`s the message
 

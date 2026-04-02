@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.notificationConsumer = void 0;
 const rabbitmq_1 = require("../../config/rabbitmq");
-const notification_service_1 = require("../services/notification.service");
 class NotificationConsumer {
     constructor() {
         this.isRunning = false;
@@ -28,13 +27,6 @@ class NotificationConsumer {
                 channel.ack(msg);
                 return;
             }
-            await notification_service_1.notificationService.createThresholdAlert({
-                userId: event.userId,
-                walletId: event.walletId,
-                walletName: event.walletName,
-                newBalance: Number(event.newBalance),
-                spendingLimit: event.spendingLimit,
-            });
             channel.ack(msg);
         }
         catch (error) {

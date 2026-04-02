@@ -17,7 +17,7 @@ export interface WalletStore {
   createWallet: (data: {
     walletType: 'CARD' | 'MOMO' | 'ZALOPAY' | 'CASH';
     walletName: string;
-    spendingLimit?: string;
+    balance?: string;
   }) => Promise<Wallet>;
   updateWalletBalance: (walletId: string, newBalance: string) => void;
   refreshWallets: () => Promise<void>;

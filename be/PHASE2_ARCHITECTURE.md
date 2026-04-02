@@ -40,7 +40,6 @@ collections:
     ├ userId: String (indexed)
     ├ walletType: CARD|MOMO|ZALOPAY|CASH
     ├ balance: Decimal128 (>= 0)
-    ├ spendingLimit: Decimal128 (null or > 0)
     ├ status: 1|0|2 (indexed)
     ├ version: Number (optimistic locking)
     └ timestamps
@@ -296,7 +295,7 @@ POST /api/v1/wallets
     {
       "walletType": "CARD|MOMO|ZALOPAY|CASH",
       "walletName": "My Card",
-      "spendingLimit": "5000000"  # optional
+      "balance": "5000000"
     }
   Response (201):
     {
@@ -304,8 +303,7 @@ POST /api/v1/wallets
       "userId": "...",
       "walletType": "CARD",
       "walletName": "My Card",
-      "balance": "0",
-      "spendingLimit": "5000000",
+      "balance": "5000000",
       "status": 1,
       "version": 0,
       "createdAt": "...",
@@ -323,9 +321,9 @@ PATCH /api/v1/wallets/:walletId/status
     { "status": 1|0|2 }
   Response (200): { wallet }
 
-PATCH /api/v1/wallets/:walletId/spending-limit
+PUT /api/v1/wallets/:walletId
   Request:
-    { "spendingLimit": "10000000" }
+    { "balance": 10000000, "status": 1 }
   Response (200): { wallet }
 ```
 

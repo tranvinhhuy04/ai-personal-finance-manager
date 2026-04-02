@@ -370,7 +370,7 @@ TOKEN=$(curl -X POST http://localhost:3000/api/v1/login \
 # Create wallet
 WALLET_ID=$(curl -X POST http://localhost:3002/api/v1/wallets \
   -H "Authorization: Bearer $TOKEN" \
-  -d '{"walletType":"CASH","walletName":"Test","spendingLimit":"1000000"}' \
+  -d '{"walletType":"CASH","walletName":"Test","balance":"1000000"}' \
   | jq -r .id)
 
 # Create category

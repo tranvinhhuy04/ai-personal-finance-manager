@@ -7,7 +7,6 @@ export class WalletRepository {
     wallet_type: string;
     wallet_name: string;
     balance: mongoose.Types.Decimal128;
-    spending_limit: mongoose.Types.Decimal128 | null;
     version: number;
     status: number;
   }): Promise<IWallet> {

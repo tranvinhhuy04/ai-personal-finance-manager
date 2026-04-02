@@ -4,13 +4,13 @@ import { catchAsync } from '../middlewares/catchAsync';
 
 export const createWallet = catchAsync(async (req: Request, res: Response) => {
   const user_id = (req as any).userId || req.body?.user_id;
-  const { wallet_type, wallet_name, spending_limit } = req.body ?? {};
+  const { wallet_type, wallet_name, balance } = req.body ?? {};
 
   const result = await walletService.createWallet({
     user_id,
     wallet_type,
     wallet_name,
-    spending_limit,
+    balance,
   });
 
   return res.status(201).json(result);
@@ -26,11 +26,11 @@ export const updateWallet = catchAsync(async (req: Request, res: Response, next:
   try {
     const user_id = (req as any).userId;
     const wallet_id = req.params.id;
-    const { wallet_name, spending_limit, status } = req.body ?? {};
+    const { wallet_name, balance, status } = req.body ?? {};
 
     const hasWalletName = wallet_name !== undefined;
-    const hasSpendingLimit = spending_limit !== undefined;
-    const hasStatusOnly = status !== undefined && !hasWalletName && !hasSpendingLimit;
+    const hasBalance = balance !== undefined;
+    const hasStatusOnly = status !== undefined && !hasWalletName && !hasBalance;
 
     // Support partial update by status only for frontend compatibility.
     if (hasStatusOnly) {
@@ -41,7 +41,7 @@ export const updateWallet = catchAsync(async (req: Request, res: Response, next:
 
     const updated = await walletService.updateWalletById(wallet_id, user_id, {
       wallet_name,
-      spending_limit,
+      balance,
     });
 
     return res.status(200).json(updated);

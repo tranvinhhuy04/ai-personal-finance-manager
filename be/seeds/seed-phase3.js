@@ -68,7 +68,6 @@ const walletSchema = new mongoose.Schema(
     wallet_type: { type: String, required: true },
     wallet_name: { type: String, required: true },
     balance: { type: mongoose.Schema.Types.Decimal128, required: true },
-    spending_limit: { type: mongoose.Schema.Types.Decimal128, default: null },
     version: { type: Number, default: 0 },
     status: { type: Number, default: 1 },
   },
@@ -359,7 +358,6 @@ async function main() {
         wallet_type: 'CARD',
         wallet_name: 'Vietcombank',
         balance: dec(15000000),
-        spending_limit: dec(20000000),
         version: 0,
         status: 1,
       },
@@ -368,7 +366,6 @@ async function main() {
         wallet_type: 'MOMO',
         wallet_name: 'MoMo',
         balance: dec(5000000),
-        spending_limit: dec(10000000),
         version: 0,
         status: 1,
       },
@@ -378,8 +375,8 @@ async function main() {
       vietcombank: walletDocs[0]._id.toString(),
       momo: walletDocs[1]._id.toString(),
     };
-    console.log(`Vietcombank  : ${walletIds.vietcombank} | balance ${money(15000000)} | limit ${money(20000000)}`);
-    console.log(`MoMo         : ${walletIds.momo} | balance ${money(5000000)} | limit ${money(10000000)}`);
+    console.log(`Vietcombank  : ${walletIds.vietcombank} | balance ${money(15000000)}`);
+    console.log(`MoMo         : ${walletIds.momo} | balance ${money(5000000)}`);
 
     section('3. Category Seed');
     const categoryDocs = await Category.insertMany([

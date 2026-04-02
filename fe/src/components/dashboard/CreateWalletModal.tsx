@@ -18,11 +18,11 @@ export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
   const [formData, setFormData] = useState<{
     walletType: WalletType;
     walletName: string;
-    spendingLimit: string;
+    balance: string;
   }>({
     walletType: 'CARD',
     walletName: '',
-    spendingLimit: '',
+    balance: '',
   });
   const [error, setError] = useState('');
   const [selectedBankCode, setSelectedBankCode] = useState('');
@@ -54,8 +54,8 @@ export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
       return;
     }
 
-    if (formData.spendingLimit && isNaN(parseFloat(formData.spendingLimit))) {
-      setError('Hạn mức chi tiêu phải là số');
+    if (formData.balance && (isNaN(parseFloat(formData.balance)) || parseFloat(formData.balance) < 0)) {
+      setError('Số dư ban đầu phải là số không âm');
       return;
     }
 
@@ -63,14 +63,14 @@ export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
       await createWallet({
         walletType: formData.walletType,
         walletName: formData.walletName,
-        spendingLimit: formData.spendingLimit || undefined,
+        balance: formData.balance || '0',
       });
 
       // Reset form and close
       setFormData({
         walletType: 'CARD',
         walletName: '',
-        spendingLimit: '',
+        balance: '',
       });
       onClose();
     } catch (err) {
@@ -208,24 +208,24 @@ export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
             />
           </div>
 
-          {/* Spending Limit */}
+          {/* Initial Balance */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Hạn mức chi tiêu (Tuỳ chọn)
+              Số dư ban đầu (Tuỳ chọn)
             </label>
             <input
               type="number"
-              value={formData.spendingLimit}
+              value={formData.balance}
               onChange={(e) =>
-                setFormData({ ...formData, spendingLimit: e.target.value })
+                setFormData({ ...formData, balance: e.target.value })
               }
               placeholder="VD: 5000000"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
               min="0"
-              step="100000"
+              step="1000"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Để trống nếu không muốn giới hạn
+              Để trống nếu muốn khởi tạo với số dư 0đ
             </p>
           </div>
 
