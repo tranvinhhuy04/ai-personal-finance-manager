@@ -1,5 +1,18 @@
+import mongoose from 'mongoose';
 import { AppError } from '../errors/AppError';
 import { MonthlyAggregateModel } from '../models/monthlyAggregate.model';
+
+type DashboardFilters = {
+  userId: string;
+  month?: string;
+  walletId?: string;
+};
+
+type MonthWindow = {
+  monthKey: string;
+  startDate: Date;
+  endDate: Date;
+};
 
 function toMonthKey(date?: string) {
   const occurredDate = date ? new Date(date) : new Date();
@@ -8,18 +21,165 @@ function toMonthKey(date?: string) {
   return `${year}-${month}`;
 }
 
-function getRecentMonthKeys(count: number) {
-  const now = new Date();
+function normalizeMonthKey(input?: string): string | null {
+  if (!input) return null;
+  const raw = input.trim();
+
+  if (/^\d{4}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  if (/^\d{2}\/\d{4}$/.test(raw)) {
+    const [month, year] = raw.split('/');
+    return `${year}-${month}`;
+  }
+
+  return null;
+}
+
+function parseMonthKey(monthKey?: string) {
+  const normalized = normalizeMonthKey(monthKey) ?? toMonthKey();
+  const [yearText, monthText] = normalized.split('-');
+  const year = Number(yearText);
+  const monthIndex = Number(monthText) - 1;
+
+  if (!Number.isInteger(year) || !Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+    throw new AppError('month must be in YYYY-MM or MM/YYYY format', 400);
+  }
+
+  return { normalized, year, monthIndex };
+}
+
+function getMonthWindow(monthKey?: string): MonthWindow {
+  const { normalized, year, monthIndex } = parseMonthKey(monthKey);
+  const startDate = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0));
+  const endDate = new Date(Date.UTC(year, monthIndex + 1, 0, 23, 59, 59, 999));
+
+  return {
+    monthKey: normalized,
+    startDate,
+    endDate,
+  };
+}
+
+function getRecentMonthKeys(count: number, endMonthKey?: string) {
+  const { year, monthIndex } = parseMonthKey(endMonthKey);
   const keys: string[] = [];
 
   for (let index = count - 1; index >= 0; index -= 1) {
-    const point = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - index, 1));
-    const year = point.getUTCFullYear();
-    const month = String(point.getUTCMonth() + 1).padStart(2, '0');
-    keys.push(`${year}-${month}`);
+    const point = new Date(Date.UTC(year, monthIndex - index, 1));
+    const pointYear = point.getUTCFullYear();
+    const pointMonth = String(point.getUTCMonth() + 1).padStart(2, '0');
+    keys.push(`${pointYear}-${pointMonth}`);
   }
 
   return keys;
+}
+
+function formatMonthLabel(monthKey: string) {
+  const [, month] = monthKey.split('-');
+  const [year] = monthKey.split('-');
+  return `${month}/${year}`;
+}
+
+function roundMoney(value: unknown): number {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num)) return 0;
+  return Math.round(num);
+}
+
+function getCategoryColor(name: string) {
+  const palette: Record<string, string> = {
+    'Ăn uống': '#f97316',
+    'Mua sắm': '#8b5cf6',
+    'Hóa đơn': '#ef4444',
+    'Di chuyển': '#0ea5e9',
+    'Lương': '#10b981',
+    'Thưởng': '#22c55e',
+  };
+
+  return palette[name] ?? '#14b8a6';
+}
+
+function resolveTransactionDbName() {
+  const configuredUri = process.env.MONGO_URI_TRANSACTION;
+  if (configuredUri) {
+    const url = new URL(configuredUri);
+    const dbName = url.pathname.replace(/^\//, '').trim();
+    if (dbName) return dbName;
+  }
+
+  return process.env.TRANSACTION_DB_NAME ?? 'fintech_transaction-service';
+}
+
+function getTransactionDb() {
+  if (mongoose.connection.readyState !== 1) {
+    throw new AppError('Analytics database is not connected', 500);
+  }
+
+  return mongoose.connection.useDb(resolveTransactionDbName(), { useCache: true });
+}
+
+function buildTransactionPipeline(filters: {
+  userId: string;
+  walletId?: string;
+  startDate?: Date;
+  endDate?: Date;
+}) {
+  const pipeline: any[] = [
+    {
+      $match: {
+        $and: [
+          {
+            $or: [{ user_id: filters.userId }, { userId: filters.userId }],
+          },
+          {
+            $or: [{ status: 'COMPLETED' }, { status: { $exists: false } }],
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        normalizedAmount: {
+          $toDouble: {
+            $ifNull: ['$amount', 0],
+          },
+        },
+        normalizedType: {
+          $ifNull: ['$transaction_type', '$transactionType'],
+        },
+        normalizedOccurredAt: {
+          $ifNull: ['$occurred_at', '$occurredAt'],
+        },
+        normalizedWalletId: {
+          $ifNull: ['$wallet_id', '$walletId'],
+        },
+        normalizedCategoryId: {
+          $ifNull: ['$category_id', '$categoryId'],
+        },
+      },
+    },
+  ];
+
+  const matchAfterNormalization: Record<string, unknown> = {};
+
+  if (filters.walletId) {
+    matchAfterNormalization.normalizedWalletId = filters.walletId;
+  }
+
+  if (filters.startDate || filters.endDate) {
+    matchAfterNormalization.normalizedOccurredAt = {
+      ...(filters.startDate ? { $gte: filters.startDate } : {}),
+      ...(filters.endDate ? { $lte: filters.endDate } : {}),
+    };
+  }
+
+  if (Object.keys(matchAfterNormalization).length > 0) {
+    pipeline.push({ $match: matchAfterNormalization });
+  }
+
+  return pipeline;
 }
 
 class AnalyticsService {
@@ -132,42 +292,192 @@ class AnalyticsService {
     }
   }
 
-  async getDashboard(userId: string) {
-    if (!userId) {
-      throw new AppError('user_id is required', 400);
+  async getDashboard(filters: DashboardFilters) {
+    if (!filters.userId) {
+      throw new AppError('userId is required', 400);
     }
 
-    const monthKeys = getRecentMonthKeys(6);
-    const docs = await MonthlyAggregateModel.find({
-      user_id: userId,
-      month: { $in: monthKeys },
-    }).lean();
+    const transactionDb = getTransactionDb();
+    const transactions = transactionDb.collection('transactions');
 
-    const mapByMonth = new Map(docs.map((item) => [item.month, item]));
+    const currentWindow = getMonthWindow(filters.month);
+    const trendMonthKeys = getRecentMonthKeys(6, currentWindow.monthKey);
+    const trendWindow = getMonthWindow(trendMonthKeys[0]);
 
-    const trend = monthKeys.map((month) => {
-      const item = mapByMonth.get(month);
+    const summaryRows = await transactions
+      .aggregate([
+        ...buildTransactionPipeline({
+          userId: filters.userId,
+          walletId: filters.walletId,
+          startDate: currentWindow.startDate,
+          endDate: currentWindow.endDate,
+        }),
+        {
+          $group: {
+            _id: null,
+            totalIncome: {
+              $sum: {
+                $cond: [{ $eq: ['$normalizedType', 'INCOME'] }, '$normalizedAmount', 0],
+              },
+            },
+            totalExpense: {
+              $sum: {
+                $cond: [{ $eq: ['$normalizedType', 'EXPENSE'] }, '$normalizedAmount', 0],
+              },
+            },
+          },
+        },
+      ])
+      .toArray();
+
+    const summaryRow = summaryRows[0] ?? { totalIncome: 0, totalExpense: 0 };
+    const totalIncome = roundMoney(summaryRow.totalIncome);
+    const totalExpense = roundMoney(summaryRow.totalExpense);
+    const net = totalIncome - totalExpense;
+
+    const trendRows = await transactions
+      .aggregate([
+        ...buildTransactionPipeline({
+          userId: filters.userId,
+          walletId: filters.walletId,
+          startDate: trendWindow.startDate,
+          endDate: currentWindow.endDate,
+        }),
+        {
+          $group: {
+            _id: {
+              year: { $year: '$normalizedOccurredAt' },
+              month: { $month: '$normalizedOccurredAt' },
+            },
+            income: {
+              $sum: {
+                $cond: [{ $eq: ['$normalizedType', 'INCOME'] }, '$normalizedAmount', 0],
+              },
+            },
+            expense: {
+              $sum: {
+                $cond: [{ $eq: ['$normalizedType', 'EXPENSE'] }, '$normalizedAmount', 0],
+              },
+            },
+          },
+        },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
+      ])
+      .toArray();
+
+    const trendMap = new Map(
+      trendRows.map((row) => {
+        const monthKey = `${row._id.year}-${String(row._id.month).padStart(2, '0')}`;
+        return [monthKey, row];
+      })
+    );
+
+    const trend = trendMonthKeys.map((monthKey) => {
+      const row = trendMap.get(monthKey);
+      const income = roundMoney(row?.income);
+      const expense = roundMoney(row?.expense);
+      const netValue = income - expense;
+
       return {
-        month,
-        totalIncome: item?.totalIncome ?? 0,
-        totalExpense: item?.totalExpense ?? 0,
-        netCashFlow: item?.netCashFlow ?? 0,
+        monthKey,
+        month: formatMonthLabel(monthKey),
+        income,
+        expense,
+        net: netValue,
+        totalIncome: income,
+        totalExpense: expense,
+        netCashFlow: netValue,
       };
     });
 
-    const currentMonth = monthKeys[monthKeys.length - 1];
-    const current = mapByMonth.get(currentMonth);
+    const breakdownRows = await transactions
+      .aggregate([
+        ...buildTransactionPipeline({
+          userId: filters.userId,
+          walletId: filters.walletId,
+          startDate: currentWindow.startDate,
+          endDate: currentWindow.endDate,
+        }),
+        {
+          $match: {
+            normalizedType: 'EXPENSE',
+          },
+        },
+        {
+          $addFields: {
+            categoryObjectId: {
+              $convert: {
+                input: '$normalizedCategoryId',
+                to: 'objectId',
+                onError: null,
+                onNull: null,
+              },
+            },
+          },
+        },
+        {
+          $lookup: {
+            from: 'categories',
+            localField: 'categoryObjectId',
+            foreignField: '_id',
+            as: 'categoryInfo',
+          },
+        },
+        {
+          $unwind: {
+            path: '$categoryInfo',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $group: {
+            _id: '$normalizedCategoryId',
+            value: { $sum: '$normalizedAmount' },
+            name: {
+              $first: {
+                $ifNull: ['$categoryInfo.name', 'Khác'],
+              },
+            },
+            color: {
+              $first: '$categoryInfo.color',
+            },
+            transactionCount: { $sum: 1 },
+          },
+        },
+        { $sort: { value: -1 } },
+      ])
+      .toArray();
+
+    const breakdown = breakdownRows.map((row) => ({
+      categoryId: String(row._id ?? ''),
+      name: String(row.name ?? 'Khác'),
+      value: roundMoney(row.value),
+      color: row.color ? String(row.color) : getCategoryColor(String(row.name ?? 'Khác')),
+      transactionCount: Number(row.transactionCount ?? 0),
+    }));
 
     return {
-      currentMonth,
+      currentMonth: currentWindow.monthKey,
+      filters: {
+        month: currentWindow.monthKey,
+        walletId: filters.walletId ?? null,
+      },
       summary: {
-        totalIncome: current?.totalIncome ?? 0,
-        totalExpense: current?.totalExpense ?? 0,
-        netCashFlow: current?.netCashFlow ?? 0,
-        byCategory: current?.byCategory ?? [],
-        byWallet: current?.byWallet ?? [],
+        totalIncome,
+        totalExpense,
+        net,
+        netCashFlow: net,
+        byCategory: breakdown.map((item) => ({
+          category_id: item.categoryId,
+          category_name: item.name,
+          total_amount: item.value,
+          transaction_count: item.transactionCount,
+          color: item.color,
+        })),
+        byWallet: [],
       },
       trend,
+      breakdown,
     };
   }
 }

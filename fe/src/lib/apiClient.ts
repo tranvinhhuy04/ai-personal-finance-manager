@@ -8,6 +8,7 @@ import type {
   CreateCategoryInput,
   UpdateInvoiceInput,
   ConfirmInvoiceInput,
+  AnalyticsDashboardResponse,
 } from '@/types/finance';
 import { axiosClient } from '@/utils/axiosClient';
 
@@ -15,6 +16,7 @@ type WalletApiResponse = Record<string, any>;
 type TransactionApiResponse = Record<string, any>;
 type CategoryApiResponse = Record<string, any>;
 type InvoiceApiResponse = Record<string, any>;
+type AnalyticsApiResponse = Record<string, any>;
 
 class ApiClient {
   private normalizeWallet(raw: WalletApiResponse): Wallet {
@@ -83,6 +85,42 @@ class ApiClient {
       createdAt: raw.createdAt ?? new Date().toISOString(),
       updatedAt: raw.updatedAt ?? new Date().toISOString(),
     } as Invoice;
+  }
+
+  private normalizeAnalyticsDashboard(raw: AnalyticsApiResponse): AnalyticsDashboardResponse {
+    const summary = raw.summary ?? {};
+
+    return {
+      currentMonth: String(raw.currentMonth ?? ''),
+      filters: {
+        month: raw.filters?.month ?? null,
+        walletId: raw.filters?.walletId ?? null,
+      },
+      summary: {
+        totalIncome: Number(summary.totalIncome ?? 0),
+        totalExpense: Number(summary.totalExpense ?? 0),
+        net: Number(summary.net ?? summary.netCashFlow ?? 0),
+        netCashFlow: Number(summary.netCashFlow ?? summary.net ?? 0),
+      },
+      trend: Array.isArray(raw.trend)
+        ? raw.trend.map((item: Record<string, any>) => ({
+            monthKey: String(item.monthKey ?? ''),
+            month: String(item.month ?? ''),
+            income: Number(item.income ?? item.totalIncome ?? 0),
+            expense: Number(item.expense ?? item.totalExpense ?? 0),
+            net: Number(item.net ?? item.netCashFlow ?? 0),
+          }))
+        : [],
+      breakdown: Array.isArray(raw.breakdown)
+        ? raw.breakdown.map((item: Record<string, any>) => ({
+            categoryId: String(item.categoryId ?? item.category_id ?? ''),
+            name: String(item.name ?? item.category_name ?? 'Khác'),
+            value: Number(item.value ?? item.total_amount ?? 0),
+            color: item.color ?? null,
+            transactionCount: Number(item.transactionCount ?? item.transaction_count ?? 0),
+          }))
+        : [],
+    };
   }
 
   private async uploadMultipart<T>(url: string, formData: FormData): Promise<T> {
@@ -248,6 +286,21 @@ class ApiClient {
       params: { wallet_id: walletId, limit, skip },
     });
     return (response.data ?? []).map((item: TransactionApiResponse) => this.normalizeTransaction(item));
+  }
+
+  async getAnalyticsDashboard(filters?: { month?: string; walletId?: string }): Promise<AnalyticsDashboardResponse> {
+    const params: Record<string, string> = {};
+
+    if (filters?.month) {
+      params.month = filters.month;
+    }
+
+    if (filters?.walletId) {
+      params.wallet_id = filters.walletId;
+    }
+
+    const response = await axiosClient.get('/api/v1/analytics/dashboard', { params });
+    return this.normalizeAnalyticsDashboard(response.data ?? {});
   }
 
   // ===== INVOICE ENDPOINTS =====

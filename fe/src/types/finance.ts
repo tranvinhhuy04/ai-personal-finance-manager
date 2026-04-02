@@ -55,6 +55,40 @@ export interface Transaction {
   createdAt: string;
 }
 
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+export interface AnalyticsTrendPoint {
+  monthKey: string;
+  month: string;
+  income: number;
+  expense: number;
+  net: number;
+}
+
+export interface AnalyticsCategoryBreakdown {
+  categoryId: string;
+  name: string;
+  value: number;
+  color?: string | null;
+  transactionCount?: number;
+}
+
+export interface AnalyticsDashboardResponse {
+  currentMonth: string;
+  filters: {
+    month: string | null;
+    walletId: string | null;
+  };
+  summary: {
+    totalIncome: number;
+    totalExpense: number;
+    net: number;
+    netCashFlow?: number;
+  };
+  trend: AnalyticsTrendPoint[];
+  breakdown: AnalyticsCategoryBreakdown[];
+}
+
 // ─── Invoice ──────────────────────────────────────────────────────────────────
 
 export type InvoiceStatus = 'PENDING' | 'PROCESSED' | 'REJECTED' | 'DELETED';
