@@ -8,7 +8,7 @@
     "start": "node dist/app.js",
     "dev": "ts-node-dev --respawn app.ts",
     "test": "jest",
-    "seed:categories": "node src/seeds/seed.system.categories.js"
+    "seed:categories": "ts-node --transpile-only src/seeds/seed.system.categories.ts"
   },
   "keywords": [
     "transaction",
@@ -28,6 +28,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.8.9",
     "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
@@ -36,8 +37,10 @@
     "@types/express": "^4.17.19",
     "@types/jsonwebtoken": "^9.0.3",
     "@types/morgan": "^1.9.6",
+    "@types/multer": "^1.4.12",
     "@types/node": "^20.19.37",
     "@types/uuid": "^9.0.2",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.1.6"
   }

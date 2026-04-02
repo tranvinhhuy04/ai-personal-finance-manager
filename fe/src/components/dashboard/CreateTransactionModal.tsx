@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, ChevronRight, ChevronLeft } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Loader2, RefreshCcw, X } from 'lucide-react';
 import { useWalletStore, useTransactionStore } from '@/store/useFinanceStore';
 import { formatCurrencyVND } from '@/utils/formatters';
-import { Wallet } from '@/store/useFinanceStore';
 
 interface CreateTransactionModalProps {
   isOpen: boolean;
@@ -16,12 +15,17 @@ export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
   onClose,
 }) => {
   const { wallets, updateWalletBalance } = useWalletStore();
-  const { createTransaction, categories, fetchCategories, isLoading, error: categoryError } =
-    useTransactionStore();
+  const {
+    createTransaction,
+    categories,
+    fetchCategories,
+    isLoading,
+    isFetchingCategories,
+    categoryError,
+  } = useTransactionStore();
 
   const [step, setStep] = useState<Step>(1);
   const [error, setError] = useState('');
-  const hasFetchedCategoriesRef = useRef(false);
   const [formData, setFormData] = useState({
     walletId: '',
     transactionType: 'EXPENSE' as 'INCOME' | 'EXPENSE',
@@ -31,26 +35,27 @@ export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
   });
 
   useEffect(() => {
-    if (!isOpen || hasFetchedCategoriesRef.current || categories.length > 0) {
+    if (!isOpen) {
       return;
     }
 
-    hasFetchedCategoriesRef.current = true;
-    const loadCategories = async () => {
-      try {
-        await fetchCategories();
-      } catch {
-        setError('Không tải được danh mục giao dịch');
-      }
-    };
-
-    void loadCategories();
-  }, [isOpen, categories.length]);
+    setError('');
+    void fetchCategories().catch(() => {
+      setError('Không tải được danh mục giao dịch');
+    });
+  }, [isOpen, fetchCategories]);
 
   const selectedWallet = wallets.find((w) => w.id === formData.walletId);
-  const availableCategories = categories.filter(
-    (c) => c.categoryType === formData.transactionType
+  const availableCategories = useMemo(
+    () => categories.filter((c) => c.categoryType === formData.transactionType && c.status === 1),
+    [categories, formData.transactionType]
   );
+
+  useEffect(() => {
+    if (formData.categoryId && !availableCategories.some((category) => category.id === formData.categoryId)) {
+      setFormData((prev) => ({ ...prev, categoryId: '' }));
+    }
+  }, [availableCategories, formData.categoryId]);
 
   const validateStep = (currentStep: Step): boolean => {
     setError('');
@@ -278,24 +283,53 @@ export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Danh mục
                 </label>
-                <select
-                  value={formData.categoryId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, categoryId: e.target.value })
-                  }
-                  disabled={isLoading}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                >
-                  {isLoading && <option value="">Đang tải danh mục...</option>}
-                  {!isLoading && categoryError && <option value="">Lỗi tải danh mục</option>}
-                  <option value="">-- Chọn danh mục --</option>
-                  {availableCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">
+                      Hiển thị danh mục {formData.transactionType === 'EXPENSE' ? 'chi tiêu' : 'thu nhập'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void fetchCategories()}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-800"
+                    >
+                      <RefreshCcw className="h-3.5 w-3.5" />
+                      Tải lại
+                    </button>
+                  </div>
+
+                  <select
+                    value={formData.categoryId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, categoryId: e.target.value })
+                    }
+                    disabled={isFetchingCategories}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                  >
+                    <option value="">
+                      {isFetchingCategories ? 'Đang tải danh mục...' : '-- Chọn danh mục --'}
                     </option>
-                  ))}
-                </select>
-                {!isLoading && categoryError && (
+                    {availableCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  {!isFetchingCategories && availableCategories.length === 0 && !categoryError && (
+                    <p className="text-xs text-amber-600">
+                      Chưa có danh mục phù hợp với loại giao dịch đang chọn.
+                    </p>
+                  )}
+
+                  {isFetchingCategories && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Đang đồng bộ danh mục từ hệ thống...
+                    </div>
+                  )}
+                </div>
+                {categoryError && (
                   <p className="mt-2 text-xs text-red-600">{categoryError}</p>
                 )}
               </div>

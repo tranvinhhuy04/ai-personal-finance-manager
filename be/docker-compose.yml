@@ -9,8 +9,8 @@ services:
     volumes:
       - mongodata:/data/db
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     networks:
       - fintech_net
     # Health check: ping MongoDB every 10s; mark healthy after 3 successes
@@ -79,7 +79,7 @@ services:
       notification-service:
         condition: service_started
     env_file:
-      - .env
+      - ./api-gateway/.env
     environment:
       PORT: 3000
       REDIS_HOST: redis-cache
@@ -104,7 +104,7 @@ services:
       mongo-db:
         condition: service_healthy
     env_file:
-      - .env
+      - ./service-identity/.env
     environment:
       NODE_ENV: development
     networks:
@@ -123,11 +123,9 @@ services:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - .env
+      - ./service-wallet/.env
     environment:
       NODE_ENV: development
-      WALLET_PORT: 3002
-      MONGO_URI_WALLET: ${MONGO_URI}
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     networks:
       - fintech_net
@@ -145,11 +143,9 @@ services:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - .env
+      - ./service-transaction/.env
     environment:
       NODE_ENV: development
-      TRANSACTION_PORT: 3003
-      MONGO_URI_TRANSACTION: ${MONGO_URI}
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     networks:
       - fintech_net
@@ -167,11 +163,9 @@ services:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - .env
+      - ./analytics-service/.env
     environment:
       NODE_ENV: development
-      ANALYTICS_PORT: 3004
-      MONGO_URI_ANALYTICS: ${MONGO_URI}
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     networks:
       - fintech_net
@@ -189,11 +183,9 @@ services:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - .env
+      - ./notification-service/.env
     environment:
       NODE_ENV: development
-      NOTIFICATION_PORT: 3005
-      MONGO_URI_NOTIFICATION: ${MONGO_URI}
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     networks:
       - fintech_net

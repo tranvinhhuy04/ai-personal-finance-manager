@@ -4,16 +4,31 @@ import { outboxPublisher } from '../messaging/outbox.publisher';
 import { catchAsync } from '../middlewares/catchAsync';
 
 export const createTransaction = catchAsync(async (req: Request, res: Response) => {
-  const { wallet_id, amount, transaction_type, idempotency_key } = req.body ?? {};
-
-  const transaction = await transactionService.createTransaction({
+  const userId = String((req as any).userId ?? '');
+  const {
     wallet_id,
+    category_id,
     amount,
     transaction_type,
+    currency,
+    description,
+    occurred_at,
     idempotency_key,
+  } = req.body ?? {};
+
+  const transaction = await transactionService.createTransaction({
+    user_id: userId,
+    wallet_id,
+    category_id,
+    amount,
+    transaction_type,
+    currency,
+    description,
+    occurred_at,
+    idempotency_key,
+    source: 'MANUAL',
   });
 
-  // Publish asynchronously right after persisting outbox; response is not blocked by wallet processing.
   outboxPublisher.publishPending().catch((error) => {
     console.error('[outbox] publishPending failed:', error);
   });
@@ -25,11 +40,13 @@ export const listTransactions = catchAsync(async (req: Request, res: Response) =
   const limit = Number.parseInt(String(req.query.limit ?? '50'), 10);
   const skip = Number.parseInt(String(req.query.skip ?? '0'), 10);
   const walletId = req.query.wallet_id ? String(req.query.wallet_id) : undefined;
+  const userId = String((req as any).userId ?? '');
 
   const data = await transactionService.listTransactions(
     Number.isNaN(limit) ? 50 : limit,
     Number.isNaN(skip) ? 0 : skip,
-    walletId
+    walletId,
+    userId
   );
 
   return res.status(200).json(data);

@@ -1,11 +1,37 @@
 import { Router } from 'express';
-import requireAuth from '../../middlewares/requireAuth';
+import requireAuth from '../middlewares/requireAuth';
 import { createTransaction, listTransactions } from '../controllers/transaction.controller';
+import { createCategory, deleteCategory, listCategories, updateCategory } from '../controllers/category.controller';
+import {
+  confirmInvoice,
+  deleteInvoice,
+  listInvoices,
+  updateInvoice,
+  uploadInvoice,
+} from '../controllers/invoice.controller';
+import { uploadInvoiceImage } from '../middlewares/upload.middleware';
 
 const router = Router();
 
 router.use(requireAuth);
-router.post('/', createTransaction);
-router.get('/', listTransactions);
+
+router.get('/categories', listCategories);
+router.post('/categories', createCategory);
+router.put('/categories/:id', updateCategory);
+router.delete('/categories/:id', deleteCategory);
+
+router.get('/transactions/categories', listCategories);
+router.post('/transactions/categories', createCategory);
+router.put('/transactions/categories/:id', updateCategory);
+router.delete('/transactions/categories/:id', deleteCategory);
+
+router.post('/transactions', createTransaction);
+router.get('/transactions', listTransactions);
+
+router.post('/invoices/upload', uploadInvoiceImage, uploadInvoice);
+router.get('/invoices', listInvoices);
+router.put('/invoices/:id', updateInvoice);
+router.delete('/invoices/:id', deleteInvoice);
+router.post('/invoices/:id/confirm', confirmInvoice);
 
 export default router;

@@ -75,9 +75,11 @@ export interface TransactionStore {
   transactions: Transaction[];
   categories: Category[];
   isLoading: boolean;
+  isFetchingCategories: boolean;
   error: string | null;
+  categoryError: string | null;
   fetchTransactions: (limit?: number, skip?: number) => Promise<void>;
-  fetchCategories: () => Promise<void>;
+  fetchCategories: (categoryType?: 'INCOME' | 'EXPENSE') => Promise<Category[]>;
   createTransaction: (data: {
     walletId: string;
     categoryId: string;
@@ -92,6 +94,13 @@ export interface TransactionStore {
     categoryType: 'INCOME' | 'EXPENSE';
     parentId?: string | null;
   }) => Promise<Category>;
+  updateCategory: (categoryId: string, data: {
+    name?: string;
+    categoryType?: 'INCOME' | 'EXPENSE';
+    parentId?: string | null;
+    status?: number;
+  }) => Promise<Category>;
+  deleteCategory: (categoryId: string) => Promise<void>;
   getWalletTransactions: (walletId: string) => Promise<Transaction[]>;
   refreshTransactions: () => Promise<void>;
 }
@@ -100,7 +109,9 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
   transactions: [],
   categories: [],
   isLoading: false,
+  isFetchingCategories: false,
   error: null,
+  categoryError: null,
 
   fetchTransactions: async (limit = 50, skip = 0) => {
     set({ isLoading: true, error: null });
@@ -114,14 +125,15 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
     }
   },
 
-  fetchCategories: async () => {
-    set({ isLoading: true, error: null });
+  fetchCategories: async (categoryType) => {
+    set({ isFetchingCategories: true, categoryError: null });
     try {
-      const categories = await apiClient.getCategories();
-      set({ categories: categories || [], isLoading: false });
+      const categories = await apiClient.getCategories(categoryType);
+      set({ categories: categories || [], isFetchingCategories: false });
+      return categories || [];
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch categories';
-      set({ error: message, isLoading: false });
+      set({ categoryError: message, isFetchingCategories: false });
       throw error;
     }
   },
@@ -143,17 +155,48 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
   },
 
   createCategory: async (data) => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, categoryError: null });
     try {
       const category = await apiClient.createCategory(data);
       set((state) => ({
-        categories: [...state.categories, category],
+        categories: [...state.categories.filter((item) => item.id !== category.id), category],
         isLoading: false,
       }));
       return category;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create category';
-      set({ error: message, isLoading: false });
+      set({ categoryError: message, isLoading: false });
+      throw error;
+    }
+  },
+
+  updateCategory: async (categoryId, data) => {
+    set({ isLoading: true, categoryError: null });
+    try {
+      const updated = await apiClient.updateCategory(categoryId, data);
+      set((state) => ({
+        categories: state.categories.map((item) => (item.id === categoryId ? updated : item)),
+        isLoading: false,
+      }));
+      return updated;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update category';
+      set({ categoryError: message, isLoading: false });
+      throw error;
+    }
+  },
+
+  deleteCategory: async (categoryId) => {
+    set({ isLoading: true, categoryError: null });
+    try {
+      await apiClient.deleteCategory(categoryId);
+      set((state) => ({
+        categories: state.categories.filter((item) => item.id !== categoryId),
+        isLoading: false,
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete category';
+      set({ categoryError: message, isLoading: false });
       throw error;
     }
   },

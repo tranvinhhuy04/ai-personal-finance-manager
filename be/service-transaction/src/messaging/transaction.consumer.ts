@@ -4,19 +4,9 @@ import {
   getChannel,
   QUEUES,
   ROUTING_KEYS,
-} from '../../config/rabbitmq';
+} from '../config/rabbitmq';
 import { transactionService } from '../services/transaction.service';
-
-type WalletBalanceUpdatedEvent = {
-  eventType: 'WalletBalanceUpdated';
-  transactionId: string;
-};
-
-type WalletBalanceUpdateFailedEvent = {
-  eventType: 'WalletBalanceUpdateFailed';
-  transactionId: string;
-  error: string;
-};
+import { WalletResponseEvent } from '../types/events';
 
 class TransactionConsumer {
   private isRunning = false;
@@ -49,7 +39,7 @@ class TransactionConsumer {
     if (!msg) return;
 
     try {
-      const event = JSON.parse(msg.content.toString()) as WalletBalanceUpdatedEvent | WalletBalanceUpdateFailedEvent;
+      const event = JSON.parse(msg.content.toString()) as WalletResponseEvent;
 
       if (event.eventType === 'WalletBalanceUpdated') {
         await transactionService.markCompleted(event.transactionId);

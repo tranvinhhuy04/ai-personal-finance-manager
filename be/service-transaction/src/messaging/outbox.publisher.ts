@@ -3,7 +3,7 @@ import {
   publishMessage,
   QUEUES,
   ROUTING_KEYS,
-} from '../../config/rabbitmq';
+} from '../config/rabbitmq';
 import { OutboxModel } from '../models/outbox.model';
 
 class OutboxPublisher {

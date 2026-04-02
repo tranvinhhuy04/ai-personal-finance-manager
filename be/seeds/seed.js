@@ -4,9 +4,9 @@
  * OripioFin — Seed Script (Phase 2)
  * ===================================
  * Tạo dữ liệu mẫu cho 3 MongoDB databases:
- *   fintech_auth        → collection: users
- *   fintech_wallets     → collection: wallets
- *   fintech_transactions→ collections: categories, transactions
+ *   fintech_identity-service    → collection: users
+ *   fintech_wallet-service      → collection: wallets
+ *   fintech_transaction-service → collections: categories, transactions
  *
  * Cách chạy:
  *   cd be/seeds
@@ -26,13 +26,13 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const ATLAS_URI = process.env.MONGO_URI;
+const ATLAS_URI = process.env.MONGO_URI || process.env.MONGO_URI_IDENTITY;
 
 if (!ATLAS_URI) {
   console.error(
-    '✗ MONGO_URI is not set.\n' +
-    '  Đặt biến môi trường MONGO_URI hoặc thêm MONGO_URI vào be/service-identity/.env\n' +
-    '  Ví dụ: MONGO_URI="mongodb+srv://user:pass@cluster.mongodb.net/fintech_auth?appName=Cluster0" node seed.js'
+    '✗ MONGO_URI (hoặc MONGO_URI_IDENTITY) is not set.\n' +
+    '  Thêm MONGO_URI vào be/service-identity/.env\n' +
+    '  Ví dụ: MONGO_URI="mongodb+srv://user:pass@cluster.mongodb.net/fintech_identity-service?appName=Cluster0" node seed.js'
   );
   process.exit(1);
 }
@@ -68,9 +68,9 @@ async function main() {
     await client.connect();
     console.log('✓ Connected to MongoDB Atlas\n');
 
-    const authDb  = client.db('fintech_auth');
-    const walletDb = client.db('fintech_wallets');
-    const txDb    = client.db('fintech_transactions');
+    const authDb   = client.db('fintech_identity-service');
+    const walletDb = client.db('fintech_wallet-service');
+    const txDb     = client.db('fintech_transaction-service');
 
     // ── 1. USERS ──────────────────────────────────────────────────────────────
     section('1/4  Seeding user');

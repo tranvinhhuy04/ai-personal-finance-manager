@@ -1,17 +1,18 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Search, Filter, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Filter, Plus, Search, Settings2 } from 'lucide-react';
 import { formatVND } from '@/lib/utils';
 import { useState, useEffect, useRef } from 'react';
-import { Plus } from 'lucide-react';
 import { useTransactionStore, useWalletStore } from '@/store/useFinanceStore';
 import { CreateTransactionModal } from '@/components/dashboard/CreateTransactionModal';
+import { CategoryManagerModal } from '../components/dashboard/CategoryManagerModal';
 
 export const Transactions = () => {
-  const { transactions, categories, fetchTransactions, isLoading, error } =
+  const { transactions, categories, fetchTransactions, fetchCategories, isLoading, error } =
     useTransactionStore();
   const { wallets } = useWalletStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isError, setIsError] = useState(false);
   const didFetchRef = useRef(false);
   const [searchText, setSearchText] = useState('');
@@ -30,7 +31,7 @@ export const Transactions = () => {
 
     const load = async () => {
       try {
-        await fetchTransactions();
+        await Promise.all([fetchTransactions(), fetchCategories()]);
         setIsError(false);
       } catch {
         setIsError(true);
@@ -120,17 +121,26 @@ export const Transactions = () => {
         transition={{ duration: 0.5 }}
         className="space-y-6"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
             Giao dịch
           </h1>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-5 h-5" />
-            Ghi nhận giao dịch
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              <Settings2 className="w-5 h-5" />
+              Quản lý danh mục
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              <Plus className="w-5 h-5" />
+              Ghi nhận giao dịch
+            </button>
+          </div>
         </div>
 
         {isError && (
@@ -362,6 +372,11 @@ export const Transactions = () => {
       <CreateTransactionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+      />
+
+      <CategoryManagerModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
       />
     </>
   );

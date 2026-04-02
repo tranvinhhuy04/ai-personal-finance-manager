@@ -7,6 +7,16 @@ export function errorHandler(err: any, _req: Request, res: Response, _next: Next
     return;
   }
 
+  if (err?.name === 'MulterError') {
+    if (!res.headersSent) {
+      const message = err.code === 'LIMIT_FILE_SIZE'
+        ? 'Invoice image exceeds the 8MB upload limit'
+        : err.message;
+      res.status(400).json({ message });
+    }
+    return;
+  }
+
   if (err?.name === 'ValidationError') {
     const message = Object.values(err.errors ?? {})
       .map((e: any) => e.message)

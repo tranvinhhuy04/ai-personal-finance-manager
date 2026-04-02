@@ -1,10 +1,6 @@
 /**
  * Canonical data types for the Finance application.
- * Single source of truth — matches the exact shapes returned by:
- *   - service-wallet  (balance / spendingLimit are MongoDB Decimal128, serialized as string)
- *   - service-transaction (amount is MongoDB Decimal128, serialized as string)
- *
- * Import from here in both apiClient.ts and the Zustand stores.
+ * Single source of truth for wallets, categories, transactions, and invoices.
  */
 
 // ─── Wallet ───────────────────────────────────────────────────────────────────
@@ -16,16 +12,12 @@ export interface Wallet {
   userId: string;
   walletType: WalletType;
   walletName: string;
-  /** Positive decimal string, e.g. "150000000" */
   balance: string;
-  /** Positive decimal string or null when no limit is set */
   spendingLimit: string | null;
-  /** 1 = Active · 0 = Inactive · 2 = Blocked */
   status: 0 | 1 | 2;
-  /** Optimistic-lock version counter */
   version: number;
-  createdAt: string; // ISO-8601
-  updatedAt: string; // ISO-8601
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Category ─────────────────────────────────────────────────────────────────
@@ -39,9 +31,8 @@ export interface Category {
   categoryType: TransactionDirection;
   parentId: string | null;
   isSystem: boolean;
-  /** 1 = Active · 0 = Inactive */
   status: 0 | 1;
-  createdAt: string; // ISO-8601
+  createdAt: string;
 }
 
 // ─── Transaction ──────────────────────────────────────────────────────────────
@@ -54,14 +45,40 @@ export interface Transaction {
   userId: string;
   categoryId: string;
   transactionType: TransactionDirection;
-  /** Positive decimal string, e.g. "500000" */
   amount: string;
   currency: string;
   status: TransactionStatus;
   description?: string;
-  occurredAt: string; // ISO-8601
+  occurredAt: string;
+  source?: 'MANUAL' | 'INVOICE_CONFIRMATION';
   idempotencyKey: string;
-  createdAt: string; // ISO-8601
+  createdAt: string;
+}
+
+// ─── Invoice ──────────────────────────────────────────────────────────────────
+
+export type InvoiceStatus = 'PENDING' | 'PROCESSED' | 'REJECTED' | 'DELETED';
+
+export interface InvoiceAuditTrailEntry {
+  action: string;
+  changedBy: string;
+  timestamp: string;
+  previousState: Record<string, unknown>;
+  nextState?: Record<string, unknown>;
+  note?: string | null;
+}
+
+export interface Invoice {
+  id: string;
+  userId: string;
+  imageUrl: string;
+  extractedData: Record<string, unknown>;
+  status: InvoiceStatus;
+  transactionId: string | null;
+  auditTrail: InvoiceAuditTrailEntry[];
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── API Create/Update Inputs ─────────────────────────────────────────────────
@@ -69,7 +86,6 @@ export interface Transaction {
 export interface CreateWalletInput {
   walletType: WalletType;
   walletName: string;
-  /** Optional — pass as string; backend expects a decimal string */
   spendingLimit?: string;
 }
 
@@ -77,7 +93,6 @@ export interface CreateTransactionInput {
   walletId: string;
   categoryId: string;
   transactionType: TransactionDirection;
-  /** Positive decimal string */
   amount: string;
   currency?: string;
   description?: string;
@@ -88,4 +103,21 @@ export interface CreateCategoryInput {
   name: string;
   categoryType: TransactionDirection;
   parentId?: string | null;
+}
+
+export interface UpdateInvoiceInput {
+  imageUrl?: string;
+  extractedData?: Record<string, unknown>;
+  status?: Exclude<InvoiceStatus, 'DELETED'>;
+}
+
+export interface ConfirmInvoiceInput {
+  walletId: string;
+  categoryId: string;
+  amount: string;
+  transactionType?: TransactionDirection;
+  currency?: string;
+  description?: string;
+  occurredAt?: string;
+  extractedData?: Record<string, unknown>;
 }

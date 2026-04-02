@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "seed": "node seed.js",
-    "seed:phase3": "node seed-phase3.js"
+    "seed:phase3": "node seed-phase3.js",
+    "seed:1year": "npx ts-node --project tsconfig.json --transpile-only seed-1year-data.ts"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

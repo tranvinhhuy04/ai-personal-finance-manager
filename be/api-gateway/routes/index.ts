@@ -48,7 +48,17 @@ function rewriteWalletPath(_path: string, req: IncomingMessage) {
   return originalUrl ?? _path;
 }
 
+function rewriteCategoryPath(_path: string, req: IncomingMessage) {
+  const originalUrl = (req as any).originalUrl as string | undefined;
+  return originalUrl ?? _path;
+}
+
 function rewriteTransactionPath(_path: string, req: IncomingMessage) {
+  const originalUrl = (req as any).originalUrl as string | undefined;
+  return originalUrl ?? _path;
+}
+
+function rewriteInvoicePath(_path: string, req: IncomingMessage) {
   const originalUrl = (req as any).originalUrl as string | undefined;
   return originalUrl ?? _path;
 }
@@ -96,6 +106,22 @@ router.use(
   })
 );
 
+// /api/v1/categories/* -> service-transaction (JWT required)
+router.use(
+  '/categories',
+  verifyToken,
+  createProxyMiddleware({
+    target: TRANSACTION_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: rewriteCategoryPath,
+    proxyTimeout: PROXY_TIMEOUT_MS,
+    timeout: PROXY_TIMEOUT_MS,
+    onProxyReq,
+    onProxyRes,
+    onError: onProxyError as any,
+  })
+);
+
 // /api/v1/transactions/* -> service-transaction (JWT required)
 router.use(
   '/transactions',
@@ -105,6 +131,22 @@ router.use(
     changeOrigin: true,
     // Keep full path unchanged so downstream transaction-service handles /api/v1/transactions.
     pathRewrite: rewriteTransactionPath,
+    proxyTimeout: PROXY_TIMEOUT_MS,
+    timeout: PROXY_TIMEOUT_MS,
+    onProxyReq,
+    onProxyRes,
+    onError: onProxyError as any,
+  })
+);
+
+// /api/v1/invoices/* -> service-transaction (JWT required)
+router.use(
+  '/invoices',
+  verifyToken,
+  createProxyMiddleware({
+    target: TRANSACTION_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: rewriteInvoicePath,
     proxyTimeout: PROXY_TIMEOUT_MS,
     timeout: PROXY_TIMEOUT_MS,
     onProxyReq,

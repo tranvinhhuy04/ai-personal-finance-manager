@@ -2,8 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
-import { connectDB } from './config/db';
-import { connectRabbitMQ } from './config/rabbitmq';
+import path from 'path';
+import { connectDB } from './src/config/db';
+import { connectRabbitMQ } from './src/config/rabbitmq';
 import transactionRoutes from './src/routes';
 import { outboxPublisher } from './src/messaging/outbox.publisher';
 import transactionConsumer from './src/messaging/transaction.consumer';
@@ -13,11 +14,14 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.TRANSACTION_PORT ?? process.env.PORT) || 3003;
+const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
 
 // Middleware
 app.use(cors());
 app.use(morgan('combined'));
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use('/api/v1/invoices/files', express.static(uploadsDir));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -25,7 +29,7 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/v1/transactions', transactionRoutes);
+app.use('/api/v1', transactionRoutes);
 
 app.use(errorHandler);
 

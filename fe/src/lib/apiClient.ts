@@ -2,15 +2,19 @@ import type {
   Wallet,
   Category,
   Transaction,
+  Invoice,
   CreateWalletInput,
   CreateTransactionInput,
   CreateCategoryInput,
+  UpdateInvoiceInput,
+  ConfirmInvoiceInput,
 } from '@/types/finance';
 import { axiosClient } from '@/utils/axiosClient';
 
 type WalletApiResponse = Record<string, any>;
 type TransactionApiResponse = Record<string, any>;
 type CategoryApiResponse = Record<string, any>;
+type InvoiceApiResponse = Record<string, any>;
 
 class ApiClient {
   private normalizeWallet(raw: WalletApiResponse): Wallet {
@@ -39,7 +43,8 @@ class ApiClient {
       currency: raw.currency ?? 'VND',
       status: raw.status ?? 'PENDING',
       description: raw.description ?? '',
-      occurredAt: raw.occurredAt ?? raw.createdAt ?? new Date().toISOString(),
+      occurredAt: raw.occurredAt ?? raw.occurred_at ?? raw.createdAt ?? new Date().toISOString(),
+      source: raw.source ?? 'MANUAL',
       idempotencyKey: raw.idempotencyKey ?? raw.idempotency_key ?? '',
       createdAt: raw.createdAt ?? new Date().toISOString(),
     } as Transaction;
@@ -56,6 +61,38 @@ class ApiClient {
       status: Number(raw.status ?? 1) as 0 | 1,
       createdAt: raw.createdAt ?? new Date().toISOString(),
     } as Category;
+  }
+
+  private normalizeInvoice(raw: InvoiceApiResponse): Invoice {
+    return {
+      id: raw.id ?? raw._id ?? '',
+      userId: raw.userId ?? raw.user_id ?? '',
+      imageUrl: raw.imageUrl ?? raw.image_url ?? '',
+      extractedData: raw.extractedData ?? raw.extracted_data ?? {},
+      status: raw.status ?? 'PENDING',
+      transactionId: raw.transactionId ?? raw.transaction_id ?? null,
+      auditTrail: (raw.auditTrail ?? raw.audit_trail ?? []).map((entry: Record<string, any>) => ({
+        action: entry.action,
+        changedBy: entry.changedBy ?? entry.changed_by ?? '',
+        timestamp: entry.timestamp ?? new Date().toISOString(),
+        previousState: entry.previousState ?? entry.previous_state ?? {},
+        nextState: entry.nextState ?? entry.next_state ?? undefined,
+        note: entry.note ?? null,
+      })),
+      deletedAt: raw.deletedAt ?? raw.deleted_at ?? null,
+      createdAt: raw.createdAt ?? new Date().toISOString(),
+      updatedAt: raw.updatedAt ?? new Date().toISOString(),
+    } as Invoice;
+  }
+
+  private async uploadMultipart<T>(url: string, formData: FormData): Promise<T> {
+    const response = await axiosClient.post<T>(url, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data;
   }
 
   // ===== WALLET ENDPOINTS =====
@@ -81,7 +118,6 @@ class ApiClient {
 
   async updateWalletStatus(walletId: string, status: number): Promise<Wallet> {
     const payload = { status: Number(status) };
-    console.log('[apiClient.updateWalletStatus] payload =', payload);
     const response = await axiosClient.put(`/api/v1/wallets/${walletId}/status`, payload);
     return this.normalizeWallet(response.data);
   }
@@ -118,8 +154,6 @@ class ApiClient {
       payload.status = Number(data.status);
     }
 
-    console.log('[apiClient.updateWallet] payload =', payload);
-
     const response = await axiosClient.put(`/api/v1/wallets/${walletId}`, payload);
     return this.normalizeWallet(response.data);
   }
@@ -140,7 +174,7 @@ class ApiClient {
     return items.length > 0;
   }
 
-  // ===== TRANSACTION ENDPOINTS =====
+  // ===== CATEGORY + TRANSACTION ENDPOINTS =====
 
   async createCategory(data: CreateCategoryInput): Promise<Category> {
     const response = await axiosClient.post('/api/v1/categories', {
@@ -151,17 +185,48 @@ class ApiClient {
     return this.normalizeCategory(response.data);
   }
 
-  async getCategories(): Promise<Category[]> {
-    const response = await axiosClient.get('/api/v1/categories');
+  async getCategories(categoryType?: 'INCOME' | 'EXPENSE'): Promise<Category[]> {
+    const response = await axiosClient.get('/api/v1/categories', {
+      params: categoryType ? { category_type: categoryType } : undefined,
+    });
     return (response.data ?? []).map((item: CategoryApiResponse) => this.normalizeCategory(item));
   }
 
+  async updateCategory(
+    categoryId: string,
+    data: { name?: string; categoryType?: 'INCOME' | 'EXPENSE'; parentId?: string | null; status?: number }
+  ): Promise<Category> {
+    const response = await axiosClient.put(`/api/v1/categories/${categoryId}`, {
+      name: data.name,
+      category_type: data.categoryType,
+      parent_id: data.parentId,
+      status: data.status,
+    });
+    return this.normalizeCategory(response.data);
+  }
+
+  async deleteCategory(categoryId: string): Promise<{ success: boolean; id: string }> {
+    const response = await axiosClient.delete(`/api/v1/categories/${categoryId}`);
+    return {
+      success: Boolean(response.data?.success),
+      id: String(response.data?.id ?? categoryId),
+    };
+  }
+
   async createTransaction(data: CreateTransactionInput): Promise<Transaction> {
+    const idempotencyKey = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `txn-${Date.now()}`;
+
     const response = await axiosClient.post('/api/v1/transactions', {
       wallet_id: data.walletId,
+      category_id: data.categoryId,
       amount: data.amount,
       transaction_type: data.transactionType,
-      idempotency_key: crypto.randomUUID(),
+      currency: data.currency ?? 'VND',
+      description: data.description ?? '',
+      occurred_at: data.occurredAt,
+      idempotency_key: idempotencyKey,
     });
     return this.normalizeTransaction(response.data);
   }
@@ -172,19 +237,70 @@ class ApiClient {
   }
 
   async getTransactions(limit: number = 50, skip: number = 0): Promise<Transaction[]> {
-    const response = await axiosClient.get(`/api/v1/transactions?limit=${limit}&skip=${skip}`);
+    const response = await axiosClient.get('/api/v1/transactions', {
+      params: { limit, skip },
+    });
     return (response.data ?? []).map((item: TransactionApiResponse) => this.normalizeTransaction(item));
   }
 
-  async getWalletTransactions(
-    walletId: string,
-    limit: number = 50,
-    skip: number = 0
-  ): Promise<Transaction[]> {
-    const response = await axiosClient.get(
-      `/api/v1/transactions/wallets/${walletId}/transactions?limit=${limit}&skip=${skip}`
-    );
+  async getWalletTransactions(walletId: string, limit: number = 50, skip: number = 0): Promise<Transaction[]> {
+    const response = await axiosClient.get('/api/v1/transactions', {
+      params: { wallet_id: walletId, limit, skip },
+    });
     return (response.data ?? []).map((item: TransactionApiResponse) => this.normalizeTransaction(item));
+  }
+
+  // ===== INVOICE ENDPOINTS =====
+
+  async uploadInvoice(file: File, extractedData: Record<string, unknown> = {}): Promise<Invoice> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('extracted_data', JSON.stringify(extractedData));
+
+    const data = await this.uploadMultipart<InvoiceApiResponse>('/api/v1/invoices/upload', formData);
+    return this.normalizeInvoice(data);
+  }
+
+  async getInvoices(): Promise<Invoice[]> {
+    const response = await axiosClient.get('/api/v1/invoices');
+    return (response.data ?? []).map((item: InvoiceApiResponse) => this.normalizeInvoice(item));
+  }
+
+  async updateInvoice(invoiceId: string, data: UpdateInvoiceInput): Promise<Invoice> {
+    const response = await axiosClient.put(`/api/v1/invoices/${invoiceId}`, {
+      image_url: data.imageUrl,
+      extracted_data: data.extractedData,
+      status: data.status,
+    });
+    return this.normalizeInvoice(response.data);
+  }
+
+  async deleteInvoice(invoiceId: string): Promise<Invoice> {
+    const response = await axiosClient.delete(`/api/v1/invoices/${invoiceId}`);
+    return this.normalizeInvoice(response.data);
+  }
+
+  async confirmInvoice(invoiceId: string, data: ConfirmInvoiceInput): Promise<{ invoice: Invoice; transaction: Transaction }> {
+    const response = await axiosClient.post(`/api/v1/invoices/${invoiceId}/confirm`, {
+      wallet_id: data.walletId,
+      category_id: data.categoryId,
+      amount: data.amount,
+      transaction_type: data.transactionType ?? 'EXPENSE',
+      currency: data.currency ?? 'VND',
+      description: data.description ?? '',
+      occurred_at: data.occurredAt,
+      extracted_data: data.extractedData,
+    });
+
+    return {
+      invoice: this.normalizeInvoice(response.data?.invoice ?? {}),
+      transaction: this.normalizeTransaction(response.data?.transaction ?? {}),
+    };
+  }
+
+  async getProtectedFileUrl(filePath: string): Promise<string> {
+    const response = await axiosClient.get(filePath, { responseType: 'blob' });
+    return URL.createObjectURL(response.data);
   }
 }
 

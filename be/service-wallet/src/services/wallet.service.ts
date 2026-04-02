@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { AppError } from '../errors/AppError';
-import { IWallet, WalletModel, WalletType } from '../models/wallet.model';
+import { IWallet, WalletType } from '../models/wallet.model';
+import { walletRepository } from '../repositories/wallet.repository';
 
 type CreateWalletInput = {
   user_id: string;
@@ -36,7 +37,7 @@ export class WalletService {
       throw new AppError('wallet_name is required', 400);
     }
 
-    const wallet = await WalletModel.create({
+    const wallet = await walletRepository.create({
       user_id: input.user_id,
       wallet_type: input.wallet_type,
       wallet_name: input.wallet_name.trim(),
@@ -53,7 +54,7 @@ export class WalletService {
 
   async listWalletsByUserId(userId: string) {
     if (!userId) throw new AppError('user_id is required', 400);
-    const wallets = await WalletModel.find({ user_id: userId }).sort({ createdAt: -1 }).lean();
+    const wallets = await walletRepository.findAllByUserId(userId);
     return wallets.map((w) => this.toResponse(w));
   }
 
@@ -61,7 +62,7 @@ export class WalletService {
     if (!mongoose.Types.ObjectId.isValid(walletId)) throw new AppError('wallet_id is invalid', 400);
     if (!userId) throw new AppError('user_id is required', 400);
 
-    const wallet = await WalletModel.findOne({ _id: walletId, user_id: userId });
+    const wallet = await walletRepository.findOwnedDoc(walletId, userId);
     if (!wallet) throw new AppError('Wallet not found', 404);
 
     if (payload.wallet_name !== undefined) {
@@ -89,12 +90,7 @@ export class WalletService {
     if (!userId) throw new AppError('user_id is required', 400);
     if (![0, 1, 2].includes(status)) throw new AppError('status must be 0, 1 or 2', 400);
 
-    const wallet = await WalletModel.findOneAndUpdate(
-      { _id: walletId, user_id: userId },
-      { $set: { status } },
-      { new: true }
-    ).lean();
-
+    const wallet = await walletRepository.updateStatus(walletId, userId, status);
     if (!wallet) throw new AppError('Wallet not found', 404);
     return this.toResponse(wallet);
   }
@@ -103,7 +99,7 @@ export class WalletService {
     if (!mongoose.Types.ObjectId.isValid(walletId)) throw new AppError('wallet_id is invalid', 400);
     if (!userId) throw new AppError('user_id is required', 400);
 
-    const deleted = await WalletModel.findOneAndDelete({ _id: walletId, user_id: userId }).lean();
+    const deleted = await walletRepository.deleteOwned(walletId, userId);
     if (!deleted) throw new AppError('Wallet not found', 404);
 
     return { success: true };
@@ -113,7 +109,7 @@ export class WalletService {
     const amountValue = parsePositiveDecimal(input.amount, 'amount');
 
     for (let retry = 0; retry < 3; retry += 1) {
-      const current = await WalletModel.findById(input.wallet_id).lean();
+      const current = await walletRepository.findById(input.wallet_id);
       if (!current) {
         return { success: false, error: 'Wallet not found' };
       }
@@ -126,18 +122,11 @@ export class WalletService {
         return { success: false, error: 'Insufficient balance' };
       }
 
-      const updated = await WalletModel.findOneAndUpdate(
-        { _id: input.wallet_id, version: current.version },
-        {
-          $set: {
-            balance: mongoose.Types.Decimal128.fromString(String(nextBalance)),
-          },
-          $inc: {
-            version: 1,
-          },
-        },
-        { new: true }
-      ).lean();
+      const updated = await walletRepository.atomicBalanceUpdate(
+        input.wallet_id,
+        current.version,
+        String(nextBalance),
+      );
 
       if (updated) {
         return {

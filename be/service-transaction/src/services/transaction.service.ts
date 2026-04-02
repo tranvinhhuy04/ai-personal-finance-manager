@@ -1,16 +1,24 @@
-import mongoose from 'mongoose';
+import mongoose, { ClientSession } from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
 import { AppError } from '../errors/AppError';
 import { OutboxModel } from '../models/outbox.model';
 import { TransactionModel } from '../models/transaction.model';
 
 export type CreateTransactionInput = {
+  user_id?: string;
   wallet_id: string;
+  category_id?: string | null;
   amount: string;
   transaction_type: 'INCOME' | 'EXPENSE';
-  idempotency_key: string;
+  currency?: string;
+  description?: string;
+  occurred_at?: string | Date;
+  idempotency_key?: string;
+  source?: 'MANUAL' | 'INVOICE_CONFIRMATION';
+  session?: ClientSession;
 };
 
-function parsePositiveAmount(value: string) {
+function parsePositiveAmount(value: string | number) {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new AppError('amount must be a positive number', 400);
@@ -18,34 +26,67 @@ function parsePositiveAmount(value: string) {
   return amount;
 }
 
+function parseOccurredAt(value?: string | Date) {
+  if (!value) return new Date();
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new AppError('occurred_at must be a valid ISO date', 400);
+  }
+  return date;
+}
+
 class TransactionService {
   async createTransaction(input: CreateTransactionInput) {
     if (!input.wallet_id) throw new AppError('wallet_id is required', 400);
     if (!input.transaction_type) throw new AppError('transaction_type is required', 400);
-    if (!input.idempotency_key) throw new AppError('idempotency_key is required', 400);
 
     const amount = parsePositiveAmount(input.amount);
+    const occurredAt = parseOccurredAt(input.occurred_at);
+    const idempotencyKey = input.idempotency_key?.trim() || uuidv4();
+    const createOptions = input.session ? { session: input.session } : {};
 
     try {
-      const transaction = await TransactionModel.create({
-        wallet_id: input.wallet_id,
-        amount: mongoose.Types.Decimal128.fromString(String(amount)),
-        transaction_type: input.transaction_type,
-        status: 'PENDING',
-        idempotency_key: input.idempotency_key,
-      });
+      const [transaction] = await TransactionModel.create(
+        [
+          {
+            user_id: input.user_id ?? null,
+            wallet_id: input.wallet_id,
+            category_id: input.category_id ?? null,
+            amount: mongoose.Types.Decimal128.fromString(String(amount)),
+            transaction_type: input.transaction_type,
+            currency: input.currency ?? 'VND',
+            description: input.description?.trim() || null,
+            occurred_at: occurredAt,
+            source: input.source ?? 'MANUAL',
+            status: 'PENDING',
+            idempotency_key: idempotencyKey,
+          },
+        ],
+        createOptions
+      );
 
-      await OutboxModel.create({
-        event_type: 'TransactionCreated',
-        aggregate_id: transaction._id.toString(),
-        payload: {
-          transactionId: transaction._id.toString(),
-          walletId: transaction.wallet_id,
-          amount: String(amount),
-          transactionType: transaction.transaction_type,
-        },
-        published: false,
-      });
+      await OutboxModel.create(
+        [
+          {
+            event_type: 'TransactionCreated',
+            aggregate_id: transaction._id.toString(),
+            payload: {
+              transactionId: transaction._id.toString(),
+              userId: transaction.user_id ?? undefined,
+              walletId: transaction.wallet_id,
+              categoryId: transaction.category_id ?? undefined,
+              amount: String(amount),
+              currency: transaction.currency ?? 'VND',
+              description: transaction.description ?? '',
+              transactionType: transaction.transaction_type,
+              occurredAt: occurredAt.toISOString(),
+              source: transaction.source ?? 'MANUAL',
+            },
+            published: false,
+          },
+        ],
+        createOptions
+      );
 
       return this.toResponse(transaction);
     } catch (error: any) {
@@ -64,11 +105,19 @@ class TransactionService {
     await TransactionModel.findByIdAndUpdate(transactionId, { status: 'FAILED' });
   }
 
-  async listTransactions(limit = 50, skip = 0, walletId?: string) {
-    const filter = walletId ? { wallet_id: walletId } : {};
+  async listTransactions(limit = 50, skip = 0, walletId?: string, userId?: string) {
+    const filter: Record<string, unknown> = {};
+
+    if (walletId) {
+      filter.wallet_id = walletId;
+    }
+
+    if (userId) {
+      filter.user_id = userId;
+    }
 
     const items = await TransactionModel.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ occurred_at: -1, createdAt: -1 })
       .limit(Math.min(limit, 200))
       .skip(skip)
       .lean();
@@ -79,10 +128,16 @@ class TransactionService {
   private toResponse(transaction: any) {
     return {
       id: transaction._id.toString(),
+      user_id: transaction.user_id ?? '',
       wallet_id: transaction.wallet_id,
+      category_id: transaction.category_id ?? '',
       amount: transaction.amount?.toString?.() ?? '0',
       transaction_type: transaction.transaction_type,
+      currency: transaction.currency ?? 'VND',
+      description: transaction.description ?? '',
       status: transaction.status,
+      occurredAt: transaction.occurred_at ?? transaction.createdAt,
+      source: transaction.source ?? 'MANUAL',
       idempotency_key: transaction.idempotency_key,
       createdAt: transaction.createdAt,
       updatedAt: transaction.updatedAt,
