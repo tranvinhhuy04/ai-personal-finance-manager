@@ -53,17 +53,34 @@ export class WalletRepository {
     walletId: string,
     currentVersion: number,
     newBalance: string,
+    transactionId?: string,
   ): Promise<IWallet | null> {
-    return WalletModel.findOneAndUpdate(
-      { _id: walletId, version: currentVersion },
-      {
-        $set: {
-          balance: mongoose.Types.Decimal128.fromString(newBalance),
-        },
-        $inc: { version: 1 },
+    const filter: Record<string, unknown> = {
+      _id: walletId,
+      version: currentVersion,
+    };
+
+    if (transactionId) {
+      filter.processed_transaction_ids = { $ne: transactionId };
+    }
+
+    const update: Record<string, unknown> = {
+      $set: {
+        balance: mongoose.Types.Decimal128.fromString(newBalance),
       },
-      { new: true },
-    ).lean();
+      $inc: { version: 1 },
+    };
+
+    if (transactionId) {
+      update.$push = {
+        processed_transaction_ids: {
+          $each: [transactionId],
+          $slice: -200,
+        },
+      };
+    }
+
+    return WalletModel.findOneAndUpdate(filter, update, { new: true }).lean();
   }
 }
 

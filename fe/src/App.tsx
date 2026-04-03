@@ -22,6 +22,7 @@ import { Help } from './pages/Help';
 import { Auth } from './pages/Auth';
 import { Profile } from './pages/Profile';
 import { Wallets } from './pages/Wallets';
+import { SavingInvestment } from './pages/SavingInvestment';
 
 function DashboardHome() {
   const { data, isLoading } = useDashboardData();
@@ -54,6 +55,7 @@ export default function App() {
                   <Route path="/" element={<DashboardHome />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/wallets" element={<Wallets />} />
+                  <Route path="/savings" element={<SavingInvestment />} />
                   <Route path="/analytics" element={<Dashboard />} />
                   <Route path="/transactions" element={<Transactions />} />
                   <Route path="/invoices" element={<Invoices />} />

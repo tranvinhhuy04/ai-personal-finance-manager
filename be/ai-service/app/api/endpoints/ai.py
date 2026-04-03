@@ -12,10 +12,15 @@ router = APIRouter()
 
 
 class ChatRequest(BaseModel):
-    question: str = Field(..., min_length=2, description="Câu hỏi tiếng Việt của người dùng")
+    message: str | None = Field(default=None, description="Tin nhắn người dùng do BFF/Gateway gửi sang")
+    question: str | None = Field(default=None, description="Alias cũ để giữ tương thích ngược với client hiện tại")
+    financialContext: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Tóm tắt tài chính đáng tin cậy do Node.js BFF lấy từ analytics-service/database",
+    )
     context: dict[str, Any] = Field(
         default_factory=dict,
-        description="Dữ liệu tài chính đã lấy từ analytics-service/wallet-service để AI trả lời tốt hơn",
+        description="Dữ liệu bổ sung để AI trả lời tốt hơn",
     )
     use_llm: bool = Field(
         default=False,
@@ -34,15 +39,35 @@ async def ocr_invoice() -> dict[str, Any]:
 
 @router.post("/chat")
 async def chat(payload: ChatRequest) -> dict[str, Any]:
-    """Classify intent bằng embedding PhoBERT và trả về skeleton trả lời chatbot."""
+    """Nhận payload đã được BFF enrich context rồi trả về câu trả lời tài chính chính xác hơn."""
     try:
+        resolved_question = (payload.message or payload.question or '').strip()
+        if len(resolved_question) < 2:
+            raise HTTPException(status_code=400, detail="message/question must contain at least 2 characters")
+
+        merged_context = dict(payload.context or {})
+        financial_context = dict(payload.financialContext or {})
+
+        if financial_context:
+            merged_context["financialContext"] = financial_context
+            merged_context["summary"] = {
+                **dict(merged_context.get("summary") or {}),
+                "totalIncome": financial_context.get("totalIncome"),
+                "totalExpense": financial_context.get("totalExpense"),
+                "netCashFlow": financial_context.get("netCashFlow"),
+                "net": financial_context.get("netCashFlow"),
+            }
+            merged_context["topExpenses"] = financial_context.get("topExpenses", [])
+
         result = await get_nlp_service().answer_question(
-            question=payload.question,
-            context=payload.context,
+            question=resolved_question,
+            context=merged_context,
             use_llm=payload.use_llm,
         )
         return {"success": True, **result}
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Không thể xử lý chatbot: {exc}") from exc

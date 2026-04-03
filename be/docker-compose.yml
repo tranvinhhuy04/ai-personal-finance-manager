@@ -212,9 +212,9 @@ services:
       - ./ai-service/.env
     environment:
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
-      AI_SERVICE_PRELOAD_MODELS: "false"
+      AI_SERVICE_PRELOAD_MODELS: "true"
       TORCH_NUM_THREADS: 1
-      AI_AUTO_USE_GEMINI: "false"
+      AI_AUTO_USE_GEMINI: "true"
     volumes:
       - ai_model_cache:/opt/hf-cache
     networks:

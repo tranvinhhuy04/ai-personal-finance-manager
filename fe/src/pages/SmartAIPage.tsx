@@ -53,18 +53,6 @@ export const SmartAIPage = () => {
   const [analysisResult, setAnalysisResult] = useState<AIChatResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const buildAiContext = async () => {
-    try {
-      const analytics = await apiClient.getAnalyticsDashboard();
-      return {
-        summary: analytics.summary,
-        trend: analytics.trend.slice(-3),
-        breakdown: analytics.breakdown.slice(0, 5),
-      };
-    } catch {
-      return {};
-    }
-  };
 
   const handleOcrFile = async (file: File) => {
     setSelectedFile(file);
@@ -132,8 +120,7 @@ export const SmartAIPage = () => {
     setChatError(null);
 
     try {
-      const context = await buildAiContext();
-      const result = await apiClient.askAI({ question: resolvedQuestion, context, useLlm: true });
+      const result = await apiClient.askAI({ question: resolvedQuestion, useLlm: true });
       setChatResult(result);
     } catch (error) {
       setChatError(getErrorMessage(error));
@@ -151,11 +138,9 @@ export const SmartAIPage = () => {
     setAnalysisError(null);
 
     try {
-      const context = await buildAiContext();
       const result = await apiClient.askAI({
         question: `Hãy đưa ra lời khuyên tài chính dựa trên nội dung sau: ${trimmed}`,
         context: {
-          ...context,
           pastedText: trimmed.slice(0, 2000),
         },
         useLlm: true,

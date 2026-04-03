@@ -62,6 +62,10 @@ class NLPService:
                 "Không thể tải PhoBERT. Hãy kiểm tra internet, disk cache hoặc bộ nhớ container."
             ) from exc
 
+    def warm_up(self) -> None:
+        """Thực sự tải model vào RAM ngay khi startup nếu được bật preload."""
+        self._ensure_model_loaded()
+
     def _build_intent_centroids(self) -> None:
         assert self.model is not None and self.tokenizer is not None
 
@@ -161,29 +165,56 @@ class NLPService:
 
     def build_rule_based_answer(self, question: str, intent: str, context: dict[str, Any]) -> str:
         summary = context.get("summary", {}) if isinstance(context, dict) else {}
-        total_expense = summary.get("totalExpense") or summary.get("total_expense")
-        total_income = summary.get("totalIncome") or summary.get("total_income")
+        financial_context = context.get("financialContext", {}) if isinstance(context, dict) else {}
+        top_expenses = context.get("topExpenses", []) if isinstance(context, dict) else []
+
+        total_expense = (
+            summary.get("totalExpense")
+            or summary.get("total_expense")
+            or financial_context.get("totalExpense")
+            or financial_context.get("total_expense")
+        )
+        total_income = (
+            summary.get("totalIncome")
+            or summary.get("total_income")
+            or financial_context.get("totalIncome")
+            or financial_context.get("total_income")
+        )
 
         if intent == "query_spending":
             if total_expense is not None:
-                return f"Tổng chi tiêu hiện tại của bạn là {float(total_expense):,.0f} VND trong kỳ đang xét."
+                return f"Tổng chi tiêu hiện tại của bạn là {float(total_expense):,.0f} VND trong tháng này."
             return (
-                "Mình nhận diện đây là câu hỏi về chi tiêu. Bước tiếp theo là gọi analytics-service "
-                "để lấy tổng `summary.totalExpense`, rồi hiển thị kết quả cho người dùng."
+                "Mình nhận diện đây là câu hỏi về chi tiêu, nhưng hiện chưa có dữ liệu tổng hợp từ analytics-service để trả lời chính xác."
             )
 
         if intent == "query_income":
             if total_income is not None:
-                return f"Tổng thu nhập hiện tại của bạn là {float(total_income):,.0f} VND trong kỳ đang xét."
+                return f"Tổng thu nhập hiện tại của bạn là {float(total_income):,.0f} VND trong tháng này."
             return (
-                "Đây là câu hỏi về thu nhập. Bạn nên lấy `summary.totalIncome` từ analytics-service "
-                "để trả lời chính xác theo tháng hoặc theo ví."
+                "Đây là câu hỏi về thu nhập, nhưng hiện chưa lấy được `summary.totalIncome` từ analytics-service."
             )
 
         if intent == "financial_advice":
+            if total_income is not None and total_expense is not None:
+                net_cash_flow = float(total_income) - float(total_expense)
+                savings_rate = 0.0 if float(total_income) <= 0 else max(net_cash_flow, 0) / float(total_income) * 100
+                top_expense = top_expenses[0] if isinstance(top_expenses, list) and top_expenses else None
+                if isinstance(top_expense, dict):
+                    category_name = str(top_expense.get("name") or "danh mục lớn nhất")
+                    category_amount = float(top_expense.get("amount") or 0)
+                    return (
+                        f"Tháng này bạn thu {float(total_income):,.0f} VND và chi {float(total_expense):,.0f} VND, "
+                        f"còn lại khoảng {net_cash_flow:,.0f} VND. Khoản chi lớn nhất hiện là {category_name} "
+                        f"({category_amount:,.0f} VND), nên bạn hãy đặt trần chi tiêu riêng cho nhóm này để cải thiện tỷ lệ tiết kiệm lên trên {savings_rate:.0f}%."
+                    )
+                return (
+                    f"Tháng này bạn thu {float(total_income):,.0f} VND và chi {float(total_expense):,.0f} VND, "
+                    f"còn lại khoảng {net_cash_flow:,.0f} VND. Bạn nên đặt ngân sách tuần cố định và giữ ít nhất 20% thu nhập cho tiết kiệm trước khi chi tiêu linh hoạt."
+                )
+
             return (
-                "Tôi khuyên bạn áp dụng quy tắc 50/30/20, đặt ngân sách theo danh mục và theo dõi "
-                "các khoản chi vượt ngưỡng mỗi tuần. Nếu muốn cá nhân hoá sâu hơn, hãy gửi dữ liệu tổng hợp sang Gemini."
+                "Tôi có thể đưa lời khuyên tốt hơn nếu backend gửi thêm tổng thu, tổng chi và nhóm chi tiêu lớn nhất từ analytics-service."
             )
 
         return (

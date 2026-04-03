@@ -9,8 +9,10 @@ export default function verifyToken(req: Request, res: Response, next: NextFunct
   }
 
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  console.log('Token received:', token);
+  const bearerToken = authHeader && authHeader.split(' ')[1];
+  const queryToken = typeof req.query.token === 'string' ? req.query.token : undefined;
+  const token = bearerToken || queryToken;
+  console.log('Token received:', token ? '[present]' : '[missing]');
 
   if (!token) {
     return res.status(401).json({ message: 'Access token missing' });

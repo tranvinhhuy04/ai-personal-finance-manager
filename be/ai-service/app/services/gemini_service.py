@@ -30,7 +30,10 @@ class GeminiService:
     @staticmethod
     def _extract_text(data: dict[str, Any]) -> str | None:
         try:
-            return data['candidates'][0]['content']['parts'][0]['text']
+            parts = data['candidates'][0]['content']['parts']
+            texts = [part.get('text', '') for part in parts if isinstance(part, dict) and part.get('text')]
+            joined = ''.join(texts).strip()
+            return joined or None
         except Exception:
             return None
 
@@ -47,28 +50,33 @@ class GeminiService:
 
         prompt = (
             'Bạn là Senior AI Financial Assistant cho ứng dụng quản lý tài chính cá nhân. '
-            'Trả lời bằng tiếng Việt, ngắn gọn, thực tế, ưu tiên số liệu trong context. '
+            'Trả lời bằng tiếng Việt tự nhiên, đầy đủ ý nhưng súc tích trong 2-4 câu. '
+            'Tuyệt đối không bịa số liệu: chỉ dùng số từ financialContext/context; nếu thiếu thì nói rõ là chưa có dữ liệu. '
+            'Nếu đang đưa lời khuyên, hãy nêu ngắn gọn: tình hình hiện tại, nguyên nhân lớn nhất và 1-2 hành động cụ thể. '
             f'Intent đã nhận diện: {intent}.\n'
             f'Câu hỏi người dùng: {question}.\n'
-            f'Context dữ liệu: {json.dumps(context, ensure_ascii=False)}.\n'
+            f'Context dữ liệu đáng tin cậy từ backend: {json.dumps(context, ensure_ascii=False)}.\n'
             f'Nếu context không đủ, dùng câu fallback sau làm nền: {fallback_answer}'
         )
 
         payload = {
             'contents': [{'parts': [{'text': prompt}]}],
             'generationConfig': {
-                'temperature': 0.3,
-                'topP': 0.9,
-                'maxOutputTokens': 300,
+                'temperature': 0.2,
+                'topP': 0.8,
+                'maxOutputTokens': 256,
             },
         }
 
         try:
-            async with httpx.AsyncClient(timeout=25.0) as client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(12.0, connect=4.0)) as client:
                 response = await client.post(self._url(), json=payload)
                 response.raise_for_status()
                 data = response.json()
-                return self._extract_text(data)
+                generated = self._extract_text(data)
+                if not generated or len(generated.strip()) < 40:
+                    return None
+                return generated
         except Exception:
             return None
 

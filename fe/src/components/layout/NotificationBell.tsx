@@ -8,6 +8,8 @@ const alertClasses: Record<string, string> = {
   ALERT: 'bg-orange-50 text-orange-700 border-orange-200',
   REMINDER: 'bg-amber-50 text-amber-700 border-amber-200',
   INFO: 'bg-slate-50 text-slate-700 border-slate-200',
+  SUCCESS: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  WARNING: 'bg-yellow-50 text-yellow-700 border-yellow-200',
 };
 
 function formatRelativeTime(value: string): string {
@@ -39,7 +41,7 @@ export const NotificationBell = memo(function NotificationBell() {
     markAsRead,
     markAllAsRead,
     isMarkingAll,
-  } = useNotifications({ page: 1, limit: 20, enabled: open });
+  } = useNotifications({ page: 1, limit: 20, enabled: true });
 
   const notifications = useMemo(() => data?.data ?? [], [data]);
 
@@ -128,7 +130,10 @@ export const NotificationBell = memo(function NotificationBell() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
-                            <p className={cn('text-sm font-medium', item.type === 'ALERT' ? 'text-orange-700' : 'text-gray-900')}>
+                            <p className={cn(
+                              'text-sm font-medium',
+                              item.type === 'ALERT' ? 'text-orange-700' : item.type === 'SUCCESS' ? 'text-emerald-700' : item.type === 'WARNING' ? 'text-yellow-700' : 'text-gray-900'
+                            )}>
                               {item.title}
                             </p>
                             {!item.is_read && <span className="w-2 h-2 rounded-full bg-red-500 mt-1" />}
@@ -144,7 +149,7 @@ export const NotificationBell = memo(function NotificationBell() {
 
               <div className="px-4 py-2 text-[11px] text-gray-400 bg-gray-50/70 border-t border-gray-100 flex items-center gap-1">
                 <Loader2 className="w-3 h-3" />
-                Cập nhật theo chu kỳ ngắn để giữ dữ liệu realtime.
+                Tự làm mới qua SSE realtime, polling giữ vai trò dự phòng.
               </div>
             </motion.div>
           </>

@@ -8,6 +8,7 @@ export interface IWallet {
   wallet_type: WalletType;
   wallet_name: string;
   balance: mongoose.Types.Decimal128;
+  processed_transaction_ids: string[];
   status: number;
   version: number;
   createdAt: Date;
@@ -36,6 +37,10 @@ const walletSchema = new Schema<IWallet>(
       type: Schema.Types.Decimal128,
       required: true,
       default: mongoose.Types.Decimal128.fromString('0'),
+    },
+    processed_transaction_ids: {
+      type: [String],
+      default: [],
     },
     version: {
       type: Number,

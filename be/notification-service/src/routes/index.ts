@@ -11,6 +11,7 @@ const router = Router();
 router.use(requireAuth);
 router.get('/', listNotifications);
 router.put('/:id/read', markNotificationRead);
+router.patch('/:id/read', markNotificationRead);
 router.get('/stream', subscribeNotifications);
 
 export default router;

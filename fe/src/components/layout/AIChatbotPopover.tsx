@@ -38,18 +38,7 @@ export const AIChatbotPopover = () => {
     });
   }, [messages, isSending]);
 
-  const buildContext = async () => {
-    try {
-      const analytics = await apiClient.getAnalyticsDashboard();
-      return {
-        summary: analytics.summary,
-        trend: analytics.trend.slice(-3),
-        breakdown: analytics.breakdown.slice(0, 5),
-      };
-    } catch {
-      return {};
-    }
-  };
+  const shouldUseLlm = (question: string) => /lời khuyên|goi y|gợi ý|tiết kiệm|tối ưu|phan tich|phân tích|nên|kế hoạch/i.test(question);
 
   const handleSend = async (prompt?: string) => {
     const question = (prompt ?? inputValue).trim();
@@ -63,15 +52,14 @@ export const AIChatbotPopover = () => {
     setIsSending(true);
 
     try {
-      const context = await buildContext();
-      const result = await apiClient.askAI({ question, context, useLlm: true });
+      const result = await apiClient.askAI({ question, useLlm: shouldUseLlm(question) });
       setMessages((prev) => [
         ...prev,
         {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
           content: result.answer,
-          meta: `Intent: ${result.intent} • ${(result.confidence * 100).toFixed(0)}%`,
+          meta: `${result.llmUsed ? 'Gemini' : 'Fast mode'} • Intent: ${result.intent} • ${(result.confidence * 100).toFixed(0)}%`,
         },
       ]);
     } catch (error) {

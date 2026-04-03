@@ -8,6 +8,7 @@ const RABBITMQ_URL = process.env.RABBITMQ_URL;
 export const EXCHANGES = {
   WALLET_EVENTS: 'wallet.events',
   TRANSACTION_EVENTS: 'transaction.events',
+  FINTECH_EVENTS: 'fintech_events',
 };
 
 export const QUEUES = {
@@ -20,6 +21,7 @@ export const ROUTING_KEYS = {
   TRANSACTION_CREATED: 'transaction.created',
   WALLET_BALANCE_UPDATED: 'wallet.balance.updated',
   WALLET_BALANCE_UPDATE_FAILED: 'wallet.balance.update.failed',
+  NOTIFICATION_TRANSACTION: 'notification.transaction',
 };
 
 export async function connectRabbitMQ() {
@@ -32,6 +34,7 @@ export async function connectRabbitMQ() {
 
   await channel.assertExchange(EXCHANGES.WALLET_EVENTS, 'topic', { durable: true });
   await channel.assertExchange(EXCHANGES.TRANSACTION_EVENTS, 'topic', { durable: true });
+  await channel.assertExchange(EXCHANGES.FINTECH_EVENTS, 'topic', { durable: true });
 
   await channel.assertQueue(QUEUES.WALLET_BALANCE_UPDATES, { durable: true });
   await channel.assertQueue(QUEUES.WALLET_RESPONSES, { durable: true });

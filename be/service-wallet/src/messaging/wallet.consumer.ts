@@ -59,7 +59,14 @@ class WalletConsumer {
         wallet_id: walletId,
         amount,
         transaction_type: transactionType,
+        transaction_id: transactionId,
       });
+
+      if (update.success && update.duplicate) {
+        console.log(`[wallet-consumer] duplicate transaction ignored: ${transactionId}`);
+        channel.ack(msg);
+        return;
+      }
 
       if (update.success && update.wallet) {
         await publishMessage(EXCHANGES.WALLET_EVENTS, ROUTING_KEYS.WALLET_BALANCE_UPDATED, {

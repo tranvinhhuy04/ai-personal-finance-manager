@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import { json, Router } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { ClientRequest, IncomingMessage, ServerResponse } from 'http';
 import verifyToken from '../middlewares/verifyToken';
+import { handleAiChat } from '../utils/aiChatBff';
 
 const router = Router();
 
@@ -15,6 +16,7 @@ const NOTIFY_SERVICE_URL       = process.env.NOTIFICATION_SERVICE_URL ?? 'http:/
 const AI_SERVICE_URL           = process.env.AI_SERVICE_URL           ?? 'http://ai-service:8000';
 const AI_PROXY_TIMEOUT_MS      = Number(process.env.AI_PROXY_TIMEOUT_MS ?? 60_000);
 const INVOICE_PROXY_TIMEOUT_MS = Number(process.env.INVOICE_PROXY_TIMEOUT_MS ?? 60_000);
+const NOTIFICATION_STREAM_TIMEOUT_MS = Number(process.env.NOTIFICATION_STREAM_TIMEOUT_MS ?? 600_000);
 
 /** Shared error handler — returns 504 when upstream is unreachable or times out */
 function onProxyError(err: Error, req: IncomingMessage, res: ServerResponse) {
@@ -57,6 +59,11 @@ function rewriteCategoryPath(_path: string, req: IncomingMessage) {
 }
 
 function rewriteTransactionPath(_path: string, req: IncomingMessage) {
+  const originalUrl = (req as any).originalUrl as string | undefined;
+  return originalUrl ?? _path;
+}
+
+function rewriteSavingsPath(_path: string, req: IncomingMessage) {
   const originalUrl = (req as any).originalUrl as string | undefined;
   return originalUrl ?? _path;
 }
@@ -147,6 +154,22 @@ router.use(
   })
 );
 
+// /api/v1/savings/* -> service-transaction (JWT required)
+router.use(
+  '/savings',
+  verifyToken,
+  createProxyMiddleware({
+    target: TRANSACTION_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: rewriteSavingsPath,
+    proxyTimeout: PROXY_TIMEOUT_MS,
+    timeout: PROXY_TIMEOUT_MS,
+    onProxyReq,
+    onProxyRes,
+    onError: onProxyError as any,
+  })
+);
+
 // /api/v1/invoices/* -> service-transaction (JWT required)
 router.use(
   '/invoices',
@@ -179,6 +202,22 @@ router.use(
   })
 );
 
+// /api/v1/notifications/stream -> notification-service SSE (JWT required, long-lived connection)
+router.use(
+  '/notifications/stream',
+  verifyToken,
+  createProxyMiddleware({
+    target: NOTIFY_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: rewriteNotificationPath,
+    proxyTimeout: NOTIFICATION_STREAM_TIMEOUT_MS,
+    timeout: NOTIFICATION_STREAM_TIMEOUT_MS,
+    onProxyReq,
+    onProxyRes,
+    onError: onProxyError as any,
+  })
+);
+
 // /api/v1/notifications/* -> notification-service (JWT required)
 router.use(
   '/notifications',
@@ -194,6 +233,9 @@ router.use(
     onError: onProxyError as any,
   })
 );
+
+// /api/v1/ai/chat -> Node.js BFF enriches context from analytics-service before calling Python ai-service
+router.post('/ai/chat', verifyToken, json({ limit: '1mb' }), handleAiChat);
 
 // /api/v1/ai/* -> ai-service (JWT required, still benefits from gateway rate limiting)
 router.use(

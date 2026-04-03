@@ -14,7 +14,7 @@ export type CreateTransactionInput = {
   description?: string;
   occurred_at?: string | Date;
   idempotency_key?: string;
-  source?: 'MANUAL' | 'INVOICE_CONFIRMATION' | 'RECURRING';
+  source?: 'MANUAL' | 'INVOICE_CONFIRMATION' | 'RECURRING' | 'SAVING';
   session?: ClientSession;
 };
 

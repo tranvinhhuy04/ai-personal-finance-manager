@@ -19,6 +19,7 @@ type ApplyTransactionInput = {
   wallet_id: string;
   amount: string;
   transaction_type: 'INCOME' | 'EXPENSE';
+  transaction_id?: string;
 };
 
 function parsePositiveDecimal(amount: string, field: string) {
@@ -123,6 +124,18 @@ export class WalletService {
         return { success: false, error: 'Wallet not found' };
       }
 
+      if (
+        input.transaction_id &&
+        Array.isArray(current.processed_transaction_ids) &&
+        current.processed_transaction_ids.includes(input.transaction_id)
+      ) {
+        return {
+          success: true,
+          wallet: this.toResponse(current),
+          duplicate: true,
+        };
+      }
+
       const currentBalance = Number(current.balance?.toString?.() ?? 0);
       const signed = input.transaction_type === 'EXPENSE' ? -amountValue : amountValue;
       const nextBalance = currentBalance + signed;
@@ -135,12 +148,14 @@ export class WalletService {
         input.wallet_id,
         current.version,
         String(nextBalance),
+        input.transaction_id,
       );
 
       if (updated) {
         return {
           success: true,
           wallet: this.toResponse(updated),
+          duplicate: false,
         };
       }
     }

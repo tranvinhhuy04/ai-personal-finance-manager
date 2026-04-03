@@ -9,11 +9,15 @@ export default function requireAuth(req: Request, res: Response, next: NextFunct
   }
 
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const bearerToken = authHeader && authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : null;
+  const queryToken = typeof req.query.token === 'string' ? req.query.token : null;
+  const token = bearerToken || queryToken;
+
+  if (!token) {
     return res.status(401).json({ message: 'Missing or invalid authorization header' });
   }
-
-  const token = authHeader.slice(7);
 
   try {
     const decoded: any = jwt.verify(token, JWT_SECRET);

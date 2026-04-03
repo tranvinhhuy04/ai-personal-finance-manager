@@ -47,7 +47,7 @@ export const axiosClient = axios.create({
 
 export const aiAxiosClient = axios.create({
   baseURL: AI_SERVICE_BASE_URL,
-  timeout: 60000,
+  timeout: 120000,
 });
 
 function attachAuthToken(config: any) {

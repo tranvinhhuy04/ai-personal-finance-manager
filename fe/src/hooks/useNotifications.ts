@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   useMutation,
   useQuery,
@@ -11,10 +11,33 @@ export interface NotificationItem {
   user_id: string;
   title: string;
   message: string;
-  type: 'ALERT' | 'INFO' | 'REMINDER';
+  type: 'ALERT' | 'INFO' | 'REMINDER' | 'SUCCESS' | 'WARNING';
   is_read: boolean;
   created_at: string;
   metadata?: Record<string, unknown>;
+}
+
+function readPersistedAuthToken(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const directToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
+  if (directToken) {
+    return directToken;
+  }
+
+  const authStorage = localStorage.getItem('auth-storage');
+  if (!authStorage) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(authStorage) as { state?: { token?: string | null } };
+    return parsed?.state?.token ?? null;
+  } catch {
+    return null;
+  }
 }
 
 interface NotificationListResponse {
@@ -55,7 +78,7 @@ export function useNotifications(params?: NotificationParams) {
     queryFn: () => fetchNotifications(page, limit),
     staleTime: 20 * 1000,
     enabled,
-    refetchInterval: enabled ? 15000 : false,
+    refetchInterval: enabled ? 30000 : false,
   });
 
   const markAsReadMutation = useMutation({
@@ -75,6 +98,32 @@ export function useNotifications(params?: NotificationParams) {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
+
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined' || typeof EventSource === 'undefined') {
+      return;
+    }
+
+    const token = readPersistedAuthToken();
+    if (!token) {
+      return;
+    }
+
+    const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
+    const eventSource = new EventSource(`${baseUrl}/api/v1/notifications/stream?token=${encodeURIComponent(token)}`);
+
+    eventSource.onmessage = () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    };
+
+    eventSource.onerror = () => {
+      // Browser will retry automatically; keep query polling as fallback.
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [enabled, queryClient]);
 
   const unreadCount = useMemo(() => {
     const list = query.data?.data ?? [];

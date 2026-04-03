@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import {
   LayoutDashboard, LineChart, ArrowRightLeft, FileText,
-  Layers, ShieldCheck, MessageSquare, Settings, HelpCircle, LogOut, Search, Sparkles
+  Layers, ShieldCheck, MessageSquare, Settings, HelpCircle, LogOut, Search, Sparkles, PiggyBank
 } from 'lucide-react';
 import { Wallet as WalletIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -107,6 +107,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             <div className="space-y-1">
               <NavItem icon={LayoutDashboard} label="Bảng điều khiển" to="/" isActive={location.pathname === '/'} onClick={onClose} />
               <NavItem icon={WalletIcon} label="Ví của tôi" to="/wallets" isActive={location.pathname === '/wallets'} onClick={onClose} />
+              <NavItem icon={PiggyBank} label="Tiền gửi/Đầu tư" to="/savings" isActive={location.pathname === '/savings'} onClick={onClose} />
               <NavItem icon={LineChart} label="Phân tích" to="/analytics" badge={20} isActive={location.pathname === '/analytics'} onClick={onClose} />
               <NavItem icon={ArrowRightLeft} label="Giao dịch" to="/transactions" isActive={location.pathname === '/transactions'} onClick={onClose} />
               <NavItem icon={FileText} label="Hóa đơn" to="/invoices" isActive={location.pathname === '/invoices'} onClick={onClose} />

@@ -7,6 +7,7 @@ const RABBITMQ_URL = process.env.RABBITMQ_URL;
 
 export const EXCHANGES = {
   WALLET_EVENTS: 'wallet.events',
+  FINTECH_EVENTS: 'fintech_events',
 };
 
 export const QUEUES = {
@@ -15,6 +16,7 @@ export const QUEUES = {
 
 export const ROUTING_KEYS = {
   WALLET_BALANCE_UPDATED: 'wallet.balance.updated',
+  NOTIFICATION_TRANSACTION: 'notification.transaction',
 };
 
 export async function connectRabbitMQ() {
@@ -26,11 +28,17 @@ export async function connectRabbitMQ() {
   channel = await connection.createChannel();
 
   await channel.assertExchange(EXCHANGES.WALLET_EVENTS, 'topic', { durable: true });
+  await channel.assertExchange(EXCHANGES.FINTECH_EVENTS, 'topic', { durable: true });
   await channel.assertQueue(QUEUES.NOTIFICATION_WALLET_EVENTS, { durable: true });
   await channel.bindQueue(
     QUEUES.NOTIFICATION_WALLET_EVENTS,
     EXCHANGES.WALLET_EVENTS,
     ROUTING_KEYS.WALLET_BALANCE_UPDATED
+  );
+  await channel.bindQueue(
+    QUEUES.NOTIFICATION_WALLET_EVENTS,
+    EXCHANGES.FINTECH_EVENTS,
+    ROUTING_KEYS.NOTIFICATION_TRANSACTION
   );
 
   console.log('Connected to RabbitMQ (notification-service)');

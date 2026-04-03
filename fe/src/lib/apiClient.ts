@@ -12,6 +12,10 @@ import type {
   RecurringRule,
   CreateRecurringRuleInput,
   UpdateRecurringRuleInput,
+  SavingPackage,
+  CreateSavingInput,
+  DepositSavingInput,
+  SettleSavingInput,
   AIOcrResponse,
   AIChatRequest,
   AIChatResponse,
@@ -24,6 +28,7 @@ type CategoryApiResponse = Record<string, any>;
 type InvoiceApiResponse = Record<string, any>;
 type AnalyticsApiResponse = Record<string, any>;
 type RecurringRuleApiResponse = Record<string, any>;
+type SavingApiResponse = Record<string, any>;
 type AIOcrApiResponse = Record<string, any>;
 type AIChatApiResponse = Record<string, any>;
 
@@ -91,6 +96,22 @@ class ApiClient {
       createdAt: raw.createdAt ?? new Date().toISOString(),
       updatedAt: raw.updatedAt ?? new Date().toISOString(),
     } as RecurringRule;
+  }
+
+  private normalizeSaving(raw: SavingApiResponse): SavingPackage {
+    return {
+      id: String(raw.id ?? raw._id ?? ''),
+      userId: String(raw.userId ?? raw.user_id ?? ''),
+      name: String(raw.name ?? 'Gói tiết kiệm'),
+      type: (raw.type ?? 'SAVING') as SavingPackage['type'],
+      targetAmount: raw.targetAmount ?? raw.target_amount ?? null,
+      currentAmount: Number(raw.currentAmount ?? raw.current_amount ?? 0),
+      startDate: String(raw.startDate ?? raw.start_date ?? new Date().toISOString()),
+      endDate: raw.endDate ?? raw.end_date ?? null,
+      status: (raw.status ?? 'ACTIVE') as SavingPackage['status'],
+      createdAt: String(raw.createdAt ?? new Date().toISOString()),
+      updatedAt: String(raw.updatedAt ?? new Date().toISOString()),
+    } as SavingPackage;
   }
 
   private normalizeInvoice(raw: InvoiceApiResponse): Invoice {
@@ -403,6 +424,47 @@ class ApiClient {
     return this.normalizeAnalyticsDashboard(response.data ?? {});
   }
 
+  async getSavings(type?: 'SAVING' | 'INVESTMENT'): Promise<SavingPackage[]> {
+    const response = await axiosClient.get('/api/v1/savings', {
+      params: type ? { type } : undefined,
+    });
+    return (response.data ?? []).map((item: SavingApiResponse) => this.normalizeSaving(item));
+  }
+
+  async createSaving(data: CreateSavingInput): Promise<SavingPackage> {
+    const response = await axiosClient.post('/api/v1/savings', {
+      name: data.name,
+      type: data.type,
+      target_amount: data.targetAmount ?? null,
+      start_date: data.startDate ?? new Date().toISOString(),
+      end_date: data.endDate ?? null,
+    });
+    return this.normalizeSaving(response.data ?? {});
+  }
+
+  async depositToSaving(savingId: string, data: DepositSavingInput): Promise<{ saving: SavingPackage; transaction: Transaction }> {
+    const response = await axiosClient.post(`/api/v1/savings/${savingId}/deposit`, {
+      sourceWalletId: data.sourceWalletId,
+      amount: Number(data.amount),
+    });
+
+    return {
+      saving: this.normalizeSaving(response.data?.saving ?? {}),
+      transaction: this.normalizeTransaction(response.data?.transaction ?? {}),
+    };
+  }
+
+  async settleSaving(savingId: string, data?: SettleSavingInput): Promise<{ saving: SavingPackage; transaction: Transaction | null }> {
+    const response = await axiosClient.post(`/api/v1/savings/${savingId}/settle`, {
+      destinationWalletId: data?.destinationWalletId ?? null,
+    });
+
+    return {
+      saving: this.normalizeSaving(response.data?.saving ?? {}),
+      transaction: response.data?.transaction ? this.normalizeTransaction(response.data.transaction) : null,
+    };
+  }
+
   // ===== AI SERVICE ENDPOINTS =====
 
   async ocrInvoice(file: File): Promise<AIOcrResponse> {
@@ -420,6 +482,7 @@ class ApiClient {
 
   async askAI(data: AIChatRequest): Promise<AIChatResponse> {
     const response = await aiAxiosClient.post('/api/v1/ai/chat', {
+      message: data.question,
       question: data.question,
       context: data.context ?? {},
       use_llm: data.useLlm ?? false,

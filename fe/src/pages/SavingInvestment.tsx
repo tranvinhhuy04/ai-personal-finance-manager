@@ -1,0 +1,494 @@
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
+import {
+  AlertCircle,
+  ArrowDownToLine,
+  BadgeDollarSign,
+  CalendarDays,
+  CheckCircle2,
+  PiggyBank,
+  Plus,
+  Target,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react';
+import { apiClient } from '@/lib/apiClient';
+import { cn, formatCurrency } from '@/lib/utils';
+import type { CreateSavingInput, SavingPackage, SavingProductType, Wallet as WalletItem } from '@/types/finance';
+
+type ToastState = {
+  type: 'success' | 'error';
+  message: string;
+};
+
+type DepositFormState = {
+  sourceWalletId: string;
+  amount: string;
+};
+
+type SettleFormState = {
+  destinationWalletId: string;
+};
+
+const productMeta: Record<SavingProductType, { label: string; icon: typeof PiggyBank; card: string; chip: string }> = {
+  SAVING: {
+    label: 'Tiết kiệm',
+    icon: PiggyBank,
+    card: 'border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50',
+    chip: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  },
+  INVESTMENT: {
+    label: 'Đầu tư',
+    icon: TrendingUp,
+    card: 'border-violet-200/80 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50',
+    chip: 'border-violet-200 bg-violet-50 text-violet-700',
+  },
+};
+
+const initialCreateForm: CreateSavingInput = {
+  name: '',
+  type: 'SAVING',
+  targetAmount: '',
+  startDate: new Date().toISOString().slice(0, 10),
+  endDate: '',
+};
+
+export function SavingInvestment() {
+  const [tab, setTab] = useState<SavingProductType>('SAVING');
+  const [savings, setSavings] = useState<SavingPackage[]>([]);
+  const [wallets, setWallets] = useState<WalletItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState<CreateSavingInput>(initialCreateForm);
+
+  const [depositTarget, setDepositTarget] = useState<SavingPackage | null>(null);
+  const [depositForm, setDepositForm] = useState<DepositFormState>({ sourceWalletId: '', amount: '' });
+
+  const [settleTarget, setSettleTarget] = useState<SavingPackage | null>(null);
+  const [settleForm, setSettleForm] = useState<SettleFormState>({ destinationWalletId: '' });
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [savingItems, walletItems] = await Promise.all([
+        apiClient.getSavings(),
+        apiClient.getWallets(),
+      ]);
+      setSavings(savingItems);
+      setWallets(walletItems.filter((wallet) => wallet.status === 1));
+    } catch (error) {
+      setToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Không thể tải dữ liệu tiết kiệm/đầu tư.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadData();
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 2800);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const filteredSavings = useMemo(
+    () => savings.filter((item) => item.type === tab).sort((a, b) => Number(a.status === 'SETTLED') - Number(b.status === 'SETTLED')),
+    [savings, tab]
+  );
+
+  const summary = useMemo(() => {
+    const activeItems = savings.filter((item) => item.status === 'ACTIVE');
+    const totalCurrent = activeItems.reduce((sum, item) => sum + Number(item.currentAmount ?? 0), 0);
+    const totalTarget = activeItems.reduce((sum, item) => sum + Number(item.targetAmount ?? 0), 0);
+    const completion = totalTarget > 0 ? Math.min(100, Math.round((totalCurrent / totalTarget) * 100)) : 0;
+
+    return {
+      activeCount: activeItems.length,
+      totalCurrent,
+      totalTarget,
+      completion,
+    };
+  }, [savings]);
+
+  const handleCreateSaving = async () => {
+    if (!createForm.name?.trim()) {
+      setToast({ type: 'error', message: 'Vui lòng nhập tên gói.' });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await apiClient.createSaving({
+        ...createForm,
+        targetAmount: createForm.targetAmount || null,
+        endDate: createForm.endDate || null,
+      });
+      setIsCreateOpen(false);
+      setCreateForm(initialCreateForm);
+      await loadData();
+      setToast({ type: 'success', message: 'Đã tạo gói tiết kiệm/đầu tư mới.' });
+    } catch (error) {
+      setToast({ type: 'error', message: error instanceof Error ? error.message : 'Tạo gói thất bại.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeposit = async () => {
+    if (!depositTarget) return;
+    if (!depositForm.sourceWalletId || !depositForm.amount) {
+      setToast({ type: 'error', message: 'Vui lòng chọn ví nguồn và nhập số tiền.' });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await apiClient.depositToSaving(depositTarget.id, depositForm);
+      setDepositTarget(null);
+      setDepositForm({ sourceWalletId: '', amount: '' });
+      await loadData();
+      setToast({ type: 'success', message: 'Nạp tiền thành công, thông báo realtime sẽ xuất hiện ngay.' });
+    } catch (error) {
+      setToast({ type: 'error', message: error instanceof Error ? error.message : 'Nạp tiền thất bại.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSettle = async () => {
+    if (!settleTarget) return;
+
+    setSubmitting(true);
+    try {
+      await apiClient.settleSaving(settleTarget.id, {
+        destinationWalletId: settleForm.destinationWalletId || null,
+      });
+      setSettleTarget(null);
+      setSettleForm({ destinationWalletId: '' });
+      await loadData();
+      setToast({ type: 'success', message: 'Đã tất toán gói thành công.' });
+    } catch (error) {
+      setToast({ type: 'error', message: error instanceof Error ? error.message : 'Tất toán thất bại.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {toast && (
+        <div
+          className={cn(
+            'fixed right-4 top-4 z-50 flex items-center gap-2 rounded-xl border px-4 py-3 text-sm shadow-lg',
+            toast.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'
+          )}
+        >
+          {toast.type === 'success' ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+          {toast.message}
+        </div>
+      )}
+
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Tiền gửi & Đầu tư</h1>
+            <p className="mt-1 text-sm text-slate-500">Tạo mục tiêu, nạp tiền từ ví và tất toán linh hoạt khi cần.</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 font-medium text-white shadow-sm transition-colors hover:bg-emerald-700"
+          >
+            <Plus className="h-4 w-4" />
+            Tạo gói mới
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-3 text-slate-500">
+              <PiggyBank className="h-5 w-5 text-emerald-600" />
+              <span className="text-sm">Gói đang hoạt động</span>
+            </div>
+            <p className="mt-3 text-3xl font-bold text-slate-900">{summary.activeCount}</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-3 text-slate-500">
+              <BadgeDollarSign className="h-5 w-5 text-sky-600" />
+              <span className="text-sm">Tổng tích lũy</span>
+            </div>
+            <p className="mt-3 text-2xl font-bold text-slate-900">{formatCurrency(summary.totalCurrent)}</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-3 text-slate-500">
+              <Target className="h-5 w-5 text-violet-600" />
+              <span className="text-sm">Mục tiêu đang đặt</span>
+            </div>
+            <p className="mt-3 text-2xl font-bold text-slate-900">{formatCurrency(summary.totalTarget)}</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-3 text-slate-500">
+              <TrendingUp className="h-5 w-5 text-amber-600" />
+              <span className="text-sm">Tiến độ hoàn thành</span>
+            </div>
+            <p className="mt-3 text-3xl font-bold text-slate-900">{summary.completion}%</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+          {(['SAVING', 'INVESTMENT'] as SavingProductType[]).map((item) => {
+            const meta = productMeta[item];
+            return (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setTab(item)}
+                className={cn(
+                  'rounded-xl px-4 py-2 text-sm font-medium transition-colors',
+                  tab === item ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+                )}
+              >
+                {meta.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {loading ? (
+          <div className="rounded-2xl border border-slate-100 bg-white py-14 text-center text-slate-500 shadow-sm">Đang tải dữ liệu gói...</div>
+        ) : filteredSavings.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-14 text-center">
+            <p className="text-base font-medium text-slate-700">Chưa có gói {tab === 'SAVING' ? 'tiết kiệm' : 'đầu tư'} nào.</p>
+            <p className="mt-2 text-sm text-slate-500">Tạo gói mới để bắt đầu kế hoạch tài chính của bạn.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            {filteredSavings.map((item) => {
+              const meta = productMeta[item.type];
+              const Icon = meta.icon;
+              const progress = item.targetAmount && item.targetAmount > 0
+                ? Math.min(100, Math.round((item.currentAmount / item.targetAmount) * 100))
+                : 0;
+
+              return (
+                <motion.div
+                  key={item.id}
+                  whileHover={{ y: -4 }}
+                  className={cn('rounded-[24px] border p-5 shadow-[0_18px_50px_-32px_rgba(15,23,42,0.35)]', meta.card)}
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/80 bg-white/80 shadow-sm">
+                          <Icon className="h-5 w-5 text-slate-800" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900">{item.name}</h3>
+                          <div className={cn('mt-1 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold', meta.chip)}>
+                            {meta.label}
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className={cn(
+                        'rounded-full px-2.5 py-1 text-xs font-semibold',
+                        item.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'
+                      )}>
+                        {item.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã tất toán'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm">
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Đã tích lũy</p>
+                        <p className="mt-2 text-2xl font-bold text-slate-900">{formatCurrency(item.currentAmount)}</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm">
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Mục tiêu</p>
+                        <p className="mt-2 text-2xl font-bold text-slate-900">{item.targetAmount ? formatCurrency(item.targetAmount) : 'Chưa đặt'}</p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm">
+                      <div className="mb-2 flex items-center justify-between text-sm text-slate-600">
+                        <span>Tiến độ</span>
+                        <span>{item.targetAmount ? `${progress}%` : 'Linh hoạt'}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-slate-200">
+                        <div className="h-2 rounded-full bg-slate-900 transition-all" style={{ width: `${item.targetAmount ? progress : 20}%` }} />
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                        <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" /> Bắt đầu: {new Date(item.startDate).toLocaleDateString('vi-VN')}</span>
+                        <span className="inline-flex items-center gap-1"><Target className="h-3.5 w-3.5" /> Kết thúc: {item.endDate ? new Date(item.endDate).toLocaleDateString('vi-VN') : 'Không giới hạn'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={item.status !== 'ACTIVE'}
+                        onClick={() => {
+                          setDepositTarget(item);
+                          setDepositForm({ sourceWalletId: wallets[0]?.id ?? '', amount: '' });
+                        }}
+                        className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        <ArrowDownToLine className="h-4 w-4" />
+                        Nạp tiền
+                      </button>
+                      <button
+                        type="button"
+                        disabled={item.status !== 'ACTIVE'}
+                        onClick={() => {
+                          setSettleTarget(item);
+                          setSettleForm({ destinationWalletId: wallets[0]?.id ?? '' });
+                        }}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                      >
+                        <Wallet className="h-4 w-4" />
+                        Tất toán
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </motion.div>
+
+      {(isCreateOpen || depositTarget || settleTarget) && <div className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-[2px]" />}
+
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-slate-900">Tạo gói mới</h3>
+            <div className="mt-4 space-y-4">
+              <input
+                value={createForm.name}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Tên gói"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={createForm.type}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, type: e.target.value as SavingProductType }))}
+                  className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+                >
+                  <option value="SAVING">Tiết kiệm</option>
+                  <option value="INVESTMENT">Đầu tư</option>
+                </select>
+                <input
+                  value={String(createForm.targetAmount ?? '')}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, targetAmount: e.target.value }))}
+                  type="number"
+                  min="0"
+                  placeholder="Mục tiêu (VND)"
+                  className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  value={createForm.startDate ?? ''}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, startDate: e.target.value }))}
+                  type="date"
+                  className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+                />
+                <input
+                  value={createForm.endDate ?? ''}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, endDate: e.target.value }))}
+                  type="date"
+                  className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" onClick={() => setIsCreateOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600">Hủy</button>
+              <button type="button" onClick={() => void handleCreateSaving()} disabled={submitting} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:bg-emerald-300">{submitting ? 'Đang lưu...' : 'Tạo gói'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {depositTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-slate-900">Nạp tiền vào {depositTarget.name}</h3>
+            <div className="mt-4 space-y-4">
+              <select
+                value={depositForm.sourceWalletId}
+                onChange={(e) => setDepositForm((prev) => ({ ...prev, sourceWalletId: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+              >
+                <option value="">Chọn ví nguồn</option>
+                {wallets.map((wallet) => (
+                  <option key={wallet.id} value={wallet.id}>
+                    {wallet.walletName} - {formatCurrency(Number(wallet.balance))}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                value={depositForm.amount}
+                onChange={(e) => setDepositForm((prev) => ({ ...prev, amount: e.target.value }))}
+                type="number"
+                min="1"
+                placeholder="Số tiền muốn nạp"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" onClick={() => setDepositTarget(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600">Hủy</button>
+              <button type="button" onClick={() => void handleDeposit()} disabled={submitting} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-400">{submitting ? 'Đang xử lý...' : 'Xác nhận nạp'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {settleTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-slate-900">Tất toán {settleTarget.name}</h3>
+            <p className="mt-2 text-sm text-slate-500">Bạn có thể chọn ví đích để hoàn tiền về ngay.</p>
+            <div className="mt-4">
+              <select
+                value={settleForm.destinationWalletId}
+                onChange={(e) => setSettleForm({ destinationWalletId: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+              >
+                <option value="">Không chuyển về ví</option>
+                {wallets.map((wallet) => (
+                  <option key={wallet.id} value={wallet.id}>
+                    {wallet.walletName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" onClick={() => setSettleTarget(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600">Hủy</button>
+              <button type="button" onClick={() => void handleSettle()} disabled={submitting} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:bg-emerald-300">{submitting ? 'Đang tất toán...' : 'Tất toán ngay'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

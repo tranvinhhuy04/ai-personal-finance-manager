@@ -37,6 +37,7 @@ export interface Category {
 // ─── Transaction ──────────────────────────────────────────────────────────────
 
 export type TransactionStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REVERSED';
+export type TransactionSource = 'MANUAL' | 'INVOICE_CONFIRMATION' | 'RECURRING' | 'SAVING';
 
 export interface Transaction {
   id: string;
@@ -49,9 +50,26 @@ export interface Transaction {
   status: TransactionStatus;
   description?: string;
   occurredAt: string;
-  source?: 'MANUAL' | 'INVOICE_CONFIRMATION' | 'RECURRING';
+  source?: TransactionSource;
   idempotencyKey: string;
   createdAt: string;
+}
+
+export type SavingProductType = 'SAVING' | 'INVESTMENT';
+export type SavingStatus = 'ACTIVE' | 'SETTLED';
+
+export interface SavingPackage {
+  id: string;
+  userId: string;
+  name: string;
+  type: SavingProductType;
+  targetAmount: number | null;
+  currentAmount: number;
+  startDate: string;
+  endDate: string | null;
+  status: SavingStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type RecurringFrequency = 'WEEKLY' | 'MONTHLY';
@@ -157,6 +175,23 @@ export interface CreateCategoryInput {
   name: string;
   categoryType: TransactionDirection;
   parentId?: string | null;
+}
+
+export interface CreateSavingInput {
+  name: string;
+  type: SavingProductType;
+  targetAmount?: number | string | null;
+  startDate?: string;
+  endDate?: string | null;
+}
+
+export interface DepositSavingInput {
+  sourceWalletId: string;
+  amount: number | string;
+}
+
+export interface SettleSavingInput {
+  destinationWalletId?: string | null;
 }
 
 export interface CreateRecurringRuleInput {

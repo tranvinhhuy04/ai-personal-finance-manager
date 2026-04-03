@@ -3,6 +3,37 @@ import { NotificationModel } from '../models/notification.model';
 import { sseHub } from './sseHub';
 
 class NotificationService {
+  async createNotification(input: {
+    userId: string;
+    title: string;
+    message: string;
+    type?: 'INFO' | 'SUCCESS' | 'WARNING' | 'ALERT' | 'REMINDER';
+    metadata?: Record<string, unknown>;
+    createdAt?: string | Date;
+  }) {
+    if (!input.userId) {
+      throw new AppError('userId is required', 400);
+    }
+
+    const notification = new NotificationModel({
+      user_id: input.userId,
+      title: input.title,
+      message: input.message,
+      type: input.type ?? 'INFO',
+      is_read: false,
+      created_at: input.createdAt ? new Date(input.createdAt) : new Date(),
+      ...(input.metadata ? { metadata: input.metadata } : {}),
+    });
+
+    await notification.save();
+    const payload = notification.toObject();
+    sseHub.push(input.userId, {
+      event: 'new_notification',
+      notification: payload,
+    });
+
+    return payload;
+  }
   async listNotifications(userId: string, page = 1, limit = 20) {
     if (!userId) throw new AppError('user_id is required', 400);
 

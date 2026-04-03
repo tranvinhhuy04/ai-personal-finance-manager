@@ -8,6 +8,7 @@ import { OutboxModel } from '../models/outbox.model';
 
 class OutboxPublisher {
   private timer: NodeJS.Timeout | null = null;
+  private isPublishing = false;
 
   async start(intervalMs = 5000) {
     if (this.timer) return;
@@ -28,20 +29,30 @@ class OutboxPublisher {
   }
 
   async publishPending() {
-    const pending = await OutboxModel.find({ published: false }).sort({ createdAt: 1 }).limit(20);
-    if (pending.length === 0) return;
+    if (this.isPublishing) {
+      return;
+    }
 
-    for (const event of pending) {
-      if (event.event_type !== 'TransactionCreated') continue;
+    this.isPublishing = true;
 
-      await publishMessage(EXCHANGES.TRANSACTION_EVENTS, ROUTING_KEYS.TRANSACTION_CREATED, {
-        eventType: 'TransactionCreated',
-        payload: event.payload,
-      });
+    try {
+      const pending = await OutboxModel.find({ published: false }).sort({ createdAt: 1 }).limit(20);
+      if (pending.length === 0) return;
 
-      event.published = true;
-      event.published_at = new Date();
-      await event.save();
+      for (const event of pending) {
+        if (event.event_type !== 'TransactionCreated') continue;
+
+        await publishMessage(EXCHANGES.TRANSACTION_EVENTS, ROUTING_KEYS.TRANSACTION_CREATED, {
+          eventType: 'TransactionCreated',
+          payload: event.payload,
+        });
+
+        event.published = true;
+        event.published_at = new Date();
+        await event.save();
+      }
+    } finally {
+      this.isPublishing = false;
     }
   }
 }

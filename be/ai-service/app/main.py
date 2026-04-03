@@ -53,7 +53,7 @@ async def warm_up_models() -> None:
         return
 
     with suppress(Exception):
-        get_nlp_service()
+        get_nlp_service().warm_up()
 
 
 @app.get("/")
