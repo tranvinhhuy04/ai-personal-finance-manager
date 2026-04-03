@@ -78,6 +78,8 @@ services:
         condition: service_started
       notification-service:
         condition: service_started
+      ai-service:
+        condition: service_started
     env_file:
       - ./api-gateway/.env
     environment:
@@ -90,6 +92,9 @@ services:
       TRANSACTION_SERVICE_URL: http://service-transaction:3003
       ANALYTICS_SERVICE_URL: http://analytics-service:3004
       NOTIFICATION_SERVICE_URL: http://notification-service:3005
+      AI_SERVICE_URL: http://ai-service:8000
+      AI_PROXY_TIMEOUT_MS: 60000
+      INVOICE_PROXY_TIMEOUT_MS: 120000
     networks:
       - fintech_net
 
@@ -144,9 +149,15 @@ services:
         condition: service_healthy
     env_file:
       - ./service-transaction/.env
+      - ./ai-service/.env
     environment:
       NODE_ENV: development
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      GEMINI_INVOICE_MODEL: gemini-2.5-flash
+      GOOGLE_APPLICATION_CREDENTIALS: /app/config/gen-lang-client-0231948223-845422dd2868.json
+      GOOGLE_CLOUD_PROJECT: gen-lang-client-0231948223
+    volumes:
+      - ./ai-service/config:/app/config:ro
     networks:
       - fintech_net
 
@@ -190,9 +201,29 @@ services:
     networks:
       - fintech_net
 
+  # AI Service (Port 8000)
+  ai-service:
+    build: ./ai-service
+    container_name: ai-service
+    restart: on-failure
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./ai-service/.env
+    environment:
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      AI_SERVICE_PRELOAD_MODELS: "false"
+      TORCH_NUM_THREADS: 1
+      AI_AUTO_USE_GEMINI: "false"
+    volumes:
+      - ai_model_cache:/opt/hf-cache
+    networks:
+      - fintech_net
+
 volumes:
   mongodata:
   rabbitmqdata:
+  ai_model_cache:
 
 networks:
   fintech_net:

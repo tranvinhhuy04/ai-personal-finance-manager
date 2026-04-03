@@ -12,8 +12,11 @@ import type {
   RecurringRule,
   CreateRecurringRuleInput,
   UpdateRecurringRuleInput,
+  AIOcrResponse,
+  AIChatRequest,
+  AIChatResponse,
 } from '@/types/finance';
-import { axiosClient } from '@/utils/axiosClient';
+import { aiAxiosClient, axiosClient } from '@/utils/axiosClient';
 
 type WalletApiResponse = Record<string, any>;
 type TransactionApiResponse = Record<string, any>;
@@ -21,6 +24,8 @@ type CategoryApiResponse = Record<string, any>;
 type InvoiceApiResponse = Record<string, any>;
 type AnalyticsApiResponse = Record<string, any>;
 type RecurringRuleApiResponse = Record<string, any>;
+type AIOcrApiResponse = Record<string, any>;
+type AIChatApiResponse = Record<string, any>;
 
 class ApiClient {
   private normalizeWallet(raw: WalletApiResponse): Wallet {
@@ -154,6 +159,37 @@ class ApiClient {
     });
 
     return response.data;
+  }
+
+  private normalizeAIOcrResponse(raw: AIOcrApiResponse): AIOcrResponse {
+    const data = raw.data ?? {};
+
+    return {
+      success: Boolean(raw.success),
+      data: {
+        merchantName: String(data.merchantName ?? ''),
+        totalAmount: Number.isFinite(Number(data.totalAmount)) ? Number(data.totalAmount) : null,
+        transactionDate: typeof data.transactionDate === 'string' && data.transactionDate.trim()
+          ? String(data.transactionDate)
+          : null,
+      },
+    };
+  }
+
+  private normalizeAIChatResponse(raw: AIChatApiResponse): AIChatResponse {
+    return {
+      success: Boolean(raw.success),
+      question: String(raw.question ?? ''),
+      intent: String(raw.intent ?? 'unknown'),
+      confidence: Number(raw.confidence ?? 0),
+      scores: Object.fromEntries(
+        Object.entries(raw.scores ?? {}).map(([key, value]) => [key, Number(value)])
+      ),
+      answer: String(raw.answer ?? ''),
+      llmUsed: Boolean(raw.llm_used ?? raw.llmUsed),
+      queryPlan: (raw.query_plan ?? raw.queryPlan ?? {}) as Record<string, unknown>,
+      meta: (raw.meta ?? {}) as Record<string, unknown>,
+    };
   }
 
   // ===== WALLET ENDPOINTS =====
@@ -365,6 +401,31 @@ class ApiClient {
 
     const response = await axiosClient.get('/api/v1/analytics/dashboard', { params });
     return this.normalizeAnalyticsDashboard(response.data ?? {});
+  }
+
+  // ===== AI SERVICE ENDPOINTS =====
+
+  async ocrInvoice(file: File): Promise<AIOcrResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await axiosClient.post('/api/v1/invoices/extract', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return this.normalizeAIOcrResponse(response.data ?? {});
+  }
+
+  async askAI(data: AIChatRequest): Promise<AIChatResponse> {
+    const response = await aiAxiosClient.post('/api/v1/ai/chat', {
+      question: data.question,
+      context: data.context ?? {},
+      use_llm: data.useLlm ?? false,
+    });
+
+    return this.normalizeAIChatResponse(response.data ?? {});
   }
 
   // ===== INVOICE ENDPOINTS =====

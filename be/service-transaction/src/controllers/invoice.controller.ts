@@ -1,12 +1,17 @@
+import { unlink } from 'fs/promises';
 import { Request, Response } from 'express';
 import { AppError } from '../errors/AppError';
 import { catchAsync } from '../middlewares/catchAsync';
 import { resolveInvoiceImageUrl } from '../middlewares/upload.middleware';
+import { invoiceExtractionService } from '../services/invoice-extraction.service';
 import { invoiceService } from '../services/invoice.service';
 
 type InvoiceUploadRequest = Request & {
   file?: {
     filename: string;
+    path: string;
+    mimetype: string;
+    originalname: string;
   };
 };
 
@@ -33,6 +38,24 @@ function parseJsonObject(input: unknown, fieldName: string): Record<string, unkn
 
   throw new AppError(`${fieldName} must be a valid JSON object`, 400);
 }
+
+export const extractInvoice = catchAsync(async (req: Request, res: Response) => {
+  const uploadReq = req as InvoiceUploadRequest;
+
+  if (!uploadReq.file?.path) {
+    throw new AppError('Invoice image file is required', 400);
+  }
+
+  try {
+    const data = await invoiceExtractionService.extractFromImage(uploadReq.file.path);
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+  } finally {
+    void unlink(uploadReq.file.path).catch(() => undefined);
+  }
+});
 
 export const uploadInvoice = catchAsync(async (req: Request, res: Response) => {
   const uploadReq = req as InvoiceUploadRequest;

@@ -1,7 +1,7 @@
 {
-  "name": "oriopin-seeds",
+  "name": "fintech-seeds",
   "version": "1.0.0",
-  "description": "Seed script for OripioFin local/test data",
+  "description": "Seed script for Fintech local/test data",
   "main": "seed.js",
   "type": "commonjs",
   "scripts": {

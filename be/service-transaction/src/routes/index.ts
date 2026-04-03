@@ -5,6 +5,7 @@ import { createCategory, deleteCategory, listCategories, updateCategory } from '
 import {
   confirmInvoice,
   deleteInvoice,
+  extractInvoice,
   listInvoices,
   updateInvoice,
   uploadInvoice,
@@ -39,6 +40,7 @@ router.delete('/transactions/recurring-rules/:id', deleteRecurringRule);
 router.post('/transactions', createTransaction);
 router.get('/transactions', listTransactions);
 
+router.post('/invoices/extract', uploadInvoiceImage, extractInvoice);
 router.post('/invoices/upload', uploadInvoiceImage, uploadInvoice);
 router.get('/invoices', listInvoices);
 router.put('/invoices/:id', updateInvoice);

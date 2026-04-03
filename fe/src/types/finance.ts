@@ -190,3 +190,34 @@ export interface ConfirmInvoiceInput {
   occurredAt?: string;
   extractedData?: Record<string, unknown>;
 }
+
+// ─── AI / OCR ────────────────────────────────────────────────────────────────
+
+export interface InvoiceExtractedData {
+  merchantName: string;
+  totalAmount: number | null;
+  transactionDate: string | null;
+}
+
+export interface AIOcrResponse {
+  success: boolean;
+  data: InvoiceExtractedData;
+}
+
+export interface AIChatRequest {
+  question: string;
+  context?: Record<string, unknown>;
+  useLlm?: boolean;
+}
+
+export interface AIChatResponse {
+  success: boolean;
+  question: string;
+  intent: string;
+  confidence: number;
+  scores: Record<string, number>;
+  answer: string;
+  llmUsed: boolean;
+  queryPlan: Record<string, unknown>;
+  meta: Record<string, unknown>;
+}

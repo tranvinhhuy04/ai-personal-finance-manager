@@ -34,15 +34,23 @@ function clearAuthStorage() {
   localStorage.removeItem('auth-storage');
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3000';
+const AI_SERVICE_BASE_URL = import.meta.env.VITE_AI_SERVICE_URL || API_BASE_URL;
+
 export const axiosClient = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-axiosClient.interceptors.request.use((config) => {
+export const aiAxiosClient = axios.create({
+  baseURL: AI_SERVICE_BASE_URL,
+  timeout: 60000,
+});
+
+function attachAuthToken(config: any) {
   const token = readPersistedAuthToken();
 
   if (token) {
@@ -58,7 +66,10 @@ axiosClient.interceptors.request.use((config) => {
   }
 
   return config;
-});
+}
+
+axiosClient.interceptors.request.use(attachAuthToken);
+aiAxiosClient.interceptors.request.use(attachAuthToken);
 
 axiosClient.interceptors.response.use(
   (response) => response,

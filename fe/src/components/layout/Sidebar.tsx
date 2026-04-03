@@ -81,7 +81,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="white" fillOpacity="0.5" />
             </svg>
           </div>
-          <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">OripioFin</span>
+          <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Fintech</span>
         </div>
 
         {/* Search */}

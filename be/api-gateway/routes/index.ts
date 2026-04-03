@@ -7,11 +7,14 @@ const router = Router();
 
 const PROXY_TIMEOUT_MS = 10_000; // 10 seconds
 
-const IDENTITY_SERVICE_URL    = process.env.IDENTITY_SERVICE_URL    ?? 'http://service-identity:3001';
-const WALLET_SERVICE_URL      = process.env.WALLET_SERVICE_URL      ?? 'http://service-wallet:3002';
-const TRANSACTION_SERVICE_URL = process.env.TRANSACTION_SERVICE_URL ?? 'http://service-transaction:3003';
-const ANALYTICS_SERVICE_URL   = process.env.ANALYTICS_SERVICE_URL   ?? 'http://analytics-service:3004';
-const NOTIFY_SERVICE_URL      = process.env.NOTIFICATION_SERVICE_URL ?? 'http://notification-service:3005';
+const IDENTITY_SERVICE_URL     = process.env.IDENTITY_SERVICE_URL     ?? 'http://service-identity:3001';
+const WALLET_SERVICE_URL       = process.env.WALLET_SERVICE_URL       ?? 'http://service-wallet:3002';
+const TRANSACTION_SERVICE_URL  = process.env.TRANSACTION_SERVICE_URL  ?? 'http://service-transaction:3003';
+const ANALYTICS_SERVICE_URL    = process.env.ANALYTICS_SERVICE_URL    ?? 'http://analytics-service:3004';
+const NOTIFY_SERVICE_URL       = process.env.NOTIFICATION_SERVICE_URL ?? 'http://notification-service:3005';
+const AI_SERVICE_URL           = process.env.AI_SERVICE_URL           ?? 'http://ai-service:8000';
+const AI_PROXY_TIMEOUT_MS      = Number(process.env.AI_PROXY_TIMEOUT_MS ?? 60_000);
+const INVOICE_PROXY_TIMEOUT_MS = Number(process.env.INVOICE_PROXY_TIMEOUT_MS ?? 60_000);
 
 /** Shared error handler — returns 504 when upstream is unreachable or times out */
 function onProxyError(err: Error, req: IncomingMessage, res: ServerResponse) {
@@ -69,6 +72,11 @@ function rewriteAnalyticsPath(_path: string, req: IncomingMessage) {
 }
 
 function rewriteNotificationPath(_path: string, req: IncomingMessage) {
+  const originalUrl = (req as any).originalUrl as string | undefined;
+  return originalUrl ?? _path;
+}
+
+function rewriteAiPath(_path: string, req: IncomingMessage) {
   const originalUrl = (req as any).originalUrl as string | undefined;
   return originalUrl ?? _path;
 }
@@ -147,8 +155,8 @@ router.use(
     target: TRANSACTION_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: rewriteInvoicePath,
-    proxyTimeout: PROXY_TIMEOUT_MS,
-    timeout: PROXY_TIMEOUT_MS,
+    proxyTimeout: INVOICE_PROXY_TIMEOUT_MS,
+    timeout: INVOICE_PROXY_TIMEOUT_MS,
     onProxyReq,
     onProxyRes,
     onError: onProxyError as any,
@@ -181,6 +189,22 @@ router.use(
     pathRewrite: rewriteNotificationPath,
     proxyTimeout: PROXY_TIMEOUT_MS,
     timeout: PROXY_TIMEOUT_MS,
+    onProxyReq,
+    onProxyRes,
+    onError: onProxyError as any,
+  })
+);
+
+// /api/v1/ai/* -> ai-service (JWT required, still benefits from gateway rate limiting)
+router.use(
+  '/ai',
+  verifyToken,
+  createProxyMiddleware({
+    target: AI_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: rewriteAiPath,
+    proxyTimeout: AI_PROXY_TIMEOUT_MS,
+    timeout: AI_PROXY_TIMEOUT_MS,
     onProxyReq,
     onProxyRes,
     onError: onProxyError as any,

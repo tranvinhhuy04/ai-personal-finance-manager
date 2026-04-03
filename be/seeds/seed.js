@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * OripioFin — Seed Script (Phase 2)
+ * Fintech — Seed Script (Phase 2)
  * ===================================
  * Tạo dữ liệu mẫu cho 3 MongoDB databases:
  *   fintech_identity-service    → collection: users

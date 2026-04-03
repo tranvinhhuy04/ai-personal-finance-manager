@@ -39,7 +39,7 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
           </button>
         </div>
         <div className="hidden sm:flex items-center gap-2 text-sm">
-          <span className="text-gray-500 font-medium">OripioFin</span>
+          <span className="text-gray-500 font-medium">Fintech</span>
           <ChevronRight className="w-4 h-4 text-gray-400" />
           <span className="text-gray-900 font-semibold">Bảng điều khiển</span>
         </div>

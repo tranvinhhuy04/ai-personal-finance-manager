@@ -67,6 +67,7 @@ export const Invoices = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -164,10 +165,20 @@ export const Invoices = () => {
     if (!selectedInvoice) return;
 
     const suggestedAmount = extractAmount(selectedInvoice.extractedData);
+    const suggestedMerchant = extractString(
+      selectedInvoice.extractedData,
+      ['merchantName', 'merchant_name', 'vendor', 'invoiceName'],
+      ''
+    );
     const suggestedDescription = extractString(
       selectedInvoice.extractedData,
-      ['merchantName', 'vendor', 'description', 'invoiceName'],
+      ['description', 'merchantName', 'merchant_name', 'vendor', 'invoiceName'],
       'Xác nhận giao dịch từ hóa đơn'
+    );
+    const suggestedOccurredAt = extractString(
+      selectedInvoice.extractedData,
+      ['transactionDate', 'date', 'occurredAt', 'occurred_at'],
+      selectedInvoice.createdAt
     );
 
     setConfirmForm({
@@ -177,8 +188,12 @@ export const Invoices = () => {
       transactionType: 'EXPENSE',
       currency: 'VND',
       description: suggestedDescription,
-      occurredAt: toInputDateTime(selectedInvoice.createdAt),
-      extractedData: selectedInvoice.extractedData,
+      occurredAt: toInputDateTime(suggestedOccurredAt),
+      extractedData: {
+        ...selectedInvoice.extractedData,
+        merchantName: suggestedMerchant,
+        merchant_name: suggestedMerchant,
+      },
     });
   }, [selectedInvoice, wallets]);
 
@@ -189,15 +204,43 @@ export const Invoices = () => {
 
   const handleUpload = useCallback(async (file: File) => {
     setUploading(true);
+    setUploadPhase('Google Vision + Gemini đang phân tích hóa đơn...');
+
     try {
-      const invoice = await apiClient.uploadInvoice(file, {
+      let extractedData: Record<string, unknown> = {
         originalFileName: file.name,
         uploadedAt: new Date().toISOString(),
         reviewStatus: 'awaiting_manual_confirmation',
-      });
+      };
+      let usedAiExtraction = false;
+
+      try {
+        const ocrResult = await apiClient.ocrInvoice(file);
+        extractedData = {
+          ...extractedData,
+          ...ocrResult.data,
+          description:
+            String(ocrResult.data.merchantName ?? '').trim() || 'Xác nhận giao dịch từ hóa đơn',
+          extractedBy: 'google-vision-gemini',
+        };
+        usedAiExtraction = Boolean(
+          ocrResult.data.merchantName || ocrResult.data.totalAmount || ocrResult.data.transactionDate
+        );
+      } catch (ocrError) {
+        console.warn('AI OCR failed, fallback to manual review:', ocrError);
+      }
+
+      setUploadPhase('Đang lưu hóa đơn vào hệ thống...');
+      const invoice = await apiClient.uploadInvoice(file, extractedData);
 
       setInvoices((prev) => [invoice, ...prev]);
-      setToast({ type: 'success', message: 'Tải hóa đơn thành công. Hãy kiểm tra và xác nhận.' });
+      setSelectedInvoice(invoice);
+      setToast({
+        type: 'success',
+        message: usedAiExtraction
+          ? 'Tải hóa đơn thành công. AI đã trích xuất dữ liệu để bạn xác nhận nhanh.'
+          : 'Tải hóa đơn thành công. Bạn vẫn có thể rà soát và nhập tay nếu OCR chưa đọc được.',
+      });
     } catch (error) {
       setToast({
         type: 'error',
@@ -205,6 +248,7 @@ export const Invoices = () => {
       });
     } finally {
       setUploading(false);
+      setUploadPhase('');
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -267,7 +311,23 @@ export const Invoices = () => {
 
     setConfirming(true);
     try {
-      const result = await apiClient.confirmInvoice(selectedInvoice.id, confirmForm);
+      const merchantName = extractString(
+        (confirmForm.extractedData ?? {}) as Record<string, unknown>,
+        ['merchantName', 'merchant_name'],
+        confirmForm.description || ''
+      );
+
+      const result = await apiClient.confirmInvoice(selectedInvoice.id, {
+        ...confirmForm,
+        extractedData: {
+          ...(confirmForm.extractedData ?? {}),
+          merchantName,
+          merchant_name: merchantName,
+          totalAmount: Number(confirmForm.amount || 0),
+          transactionDate: confirmForm.occurredAt ? new Date(confirmForm.occurredAt).toISOString() : null,
+          description: confirmForm.description,
+        },
+      });
 
       setInvoices((prev) => prev.map((item) => (item.id === result.invoice.id ? result.invoice : item)));
       setSelectedInvoice(result.invoice);
@@ -334,8 +394,11 @@ export const Invoices = () => {
         >
           {uploading ? <Loader2 className="h-8 w-8 animate-spin text-emerald-600" /> : <UploadCloud className="h-8 w-8 text-emerald-600" />}
           <div>
-            <p className="text-base font-semibold text-gray-900">Kéo thả ảnh hóa đơn hoặc bấm để tải lên</p>
+            <p className="text-base font-semibold text-gray-900">Kéo thả ảnh hóa đơn để AI OCR tự động đọc dữ liệu</p>
             <p className="mt-1 text-sm text-gray-500">Hỗ trợ JPG, PNG, WEBP · tối đa 8MB</p>
+            {uploading && uploadPhase ? (
+              <p className="mt-2 text-xs font-medium text-emerald-700">{uploadPhase}</p>
+            ) : null}
           </div>
           <input
             ref={fileInputRef}
@@ -535,15 +598,43 @@ export const Invoices = () => {
                       </select>
                     </label>
 
+                    <label className="space-y-1 text-sm sm:col-span-2">
+                      <span className="text-gray-600">Tên người bán</span>
+                      <input
+                        value={extractString(
+                          (confirmForm.extractedData ?? {}) as Record<string, unknown>,
+                          ['merchantName', 'merchant_name'],
+                          ''
+                        )}
+                        disabled={selectedInvoice.status === 'PROCESSED'}
+                        onChange={(event) => {
+                          const merchantName = event.target.value;
+                          setConfirmForm((prev) => ({
+                            ...prev,
+                            description: merchantName || prev.description,
+                            extractedData: {
+                              ...(prev.extractedData ?? {}),
+                              merchantName,
+                              merchant_name: merchantName,
+                            },
+                          }));
+                        }}
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2"
+                        placeholder="VD: Bông Trà CN Phạm Viết Chánh"
+                      />
+                    </label>
+
                     <label className="space-y-1 text-sm">
                       <span className="text-gray-600">Số tiền</span>
                       <input
+                        type="number"
                         value={confirmForm.amount}
                         disabled={selectedInvoice.status === 'PROCESSED'}
                         onChange={(event) => setConfirmForm((prev) => ({ ...prev, amount: event.target.value }))}
                         className="w-full rounded-xl border border-gray-200 px-3 py-2"
                         placeholder="VD: 250000"
                       />
+                      <p className="text-xs text-emerald-700">{formatVND(Number(confirmForm.amount || 0))}</p>
                     </label>
 
                     <label className="space-y-1 text-sm">
@@ -570,11 +661,18 @@ export const Invoices = () => {
                   </label>
                 </div>
 
-                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
-                  <p className="font-semibold text-gray-900">Dữ liệu trích xuất</p>
-                  <pre className="mt-2 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-slate-100">
-                    {JSON.stringify(selectedInvoice.extractedData, null, 2)}
-                  </pre>
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm text-gray-700">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-emerald-900">Kết quả AI nhận diện</p>
+                      <p className="mt-1 text-xs text-emerald-700">
+                        Dữ liệu đã được điền sẵn theo luồng Google Vision + Gemini và bạn có thể chỉnh sửa trước khi lưu.
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-[11px] font-semibold text-emerald-700">
+                      Vision + Gemini
+                    </span>
+                  </div>
                 </div>
 
                 {selectedInvoice.status === 'PROCESSED' ? (
@@ -614,7 +712,7 @@ export const Invoices = () => {
                     className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                    Xác nhận thành giao dịch
+                    Xác nhận & Lưu giao dịch
                   </button>
                 </div>
               </div>
