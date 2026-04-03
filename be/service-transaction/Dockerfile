@@ -22,3 +22,5 @@ COPY --from=builder /app/dist ./dist
 EXPOSE 3003
 
 CMD ["npm", "start"]
+
+RUN npm install -g typescript
