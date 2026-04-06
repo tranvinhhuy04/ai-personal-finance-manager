@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { useWalletStore } from '@/store/useFinanceStore';
 import { apiClient } from '@/lib/apiClient';
+import { CurrencyInput } from '@/components/common/CurrencyInput';
+import type { Wallet } from '@/types/finance';
 
 interface EditWalletModalProps {
-  walletId: string;
+  wallet: Wallet;
   onClose: () => void;
+  onSuccess?: () => void | Promise<void>;
 }
 
 export const EditWalletModal: React.FC<EditWalletModalProps> = ({
-  walletId,
+  wallet,
   onClose,
+  onSuccess,
 }) => {
-  const { wallets, refreshWallets } = useWalletStore();
-  const wallet = wallets.find((w) => w.id === walletId);
   const [status, setStatus] = useState<number>(wallet?.status || 1);
   const [balance, setBalance] = useState(wallet?.balance?.toString() || '0');
   const [error, setError] = useState('');
@@ -44,8 +45,8 @@ export const EditWalletModal: React.FC<EditWalletModalProps> = ({
 
       console.log('[EditWalletModal.handleSubmit] payload =', payload);
 
-      await apiClient.updateWallet(walletId, payload);
-      await refreshWallets();
+      await apiClient.updateWallet(wallet.id, payload);
+      await onSuccess?.();
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi khi cập nhật ví');
@@ -107,14 +108,11 @@ export const EditWalletModal: React.FC<EditWalletModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Số dư ban đầu
             </label>
-            <input
-              type="number"
+            <CurrencyInput
               value={balance}
-              onChange={(e) => setBalance(e.target.value)}
-              placeholder="VD: 5000000"
+              onValueChange={setBalance}
+              placeholder="VD: 5.000.000 đ"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-              min="0"
-              step="1000"
             />
           </div>
 

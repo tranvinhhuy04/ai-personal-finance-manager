@@ -84,6 +84,9 @@ services:
       - ./api-gateway/.env
     environment:
       PORT: 3000
+      NODE_ENV: development
+      RATE_LIMIT_MAX_DEV: 1000
+      DISABLE_RATE_LIMIT_IN_DEV: "false"
       REDIS_HOST: redis-cache
       REDIS_PORT: 6379
       REDIS_URL: redis://redis-cache:6379

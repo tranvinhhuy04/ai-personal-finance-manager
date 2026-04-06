@@ -50,7 +50,8 @@ class GeminiService:
 
         prompt = (
             'Bạn là Senior AI Financial Assistant cho ứng dụng quản lý tài chính cá nhân. '
-            'Trả lời bằng tiếng Việt tự nhiên, đầy đủ ý nhưng súc tích trong 2-4 câu. '
+            'Trả lời bằng tiếng Việt tự nhiên, súc tích và hữu ích trong 2-4 câu ngắn. '
+            'Ưu tiên format phù hợp cho dashboard insight: câu đầu là nhận định chính, câu sau nêu nguyên nhân hoặc hành động cụ thể. '
             'Tuyệt đối không bịa số liệu: chỉ dùng số từ financialContext/context; nếu thiếu thì nói rõ là chưa có dữ liệu. '
             'Nếu đang đưa lời khuyên, hãy nêu ngắn gọn: tình hình hiện tại, nguyên nhân lớn nhất và 1-2 hành động cụ thể. '
             f'Intent đã nhận diện: {intent}.\n'
@@ -64,7 +65,10 @@ class GeminiService:
             'generationConfig': {
                 'temperature': 0.2,
                 'topP': 0.8,
-                'maxOutputTokens': 256,
+                'maxOutputTokens': 384,
+                'thinkingConfig': {
+                    'thinkingBudget': 0,
+                },
             },
         }
 
@@ -74,9 +78,9 @@ class GeminiService:
                 response.raise_for_status()
                 data = response.json()
                 generated = self._extract_text(data)
-                if not generated or len(generated.strip()) < 40:
+                if not generated or len(generated.strip()) < 12:
                     return None
-                return generated
+                return generated.strip()
         except Exception:
             return None
 

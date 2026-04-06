@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import {
   AlertCircle,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { formatVND } from '@/lib/utils';
+import { CurrencyInput } from '@/components/common/CurrencyInput';
 import type { Category, ConfirmInvoiceInput, Invoice, Wallet } from '@/types/finance';
 
 type ToastState = {
@@ -61,15 +63,11 @@ function toInputDateTime(value: string) {
 export const Invoices = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const createdObjectUrlsRef = useRef<string[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const queryClient = useQueryClient();
   const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({});
-  const [wallets, setWallets] = useState<Wallet[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadPhase, setUploadPhase] = useState('');
-  const [confirming, setConfirming] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [confirmForm, setConfirmForm] = useState<ConfirmInvoiceInput>({
     walletId: '',
@@ -82,31 +80,100 @@ export const Invoices = () => {
     extractedData: {},
   });
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [invoiceData, walletData, categoryData] = await Promise.all([
-        apiClient.getInvoices(),
-        apiClient.getWallets(),
-        apiClient.getCategories().catch(() => []),
-      ]);
+  const invoicesQuery = useQuery({
+    queryKey: ['invoices'],
+    queryFn: () => apiClient.getInvoices(),
+    staleTime: 30 * 1000,
+  });
 
-      setInvoices(invoiceData);
-      setWallets(walletData);
-      setCategories(categoryData);
-    } catch (error) {
-      setToast({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Không thể tải danh sách hóa đơn',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const walletsQuery = useQuery({
+    queryKey: ['wallets'],
+    queryFn: () => apiClient.getWallets(),
+    staleTime: 60 * 1000,
+  });
+
+  const categoriesQuery = useQuery({
+    queryKey: ['categories', 'all'],
+    queryFn: async () => apiClient.getCategories().catch(() => []),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const invoices = invoicesQuery.data ?? [];
+  const wallets = walletsQuery.data ?? [];
+  const categories = categoriesQuery.data ?? [];
+  const loading = invoicesQuery.isLoading || walletsQuery.isLoading || categoriesQuery.isLoading;
+  const selectedInvoice = useMemo(
+    () => invoices.find((invoice) => invoice.id === selectedInvoiceId) ?? null,
+    [invoices, selectedInvoiceId]
+  );
+
+  const refreshData = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+      queryClient.invalidateQueries({ queryKey: ['wallets'] }),
+      queryClient.invalidateQueries({ queryKey: ['categories'] }),
+    ]);
+  }, [queryClient]);
+
+  const uploadInvoiceMutation = useMutation({
+    mutationFn: ({ file, extractedData }: { file: File; extractedData: Record<string, unknown> }) =>
+      apiClient.uploadInvoice(file, extractedData),
+    onSuccess: async (invoice) => {
+      queryClient.setQueryData<Invoice[]>(['invoices'], (prev = []) => [invoice, ...prev.filter((item) => item.id !== invoice.id)]);
+      setSelectedInvoiceId(invoice.id);
+      await queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+  });
+
+  const deleteInvoiceMutation = useMutation({
+    mutationFn: (invoiceId: string) => apiClient.deleteInvoice(invoiceId),
+    onSuccess: async (_result, invoiceId) => {
+      queryClient.setQueryData<Invoice[]>(['invoices'], (prev = []) => prev.filter((item) => item.id !== invoiceId));
+      setSelectedInvoiceId((current) => (current === invoiceId ? null : current));
+      await queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+  });
+
+  const rejectInvoiceMutation = useMutation({
+    mutationFn: ({ invoiceId, extractedData }: { invoiceId: string; extractedData: Record<string, unknown> }) =>
+      apiClient.updateInvoice(invoiceId, {
+        status: 'REJECTED',
+        extractedData,
+      }),
+    onSuccess: async (updated) => {
+      queryClient.setQueryData<Invoice[]>(['invoices'], (prev = []) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      setSelectedInvoiceId(updated.id);
+      await queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+  });
+
+  const confirmInvoiceMutation = useMutation({
+    mutationFn: ({ invoiceId, payload }: { invoiceId: string; payload: ConfirmInvoiceInput }) =>
+      apiClient.confirmInvoice(invoiceId, payload),
+    onSuccess: async (result) => {
+      queryClient.setQueryData<Invoice[]>(['invoices'], (prev = []) =>
+        prev.map((item) => (item.id === result.invoice.id ? result.invoice : item))
+      );
+      setSelectedInvoiceId(result.invoice.id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+        queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+        queryClient.invalidateQueries({ queryKey: ['wallets'] }),
+      ]);
+    },
+  });
+
+  const confirming = confirmInvoiceMutation.isPending;
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    const loadError = invoicesQuery.error ?? walletsQuery.error ?? categoriesQuery.error;
+    if (!loadError) return;
+
+    setToast({
+      type: 'error',
+      message: loadError instanceof Error ? loadError.message : 'Không thể tải danh sách hóa đơn',
+    });
+  }, [categoriesQuery.error, invoicesQuery.error, walletsQuery.error]);
 
   useEffect(() => {
     if (!toast) return;
@@ -231,10 +298,9 @@ export const Invoices = () => {
       }
 
       setUploadPhase('Đang lưu hóa đơn vào hệ thống...');
-      const invoice = await apiClient.uploadInvoice(file, extractedData);
+      const invoice = await uploadInvoiceMutation.mutateAsync({ file, extractedData });
 
-      setInvoices((prev) => [invoice, ...prev]);
-      setSelectedInvoice(invoice);
+      setSelectedInvoiceId(invoice.id);
       setToast({
         type: 'success',
         message: usedAiExtraction
@@ -253,7 +319,7 @@ export const Invoices = () => {
         fileInputRef.current.value = '';
       }
     }
-  }, []);
+  }, [uploadInvoiceMutation]);
 
   const handleDelete = useCallback(
     async (invoiceId: string) => {
@@ -262,11 +328,7 @@ export const Invoices = () => {
       }
 
       try {
-        await apiClient.deleteInvoice(invoiceId);
-        setInvoices((prev) => prev.filter((item) => item.id !== invoiceId));
-        if (selectedInvoice?.id === invoiceId) {
-          setSelectedInvoice(null);
-        }
+        await deleteInvoiceMutation.mutateAsync(invoiceId);
         setToast({ type: 'success', message: 'Đã soft-delete hóa đơn.' });
       } catch (error) {
         setToast({
@@ -275,20 +337,18 @@ export const Invoices = () => {
         });
       }
     },
-    [selectedInvoice]
+    [deleteInvoiceMutation]
   );
 
   const handleReject = useCallback(async () => {
     if (!selectedInvoice) return;
 
     try {
-      const updated = await apiClient.updateInvoice(selectedInvoice.id, {
-        status: 'REJECTED',
+      await rejectInvoiceMutation.mutateAsync({
+        invoiceId: selectedInvoice.id,
         extractedData: selectedInvoice.extractedData,
       });
 
-      setInvoices((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      setSelectedInvoice(updated);
       setToast({ type: 'success', message: 'Hóa đơn đã được đánh dấu từ chối.' });
     } catch (error) {
       setToast({
@@ -296,7 +356,7 @@ export const Invoices = () => {
         message: error instanceof Error ? error.message : 'Không thể cập nhật hóa đơn',
       });
     }
-  }, [selectedInvoice]);
+  }, [rejectInvoiceMutation, selectedInvoice]);
 
   const handleConfirm = useCallback(async () => {
     if (!selectedInvoice) return;
@@ -309,7 +369,6 @@ export const Invoices = () => {
       return;
     }
 
-    setConfirming(true);
     try {
       const merchantName = extractString(
         (confirmForm.extractedData ?? {}) as Record<string, unknown>,
@@ -317,31 +376,31 @@ export const Invoices = () => {
         confirmForm.description || ''
       );
 
-      const result = await apiClient.confirmInvoice(selectedInvoice.id, {
-        ...confirmForm,
-        extractedData: {
-          ...(confirmForm.extractedData ?? {}),
-          merchantName,
-          merchant_name: merchantName,
-          totalAmount: Number(confirmForm.amount || 0),
-          transactionDate: confirmForm.occurredAt ? new Date(confirmForm.occurredAt).toISOString() : null,
-          description: confirmForm.description,
+      await confirmInvoiceMutation.mutateAsync({
+        invoiceId: selectedInvoice.id,
+        payload: {
+          ...confirmForm,
+          extractedData: {
+            ...(confirmForm.extractedData ?? {}),
+            merchantName,
+            merchant_name: merchantName,
+            totalAmount: Number(confirmForm.amount || 0),
+            transactionDate: confirmForm.occurredAt ? new Date(confirmForm.occurredAt).toISOString() : null,
+            description: confirmForm.description,
+          },
         },
       });
 
-      setInvoices((prev) => prev.map((item) => (item.id === result.invoice.id ? result.invoice : item)));
-      setSelectedInvoice(result.invoice);
       setToast({ type: 'success', message: 'Đã tạo giao dịch bất biến từ hóa đơn.' });
-      await loadData();
     } catch (error) {
       setToast({
         type: 'error',
         message: error instanceof Error ? error.message : 'Xác nhận hóa đơn thất bại',
       });
     } finally {
-      setConfirming(false);
+      // handled by React Query mutation state
     }
-  }, [confirmForm, loadData, selectedInvoice]);
+  }, [confirmForm, confirmInvoiceMutation, selectedInvoice]);
 
   return (
     <motion.div
@@ -373,7 +432,7 @@ export const Invoices = () => {
 
         <button
           type="button"
-          onClick={loadData}
+          onClick={() => void refreshData()}
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
           <RefreshCcw className="h-4 w-4" />
@@ -436,15 +495,15 @@ export const Invoices = () => {
             return (
               <div key={invoice.id} className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
                 <div className="aspect-[4/3] bg-gray-50">
-                  {imagePreviews[invoice.id] ? (
+                  {invoice.imageUrl ? (
                     <img
-                      src={imagePreviews[invoice.id]}
-                      alt={vendor}
-                      className="h-full w-full object-cover"
+                      src={imagePreviews[invoice.id] || invoice.imageUrl}
+                      alt="Hóa đơn"
+                      className="w-full h-full object-cover rounded-t-lg"
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-gray-400">
-                      Đang tải ảnh hóa đơn...
+                    <div className="w-full h-full bg-gray-100 flex items-center justify-center rounded-t-lg text-gray-400">
+                      Không có ảnh
                     </div>
                   )}
                 </div>
@@ -482,7 +541,7 @@ export const Invoices = () => {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setSelectedInvoice(invoice)}
+                      onClick={() => setSelectedInvoiceId(invoice.id)}
                       className="flex-1 rounded-xl bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
                     >
                       <span className="inline-flex items-center gap-2">
@@ -515,7 +574,7 @@ export const Invoices = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedInvoice(null)}
+                onClick={() => setSelectedInvoiceId(null)}
                 className="rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
               >
                 Đóng
@@ -525,15 +584,15 @@ export const Invoices = () => {
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-4">
                 <div className="overflow-hidden rounded-3xl border border-gray-100 bg-gray-50">
-                  {imagePreviews[selectedInvoice.id] ? (
+                  {selectedInvoice.imageUrl ? (
                     <img
-                      src={imagePreviews[selectedInvoice.id]}
-                      alt="Invoice preview"
+                      src={imagePreviews[selectedInvoice.id] || selectedInvoice.imageUrl}
+                      alt="Hóa đơn"
                       className="max-h-[520px] w-full object-contain"
                     />
                   ) : (
-                    <div className="flex min-h-[320px] items-center justify-center text-sm text-gray-400">
-                      Đang tải ảnh hóa đơn...
+                    <div className="w-full min-h-[320px] bg-gray-100 flex items-center justify-center text-gray-400 rounded-t-lg">
+                      Không có ảnh
                     </div>
                   )}
                 </div>
@@ -626,13 +685,12 @@ export const Invoices = () => {
 
                     <label className="space-y-1 text-sm">
                       <span className="text-gray-600">Số tiền</span>
-                      <input
-                        type="number"
+                      <CurrencyInput
                         value={confirmForm.amount}
                         disabled={selectedInvoice.status === 'PROCESSED'}
-                        onChange={(event) => setConfirmForm((prev) => ({ ...prev, amount: event.target.value }))}
+                        onValueChange={(value) => setConfirmForm((prev) => ({ ...prev, amount: value }))}
                         className="w-full rounded-xl border border-gray-200 px-3 py-2"
-                        placeholder="VD: 250000"
+                        placeholder="VD: 250.000 đ"
                       />
                       <p className="text-xs text-emerald-700">{formatVND(Number(confirmForm.amount || 0))}</p>
                     </label>
@@ -699,7 +757,7 @@ export const Invoices = () => {
 
                   <button
                     type="button"
-                    onClick={() => setSelectedInvoice(null)}
+                    onClick={() => setSelectedInvoiceId(null)}
                     className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                   >
                     Đóng

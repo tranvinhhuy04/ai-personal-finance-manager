@@ -6,12 +6,9 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(value: number) {
-  const amount = Number.isFinite(value) ? value : 0;
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(amount);
+  const amount = Number(value);
+  const safeAmount = Number.isFinite(amount) ? Math.round(amount) : 0;
+  return `${new Intl.NumberFormat('vi-VN').format(safeAmount)} đ`;
 }
 
 export function formatCompactNumber(value: number) {

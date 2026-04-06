@@ -138,18 +138,48 @@ class ApiClient {
 
   private normalizeAnalyticsDashboard(raw: AnalyticsApiResponse): AnalyticsDashboardResponse {
     const summary = raw.summary ?? {};
+    const kpis = raw.kpis ?? {};
+    const insights = raw.insights ?? {};
 
     return {
       currentMonth: String(raw.currentMonth ?? ''),
       filters: {
         month: raw.filters?.month ?? null,
         walletId: raw.filters?.walletId ?? null,
+        range: raw.filters?.range ?? null,
+        from: raw.filters?.from ?? null,
+        to: raw.filters?.to ?? null,
       },
+      period: raw.period
+        ? {
+            range: String(raw.period.range ?? 'month'),
+            label: String(raw.period.label ?? ''),
+            startDate: String(raw.period.startDate ?? ''),
+            endDate: String(raw.period.endDate ?? ''),
+          }
+        : undefined,
       summary: {
         totalIncome: Number(summary.totalIncome ?? 0),
         totalExpense: Number(summary.totalExpense ?? 0),
         net: Number(summary.net ?? summary.netCashFlow ?? 0),
         netCashFlow: Number(summary.netCashFlow ?? summary.net ?? 0),
+      },
+      kpis: {
+        savingsRate: Number(kpis.savingsRate ?? 0),
+        dailyAverageExpense: Number(kpis.dailyAverageExpense ?? 0),
+        recurringSpend: Number(kpis.recurringSpend ?? 0),
+        transactionCount: Number(kpis.transactionCount ?? 0),
+      },
+      insights: {
+        severity: (insights.severity ?? 'neutral') as 'good' | 'warning' | 'neutral',
+        headline: String(insights.headline ?? ''),
+        message: String(insights.message ?? ''),
+        recommendation: String(insights.recommendation ?? ''),
+        spendingChangePercent: Number(insights.spendingChangePercent ?? 0),
+        incomeChangePercent: Number(insights.incomeChangePercent ?? 0),
+        savingsRate: Number(insights.savingsRate ?? 0),
+        dailyAverageExpense: Number(insights.dailyAverageExpense ?? 0),
+        riskiestCategory: insights.riskiestCategory ? String(insights.riskiestCategory) : null,
       },
       trend: Array.isArray(raw.trend)
         ? raw.trend.map((item: Record<string, any>) => ({
@@ -167,6 +197,50 @@ class ApiClient {
             value: Number(item.value ?? item.total_amount ?? 0),
             color: item.color ?? null,
             transactionCount: Number(item.transactionCount ?? item.transaction_count ?? 0),
+          }))
+        : [],
+      comparison: Array.isArray(raw.comparison)
+        ? raw.comparison.map((item: Record<string, any>) => ({
+            label: String(item.label ?? ''),
+            income: Number(item.income ?? 0),
+            expense: Number(item.expense ?? 0),
+          }))
+        : [],
+      budgetProgress: Array.isArray(raw.budgetProgress)
+        ? raw.budgetProgress.map((item: Record<string, any>) => ({
+            category: String(item.category ?? 'Khác'),
+            spent: Number(item.spent ?? 0),
+            limit: Number(item.limit ?? 0),
+            remaining: Number(item.remaining ?? 0),
+            percent: Number(item.percent ?? 0),
+          }))
+        : [],
+      forecast: Array.isArray(raw.forecast)
+        ? raw.forecast.map((item: Record<string, any>) => ({
+            label: String(item.label ?? ''),
+            actual: item.actual == null ? undefined : Number(item.actual),
+            forecast: item.forecast == null ? undefined : Number(item.forecast),
+          }))
+        : [],
+      topTransactions: Array.isArray(raw.topTransactions)
+        ? raw.topTransactions.map((item: Record<string, any>) => ({
+            id: String(item.id ?? ''),
+            merchant: String(item.merchant ?? item.description ?? 'Giao dịch'),
+            category: String(item.category ?? 'Khác'),
+            date: String(item.date ?? ''),
+            amount: Number(item.amount ?? 0),
+            transactionType: (item.transactionType ?? 'EXPENSE') as 'INCOME' | 'EXPENSE',
+            source: item.source ? String(item.source) : undefined,
+          }))
+        : [],
+      subscriptions: Array.isArray(raw.subscriptions)
+        ? raw.subscriptions.map((item: Record<string, any>) => ({
+            id: String(item.id ?? ''),
+            name: String(item.name ?? 'Khoản định kỳ'),
+            date: String(item.date ?? ''),
+            amount: Number(item.amount ?? 0),
+            frequency: (item.frequency ?? 'MONTHLY') as 'WEEKLY' | 'MONTHLY',
+            status: (item.status ?? 'ACTIVE') as 'ACTIVE' | 'PAUSED',
           }))
         : [],
     };
@@ -409,7 +483,14 @@ class ApiClient {
     };
   }
 
-  async getAnalyticsDashboard(filters?: { month?: string; walletId?: string }): Promise<AnalyticsDashboardResponse> {
+  async getAnalyticsDashboard(filters?: {
+    month?: string;
+    walletId?: string;
+    type?: 'monthly' | 'yearly' | string;
+    range?: 'month' | 'quarter' | 'year' | 'custom' | string;
+    from?: string;
+    to?: string;
+  }): Promise<AnalyticsDashboardResponse> {
     const params: Record<string, string> = {};
 
     if (filters?.month) {
@@ -418,6 +499,22 @@ class ApiClient {
 
     if (filters?.walletId) {
       params.wallet_id = filters.walletId;
+    }
+
+    if (filters?.type) {
+      params.type = filters.type;
+    }
+
+    if (filters?.range) {
+      params.range = filters.range;
+    }
+
+    if (filters?.from) {
+      params.from = filters.from;
+    }
+
+    if (filters?.to) {
+      params.to = filters.to;
     }
 
     const response = await axiosClient.get('/api/v1/analytics/dashboard', { params });
@@ -486,6 +583,11 @@ class ApiClient {
       question: data.question,
       context: data.context ?? {},
       use_llm: data.useLlm ?? false,
+      month: data.month,
+      walletId: data.walletId,
+      range: data.range,
+      from: data.from,
+      to: data.to,
     });
 
     return this.normalizeAIChatResponse(response.data ?? {});

@@ -12,6 +12,12 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const isDevelopment = process.env.NODE_ENV === 'development';
+const disableRateLimitInDev = process.env.DISABLE_RATE_LIMIT_IN_DEV === 'true';
+const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60 * 1000;
+const rateLimitMax = Number(
+  process.env.RATE_LIMIT_MAX || (isDevelopment ? process.env.RATE_LIMIT_MAX_DEV ?? 1000 : 100)
+);
 
 // Redis client for rate limiting
 const redisClient = createClient({
@@ -31,18 +37,25 @@ app.use(cors());
 app.use(morgan('dev'));
 
 // Rate limiting (global, using Redis)
-app.use(
-  rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    store: new RedisStore({
-      sendCommand: (...args: string[]) => redisClient.sendCommand(args),
-    }),
-    message: 'Too many requests, please try again later.',
-  })
-);
+if (isDevelopment && disableRateLimitInDev) {
+  console.log('[api-gateway] Rate limiter disabled for development mode');
+} else {
+  app.use(
+    rateLimit({
+      windowMs: rateLimitWindowMs,
+      max: Math.max(1, rateLimitMax),
+      standardHeaders: true,
+      legacyHeaders: false,
+      store: new RedisStore({
+        sendCommand: (...args: string[]) => redisClient.sendCommand(args),
+      }),
+      skip: (req) => isDevelopment && req.originalUrl.includes('/notifications/stream'),
+      message: isDevelopment
+        ? 'Dev rate limit reached. Please slow down a bit.'
+        : 'Too many requests, please try again later.',
+    })
+  );
+}
 
 // Mount versioned API routes (proxy + auth)
 app.use('/api/v1', routes);

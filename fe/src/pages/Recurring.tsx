@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import {
   Activity,
@@ -13,9 +14,10 @@ import {
   Trash2,
   Wallet,
 } from 'lucide-react';
+import { apiClient } from '@/lib/apiClient';
 import { cn, formatVND } from '@/lib/utils';
-import { useRecurringStore, useTransactionStore, useWalletStore } from '@/store/useFinanceStore';
-import type { RecurringFrequency, RecurringRule, RecurringRuleStatus } from '@/types/finance';
+import { CurrencyInput } from '@/components/common/CurrencyInput';
+import type { RecurringFrequency, RecurringRule, RecurringRuleStatus, Wallet as WalletItem, Category } from '@/types/finance';
 const WEEK_DAY_OPTIONS = [
   { value: 1, label: 'Thứ 2' },
   { value: 2, label: 'Thứ 3' },
@@ -26,6 +28,9 @@ const WEEK_DAY_OPTIONS = [
   { value: 0, label: 'Chủ nhật' },
 ];
 const MONTH_DAY_OPTIONS = Array.from({ length: 31 }, (_, index) => index + 1);
+const EMPTY_WALLETS: WalletItem[] = [];
+const EMPTY_CATEGORIES: Category[] = [];
+const EMPTY_RULES: RecurringRule[] = [];
 
 function getFrequencyLabel(frequency: RecurringFrequency) {
   return frequency === 'WEEKLY' ? 'Hàng tuần' : 'Hàng tháng';
@@ -86,18 +91,7 @@ function StatusBadge({ status }: { status: RecurringRuleStatus }) {
 }
 
 export const Recurring = () => {
-  const { wallets, fetchWallets } = useWalletStore();
-  const { categories, fetchCategories } = useTransactionStore();
-  const {
-    recurringRules: rules,
-    isLoading: recurringLoading,
-    error: recurringError,
-    fetchRecurringRules,
-    createRecurringRule,
-    updateRecurringRule,
-    deleteRecurringRule,
-  } = useRecurringStore();
-
+  const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [formData, setFormData] = useState({
     walletId: '',
@@ -111,14 +105,65 @@ export const Recurring = () => {
     note: '',
   });
 
+  const walletsQuery = useQuery({
+    queryKey: ['wallets'],
+    queryFn: () => apiClient.getWallets(),
+    staleTime: 60 * 1000,
+    select: (items: WalletItem[]) => items.filter((wallet) => wallet.status === 1),
+  });
+
+  const categoriesQuery = useQuery({
+    queryKey: ['categories', 'all'],
+    queryFn: () => apiClient.getCategories(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const recurringRulesQuery = useQuery({
+    queryKey: ['recurringRules'],
+    queryFn: () => apiClient.getRecurringRules(),
+    staleTime: 30 * 1000,
+  });
+
+  const createRuleMutation = useMutation({
+    mutationFn: (data: Parameters<typeof apiClient.createRecurringRule>[0]) => apiClient.createRecurringRule(data),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['recurringRules'] });
+    },
+  });
+
+  const updateRuleMutation = useMutation({
+    mutationFn: ({ ruleId, data }: { ruleId: string; data: Parameters<typeof apiClient.updateRecurringRule>[1] }) =>
+      apiClient.updateRecurringRule(ruleId, data),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['recurringRules'] });
+    },
+  });
+
+  const deleteRuleMutation = useMutation({
+    mutationFn: (ruleId: string) => apiClient.deleteRecurringRule(ruleId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['recurringRules'] });
+    },
+  });
+
+  const wallets = walletsQuery.data ?? EMPTY_WALLETS;
+  const categories = (categoriesQuery.data ?? EMPTY_CATEGORIES) as Category[];
+  const rules = recurringRulesQuery.data ?? EMPTY_RULES;
+  const recurringLoading = walletsQuery.isLoading || categoriesQuery.isLoading || recurringRulesQuery.isLoading;
+  const isMutating = createRuleMutation.isPending || updateRuleMutation.isPending || deleteRuleMutation.isPending;
+  const recurringError = walletsQuery.error ?? categoriesQuery.error ?? recurringRulesQuery.error ?? null;
+
   useEffect(() => {
-    void Promise.all([fetchWallets(), fetchCategories(), fetchRecurringRules()]).catch(() => {
-      setFeedback({
-        type: 'error',
-        text: 'Không thể tải dữ liệu ví, danh mục hoặc recurring rules. Vui lòng thử lại sau.',
-      });
+    if (!recurringError) return;
+
+    setFeedback({
+      type: 'error',
+      text:
+        recurringError instanceof Error
+          ? recurringError.message
+          : 'Không thể tải dữ liệu ví, danh mục hoặc recurring rules. Vui lòng thử lại sau.',
     });
-  }, [fetchWallets, fetchCategories, fetchRecurringRules]);
+  }, [recurringError]);
 
   const categoryOptions = useMemo(
     () => categories.filter((item) => item.categoryType === formData.transactionType && item.status === 1),
@@ -127,21 +172,28 @@ export const Recurring = () => {
 
   useEffect(() => {
     if (!categoryOptions.length) {
-      setFormData((current) => ({ ...current, categoryId: '' }));
+      setFormData((current) => (current.categoryId ? { ...current, categoryId: '' } : current));
       return;
     }
 
     const stillExists = categoryOptions.some((item) => item.id === formData.categoryId);
     if (!stillExists) {
-      setFormData((current) => ({ ...current, categoryId: categoryOptions[0]?.id ?? '' }));
+      const nextCategoryId = categoryOptions[0]?.id ?? '';
+      setFormData((current) =>
+        current.categoryId === nextCategoryId ? current : { ...current, categoryId: nextCategoryId }
+      );
     }
   }, [categoryOptions, formData.categoryId]);
 
   useEffect(() => {
-    if (wallets.length === 0) return;
-    if (!formData.walletId) {
-      setFormData((current) => ({ ...current, walletId: wallets[0]?.id ?? '' }));
-    }
+    if (wallets.length === 0 || formData.walletId) return;
+
+    const nextWalletId = wallets[0]?.id ?? '';
+    if (!nextWalletId) return;
+
+    setFormData((current) =>
+      current.walletId === nextWalletId ? current : { ...current, walletId: nextWalletId }
+    );
   }, [wallets, formData.walletId]);
 
   const activeRules = rules.filter((rule) => rule.status === 'ACTIVE');
@@ -171,7 +223,7 @@ export const Recurring = () => {
     }
 
     try {
-      await createRecurringRule({
+      await createRuleMutation.mutateAsync({
         walletId: formData.walletId,
         categoryId: formData.categoryId,
         transactionType: formData.transactionType,
@@ -202,8 +254,11 @@ export const Recurring = () => {
 
   const toggleRuleStatus = async (rule: RecurringRule) => {
     try {
-      await updateRecurringRule(rule.id, {
-        status: rule.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE',
+      await updateRuleMutation.mutateAsync({
+        ruleId: rule.id,
+        data: {
+          status: rule.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE',
+        },
       });
       setFeedback({ type: 'success', text: 'Đã cập nhật trạng thái recurring rule.' });
     } catch (error) {
@@ -216,7 +271,7 @@ export const Recurring = () => {
 
   const handleDeleteRule = async (ruleId: string) => {
     try {
-      await deleteRecurringRule(ruleId);
+      await deleteRuleMutation.mutateAsync(ruleId);
       setFeedback({ type: 'success', text: 'Đã xóa recurring rule khỏi MongoDB.' });
     } catch (error) {
       setFeedback({
@@ -306,13 +361,10 @@ export const Recurring = () => {
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-200">Số tiền</label>
-                <input
-                  type="number"
-                  min="1000"
-                  step="1000"
+                <CurrencyInput
                   value={formData.amount}
-                  onChange={(event) => setFormData((current) => ({ ...current, amount: event.target.value }))}
-                  placeholder="VD: 1500000"
+                  onValueChange={(value) => setFormData((current) => ({ ...current, amount: value }))}
+                  placeholder="VD: 1.500.000 đ"
                   className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 />
               </div>
@@ -386,7 +438,7 @@ export const Recurring = () => {
 
             {recurringError && !feedback && (
               <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
-                {recurringError}
+                {recurringError instanceof Error ? recurringError.message : 'Không thể tải recurring rules.'}
               </div>
             )}
 
@@ -423,11 +475,11 @@ export const Recurring = () => {
 
               <button
                 type="submit"
-                disabled={recurringLoading}
+                disabled={recurringLoading || isMutating}
                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-500 dark:hover:bg-emerald-400"
               >
                 <Plus className="h-4 w-4" />
-                {recurringLoading ? 'Đang lưu...' : 'Lưu quy tắc'}
+                {createRuleMutation.isPending ? 'Đang lưu...' : 'Lưu quy tắc'}
               </button>
             </div>
           </form>
@@ -461,7 +513,11 @@ export const Recurring = () => {
             <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">Danh sách này đại diện cho các lệnh mà cron job backend sẽ quét mỗi ngày.</p>
 
             <div className="mt-4 space-y-3">
-              {rules.length === 0 ? (
+              {recurringLoading ? (
+                <div className="flex items-center justify-center rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-500 dark:border-slate-700 dark:text-slate-400">
+                  Đang tải recurring rules...
+                </div>
+              ) : rules.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center dark:border-slate-700">
                   <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 dark:bg-slate-800">
                     <Layers className="h-6 w-6 text-gray-400 dark:text-slate-400" />

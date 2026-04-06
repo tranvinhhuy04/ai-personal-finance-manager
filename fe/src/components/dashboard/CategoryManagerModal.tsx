@@ -7,6 +7,7 @@ import type { Category, TransactionDirection } from '@/types/finance';
 interface CategoryManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void | Promise<void>;
 }
 
 type NoticeState = {
@@ -22,6 +23,7 @@ const TAB_LABELS: Record<TransactionDirection, string> = {
 export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   isOpen,
   onClose,
+  onSuccess,
 }) => {
   const {
     fetchCategories,
@@ -120,6 +122,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       }
 
       await loadCategories();
+      await onSuccess?.();
       setActiveTab(formData.categoryType);
       resetForm();
     } catch (error) {
@@ -142,6 +145,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     try {
       await deleteCategory(category.id);
       await loadCategories();
+      await onSuccess?.();
       if (editingCategory?.id === category.id) {
         resetForm();
       }

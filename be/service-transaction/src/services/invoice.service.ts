@@ -304,6 +304,7 @@ class InvoiceService {
       id: invoice._id.toString(),
       user_id: invoice.user_id?.toString?.() ?? String(invoice.user_id ?? ''),
       image_url: invoice.image_url,
+      imageUrl: invoice.image_url,
       extracted_data: invoice.extracted_data ?? {},
       status: invoice.status,
       transaction_id: invoice.transaction_id ? invoice.transaction_id.toString() : null,

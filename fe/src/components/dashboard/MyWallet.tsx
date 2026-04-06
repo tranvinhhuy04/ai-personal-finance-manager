@@ -1,15 +1,39 @@
-import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { WalletCard } from './WalletCard';
 import { DashboardData } from '@/hooks/useDashboardData';
 import { motion } from 'motion/react';
-import { AddWalletModal } from './AddWalletModal';
+import { useVietQRBanks, type VietQRBank } from '@/hooks/useVietQRBanks';
 
-export const MyWallet = ({ data }: { data: DashboardData['wallet'] }) => {
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+function getWalletLogo(walletName: string, banks: VietQRBank[] = []) {
+  const normalizedName = (walletName || '').toLowerCase();
+
+  if (normalizedName.includes('momo')) {
+    return '/image/momo-logo.png';
+  }
+
+  if (normalizedName.includes('zalopay') || normalizedName.includes('zalo pay')) {
+    return '/image/zalopay-png.png';
+  }
+
+  if (normalizedName.includes('tiền mặt') || normalizedName.includes('tien mat') || normalizedName.includes('cash')) {
+    return '/image/cash-logo.png';
+  }
+
+  const matchedBank = banks.find((bank) => {
+    const bankName = bank.name.toLowerCase();
+    const shortName = bank.shortName.toLowerCase();
+    const bankCode = bank.code.toLowerCase();
+
+    return normalizedName.includes(bankName) || normalizedName.includes(shortName) || normalizedName.includes(bankCode);
+  });
+
+  return matchedBank?.logo ?? null;
+}
+
+export const MyWallet = ({ data, onAddWallet }: { data: DashboardData['wallet']; onAddWallet: () => void }) => {
+  const { banks } = useVietQRBanks(true);
 
   return (
-    <>
       <motion.section 
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -22,7 +46,7 @@ export const MyWallet = ({ data }: { data: DashboardData['wallet'] }) => {
             <p className="text-xs text-gray-500 font-medium">{data.exchangeRate}</p>
           </div>
           <button 
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={onAddWallet}
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
@@ -30,13 +54,11 @@ export const MyWallet = ({ data }: { data: DashboardData['wallet'] }) => {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 flex-1">
+        <div className="grid grid-cols-2 gap-4 flex-1 auto-rows-fr">
           {data.currencies.map((currency) => (
-            <WalletCard key={currency.id} data={currency} />
+            <WalletCard key={currency.id} data={currency} logoSrc={getWalletLogo(currency.name, banks)} />
           ))}
         </div>
       </motion.section>
-      <AddWalletModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
-    </>
   );
 };

@@ -3,15 +3,18 @@ import { AlertCircle, Loader2, X } from 'lucide-react';
 import { useWalletStore } from '@/store/useFinanceStore';
 import type { WalletType } from '@/types/finance';
 import { useVietQRBanks } from '@/hooks/useVietQRBanks';
+import { CurrencyInput } from '@/components/common/CurrencyInput';
 
 interface CreateWalletModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void | Promise<void>;
 }
 
 export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
   isOpen,
   onClose,
+  onSuccess,
 }) => {
   const { createWallet, isLoading } = useWalletStore();
 
@@ -72,6 +75,7 @@ export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
         walletName: '',
         balance: '',
       });
+      await onSuccess?.();
       onClose();
     } catch (err) {
       setError(
@@ -213,16 +217,11 @@ export const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Số dư ban đầu (Tuỳ chọn)
             </label>
-            <input
-              type="number"
+            <CurrencyInput
               value={formData.balance}
-              onChange={(e) =>
-                setFormData({ ...formData, balance: e.target.value })
-              }
-              placeholder="VD: 5000000"
+              onValueChange={(value) => setFormData({ ...formData, balance: value })}
+              placeholder="VD: 5.000.000 đ"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-              min="0"
-              step="1000"
             />
             <p className="text-xs text-gray-500 mt-1">
               Để trống nếu muốn khởi tạo với số dư 0đ

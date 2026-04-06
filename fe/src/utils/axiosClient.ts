@@ -85,6 +85,17 @@ axiosClient.interceptors.response.use(
       error?.response?.data?.message ||
       error?.message ||
       'Request failed';
-    return Promise.reject(new Error(message));
+
+    const normalizedError = new Error(message) as Error & {
+      status?: number;
+      code?: string;
+      data?: unknown;
+    };
+
+    normalizedError.status = error?.response?.status;
+    normalizedError.code = error?.code;
+    normalizedError.data = error?.response?.data;
+
+    return Promise.reject(normalizedError);
   }
 );

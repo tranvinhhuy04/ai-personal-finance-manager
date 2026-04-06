@@ -13,18 +13,17 @@ interface NavItemProps {
   icon: React.ElementType;
   label: string;
   to: string;
-  badge?: number;
   isActive?: boolean;
   onClick?: () => void;
 }
 
-const NavItem = ({ icon: Icon, label, to, badge, isActive, onClick }: NavItemProps) => {
+const NavItem = ({ icon: Icon, label, to, isActive, onClick }: NavItemProps) => {
   return (
     <Link
       to={to}
       onClick={onClick}
       className={cn(
-        'group flex w-full items-center justify-between rounded-xl px-4 py-3 transition-all duration-200',
+        'group flex w-full items-center rounded-xl px-4 py-3 transition-all duration-200',
         isActive
           ? 'border border-gray-700 bg-gradient-to-br from-gray-800 via-gray-900 to-black text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] dark:border-emerald-800/60 dark:from-emerald-700 dark:via-emerald-800 dark:to-slate-950'
           : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
@@ -34,16 +33,6 @@ const NavItem = ({ icon: Icon, label, to, badge, isActive, onClick }: NavItemPro
         <Icon className={cn('w-5 h-5', isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600 dark:text-slate-400 dark:group-hover:text-slate-200')} />
         <span className="font-medium text-sm">{label}</span>
       </div>
-      {badge !== undefined && (
-        <span
-          className={cn(
-            'text-xs font-semibold px-2 py-0.5 rounded-full',
-            isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200'
-          )}
-        >
-          {badge}
-        </span>
-      )}
     </Link>
   );
 };
@@ -108,17 +97,17 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               <NavItem icon={LayoutDashboard} label="Bảng điều khiển" to="/" isActive={location.pathname === '/'} onClick={onClose} />
               <NavItem icon={WalletIcon} label="Ví của tôi" to="/wallets" isActive={location.pathname === '/wallets'} onClick={onClose} />
               <NavItem icon={PiggyBank} label="Tiền gửi/Đầu tư" to="/savings" isActive={location.pathname === '/savings'} onClick={onClose} />
-              <NavItem icon={LineChart} label="Phân tích" to="/analytics" badge={20} isActive={location.pathname === '/analytics'} onClick={onClose} />
+              <NavItem icon={LineChart} label="Phân tích" to="/analytics" isActive={location.pathname === '/analytics'} onClick={onClose} />
               <NavItem icon={ArrowRightLeft} label="Giao dịch" to="/transactions" isActive={location.pathname === '/transactions'} onClick={onClose} />
               <NavItem icon={FileText} label="Hóa đơn" to="/invoices" isActive={location.pathname === '/invoices'} onClick={onClose} />
-              <NavItem icon={Sparkles} label="Trợ lý AI thông minh" to="/ai-assistant" badge={1} isActive={location.pathname === '/ai-assistant'} onClick={onClose} />
+              <NavItem icon={Sparkles} label="Trợ lý AI thông minh" to="/ai-assistant" isActive={location.pathname === '/ai-assistant'} onClick={onClose} />
             </div>
           </div>
 
           <div>
             <h3 className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Tính năng</h3>
             <div className="space-y-1">
-              <NavItem icon={Layers} label="Định kỳ" to="/recurring" badge={16} isActive={location.pathname === '/recurring'} onClick={onClose} />
+              <NavItem icon={Layers} label="Định kỳ" to="/recurring" isActive={location.pathname === '/recurring'} onClick={onClose} />
               <NavItem icon={ShieldCheck} label="Đăng ký" to="/subscriptions" isActive={location.pathname === '/subscriptions'} onClick={onClose} />
               <NavItem icon={MessageSquare} label="Phản hồi" to="/feedback" isActive={location.pathname === '/feedback'} onClick={onClose} />
             </div>

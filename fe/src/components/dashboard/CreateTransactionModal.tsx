@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, RefreshCcw, X } from 'lucide-react';
 import { useWalletStore, useTransactionStore } from '@/store/useFinanceStore';
 import { formatCurrencyVND } from '@/utils/formatters';
+import { CurrencyInput } from '@/components/common/CurrencyInput';
 
 interface CreateTransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void | Promise<void>;
 }
 
 type Step = 1 | 2 | 3;
@@ -13,6 +15,7 @@ type Step = 1 | 2 | 3;
 export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
   isOpen,
   onClose,
+  onSuccess,
 }) => {
   const { wallets, updateWalletBalance } = useWalletStore();
   const {
@@ -135,6 +138,7 @@ export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
         amount: '',
         description: '',
       });
+      await onSuccess?.();
       onClose();
     } catch (err) {
       setError(
@@ -339,22 +343,12 @@ export const CreateTransactionModal: React.FC<CreateTransactionModalProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Số tiền
                 </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={formData.amount}
-                    onChange={(e) =>
-                      setFormData({ ...formData, amount: e.target.value })
-                    }
-                    placeholder="0"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-right text-2xl"
-                    min="0"
-                    step="1000"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
-                    VND
-                  </span>
-                </div>
+                <CurrencyInput
+                  value={formData.amount}
+                  onValueChange={(value) => setFormData({ ...formData, amount: value })}
+                  placeholder="0 đ"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-right text-2xl"
+                />
               </div>
 
               {/* Description (Optional) */}

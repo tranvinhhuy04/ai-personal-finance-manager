@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Wallet } from 'lucide-react';
+import { CurrencyInput } from '@/components/common/CurrencyInput';
 
 interface AddWalletModalProps {
   isOpen: boolean;
@@ -70,9 +71,8 @@ export const AddWalletModal: React.FC<AddWalletModalProps> = ({ isOpen, onClose 
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Số dư ban đầu</label>
-                <input 
-                  type="text" 
-                  placeholder="0 ₫" 
+                <CurrencyInput
+                  placeholder="0 đ"
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700 transition-all"
                 />
               </div>

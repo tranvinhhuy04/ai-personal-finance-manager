@@ -73,7 +73,10 @@ async function fetchAnalyticsDashboard(req: Request): Promise<FinancialContext> 
   const body = (req.body ?? {}) as Record<string, unknown>;
   const month = typeof body.month === 'string' && body.month.trim() ? body.month.trim() : 'current';
   const walletId = typeof body.walletId === 'string' && body.walletId.trim() ? body.walletId.trim() : null;
-  const cacheKey = `${userId}:${month}:${walletId ?? 'all'}`;
+  const range = typeof body.range === 'string' && body.range.trim() ? body.range.trim() : null;
+  const from = typeof body.from === 'string' && body.from.trim() ? body.from.trim() : null;
+  const to = typeof body.to === 'string' && body.to.trim() ? body.to.trim() : null;
+  const cacheKey = `${userId}:${month}:${walletId ?? 'all'}:${range ?? 'default'}:${from ?? 'na'}:${to ?? 'na'}`;
   const cached = financialContextCache.get(cacheKey);
 
   if (cached && cached.expiresAt > Date.now()) {
@@ -86,6 +89,15 @@ async function fetchAnalyticsDashboard(req: Request): Promise<FinancialContext> 
   }
   if (walletId) {
     url.searchParams.set('walletId', walletId);
+  }
+  if (range) {
+    url.searchParams.set('range', range);
+  }
+  if (from) {
+    url.searchParams.set('from', from);
+  }
+  if (to) {
+    url.searchParams.set('to', to);
   }
 
   const response = await fetch(url.toString(), {

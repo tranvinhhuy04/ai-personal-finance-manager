@@ -1,11 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { CreditCard, Edit, Landmark, Lock, Plus, Trash2, Unlock, Wallet as WalletIcon } from 'lucide-react';
-import { useWalletStore } from '@/store/useFinanceStore';
+import { apiClient } from '@/lib/apiClient';
 import { cn, formatCurrency } from '@/lib/utils';
 import { CreateWalletModal } from '@/components/dashboard/CreateWalletModal';
 import { EditWalletModal } from '@/components/dashboard/EditWalletModal';
 import { useVietQRBanks, type VietQRBank } from '@/hooks/useVietQRBanks';
+import type { Wallet as WalletItem } from '@/types/finance';
 
 function getWalletLogo(walletType: string, walletName: string, banks: VietQRBank[] = []) {
   const normalizedType = (walletType || '').toLowerCase();
@@ -98,28 +100,31 @@ function renderFallbackIcon(type: string) {
 }
 
 export const Wallets = () => {
-  const { wallets, isLoading, error, fetchWallets } = useWalletStore();
   const { banks } = useVietQRBanks(true);
+  const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [editingWallet, setEditingWallet] = useState<string | null>(null);
-  const [isError, setIsError] = useState(false);
-  const didFetchRef = useRef(false);
+  const [editingWalletId, setEditingWalletId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (didFetchRef.current) return;
-    didFetchRef.current = true;
+  const {
+    data: wallets = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['wallets'],
+    queryFn: () => apiClient.getWallets(),
+    staleTime: 60 * 1000,
+  });
 
-    const load = async () => {
-      try {
-        await fetchWallets();
-        setIsError(false);
-      } catch {
-        setIsError(true);
-      }
-    };
+  const editingWallet = useMemo<WalletItem | null>(
+    () => wallets.find((wallet) => wallet.id === editingWalletId) ?? null,
+    [editingWalletId, wallets]
+  );
 
-    void load();
-  }, [fetchWallets]);
+  const handleWalletMutationSuccess = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['wallets'] });
+  }, [queryClient]);
+
+  const errorMessage = error instanceof Error ? error.message : 'Vui lòng thử lại sau';
 
   return (
     <>
@@ -148,12 +153,12 @@ export const Wallets = () => {
           <div className="flex h-40 items-center justify-center rounded-2xl border border-slate-100 bg-white text-slate-500 shadow-sm">
             Đang tải dữ liệu ví...
           </div>
-        ) : isError ? (
+        ) : error ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 py-12 text-center">
             <p className="font-medium text-red-700">Không thể tải danh sách ví</p>
-            <p className="mt-2 text-sm text-red-600">{error ?? 'Vui lòng thử lại sau'}</p>
+            <p className="mt-2 text-sm text-red-600">{errorMessage}</p>
           </div>
-        ) : wallets && wallets.length > 0 ? (
+        ) : wallets.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
             {wallets.map((wallet) => {
               const style = getWalletStyle(wallet.walletType);
@@ -192,7 +197,7 @@ export const Wallets = () => {
 
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => setEditingWallet(wallet.id)}
+                          onClick={() => setEditingWalletId(wallet.id)}
                           className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-white/70 hover:text-sky-600"
                           title="Sửa ví"
                         >
@@ -239,9 +244,19 @@ export const Wallets = () => {
         )}
       </motion.div>
 
-      <CreateWalletModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
+      <CreateWalletModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleWalletMutationSuccess}
+      />
 
-      {editingWallet && <EditWalletModal walletId={editingWallet} onClose={() => setEditingWallet(null)} />}
+      {editingWallet && (
+        <EditWalletModal
+          wallet={editingWallet}
+          onClose={() => setEditingWalletId(null)}
+          onSuccess={handleWalletMutationSuccess}
+        />
+      )}
     </>
   );
 };

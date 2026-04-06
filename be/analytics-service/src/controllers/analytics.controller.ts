@@ -14,6 +14,10 @@ export const getDashboard = catchAsync(async (req: Request, res: Response) => {
         : typeof req.query.walletId === 'string'
           ? req.query.walletId
           : undefined,
+    range: typeof req.query.range === 'string' ? req.query.range : undefined,
+    type: typeof req.query.type === 'string' ? req.query.type : undefined,
+    from: typeof req.query.from === 'string' ? req.query.from : undefined,
+    to: typeof req.query.to === 'string' ? req.query.to : undefined,
   });
 
   return res.status(200).json(result);

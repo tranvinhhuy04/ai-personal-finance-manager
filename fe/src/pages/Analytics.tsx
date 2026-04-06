@@ -2,184 +2,274 @@ import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import {
-  Bar,
-  CartesianGrid,
-  Cell,
-  ComposedChart,
-  Legend,
-  Line,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import { AlertTriangle, Landmark, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
+  AlertTriangle,
+  ArrowUpRight,
+  BrainCircuit,
+  CalendarRange,
+  PiggyBank,
+  RefreshCcw,
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
+  Wallet2,
+} from 'lucide-react';
+import { AnalyticsCard } from '@/components/analytics/AnalyticsCard';
+import { BudgetProgress } from '@/components/analytics/BudgetProgress';
+import { CategoryChart } from '@/components/analytics/CategoryChart';
+import { ForecastTrendChart } from '@/components/analytics/ForecastTrendChart';
+import { IncomeExpenseComparisonChart } from '@/components/analytics/IncomeExpenseComparisonChart';
 import { apiClient } from '@/lib/apiClient';
+import { cn, formatCurrency } from '@/lib/utils';
 import type { AnalyticsDashboardResponse, Wallet } from '@/types/finance';
-import { cn, formatCompactNumber, formatCurrency } from '@/lib/utils';
 
-const FALLBACK_COLORS = ['#10b981', '#f97316', '#8b5cf6', '#0ea5e9', '#ef4444', '#14b8a6', '#84cc16'];
+type TimeRange = 'month' | 'quarter' | 'year' | 'custom';
 
-const SUMMARY_STYLES = {
-  income: {
-    card: 'border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50',
-    orb: 'from-emerald-400/30 via-emerald-300/10 to-transparent',
-    iconWrap: 'bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-200/70 shadow-[0_10px_30px_-12px_rgba(16,185,129,0.7)]',
-    badge: 'text-emerald-700',
-  },
-  expense: {
-    card: 'border-orange-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50',
-    orb: 'from-orange-400/30 via-amber-300/10 to-transparent',
-    iconWrap: 'bg-orange-500/10 text-orange-700 ring-1 ring-orange-200/70 shadow-[0_10px_30px_-12px_rgba(249,115,22,0.65)]',
-    badge: 'text-orange-700',
-  },
-  net: {
-    card: 'border-sky-200/80 bg-gradient-to-br from-sky-50 via-white to-indigo-50',
-    orb: 'from-sky-400/30 via-sky-300/10 to-transparent',
-    iconWrap: 'bg-sky-500/10 text-sky-700 ring-1 ring-sky-200/70 shadow-[0_10px_30px_-12px_rgba(14,165,233,0.65)]',
-    badge: 'text-sky-700',
-  },
-} as const;
+const TIME_FILTERS: Array<{ value: TimeRange; label: string }> = [
+  { value: 'month', label: 'Tháng này' },
+  { value: 'quarter', label: 'Quý này' },
+  { value: 'year', label: 'Năm nay' },
+  { value: 'custom', label: 'Tùy chỉnh' },
+];
 
-const CurrencyTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) {
-    return null;
-  }
+function getCategoryIcon(name: string) {
+  const normalized = name.toLowerCase();
 
-  return (
-    <div className="rounded-2xl border border-white/70 bg-white/90 px-3 py-3 shadow-[0_20px_60px_-20px_rgba(15,23,42,0.35)] backdrop-blur-xl">
-      <p className="mb-1 text-xs font-medium text-slate-500">{label || payload[0]?.name}</p>
-      <div className="space-y-1.5">
-        {payload.map((entry: any) => (
-          <div key={`${entry.dataKey}-${entry.name}`} className="flex items-center justify-between gap-4 text-xs">
-            <span className="font-medium" style={{ color: entry.color }}>
-              {entry.name}
-            </span>
-            <span className="font-semibold text-slate-900">{formatCurrency(Number(entry.value) || 0)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+  if (normalized.includes('ăn') || normalized.includes('food') || normalized.includes('uống')) return '🍜';
+  if (normalized.includes('di chuyển') || normalized.includes('xăng') || normalized.includes('xe')) return '🛵';
+  if (normalized.includes('mua sắm') || normalized.includes('shopping')) return '🛍️';
+  if (normalized.includes('giải trí') || normalized.includes('netflix') || normalized.includes('phim')) return '🎬';
+  if (normalized.includes('nhà') || normalized.includes('thuê')) return '🏠';
+  if (normalized.includes('điện') || normalized.includes('nước') || normalized.includes('hóa đơn')) return '💡';
+  if (normalized.includes('lương') || normalized.includes('thu nhập')) return '💼';
+  return '💳';
+}
+
+function buildFallbackComparison() {
+  return Array.from({ length: 5 }, (_, index) => ({
+    label: `Tuần ${index + 1}`,
+    income: 0,
+    expense: 0,
+  }));
+}
 
 function AnalyticsSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="h-9 w-64 animate-pulse rounded-lg bg-slate-200" />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, idx) => (
-          <div key={idx} className="h-28 animate-pulse rounded-2xl bg-slate-200" />
-        ))}
+      <div className="h-24 animate-pulse rounded-2xl bg-slate-200" />
+      <div className="grid gap-6 xl:grid-cols-3">
+        <div className="h-64 animate-pulse rounded-2xl bg-slate-200 xl:col-span-2" />
+        <div className="space-y-3">
+          <div className="h-20 animate-pulse rounded-2xl bg-slate-200" />
+          <div className="h-20 animate-pulse rounded-2xl bg-slate-200" />
+          <div className="h-20 animate-pulse rounded-2xl bg-slate-200" />
+        </div>
       </div>
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="h-[420px] animate-pulse rounded-3xl bg-slate-200" />
-        <div className="h-[420px] animate-pulse rounded-3xl bg-slate-200" />
+      <div className="grid gap-6 xl:grid-cols-2">
+        <div className="h-[340px] animate-pulse rounded-2xl bg-slate-200" />
+        <div className="h-[340px] animate-pulse rounded-2xl bg-slate-200" />
       </div>
     </div>
   );
 }
 
-function SummaryCard({
-  label,
-  value,
-  tone,
-  icon,
-}: {
-  label: string;
-  value: number;
-  tone: 'income' | 'expense' | 'net';
-  icon: React.ReactNode;
-}) {
-  const theme = SUMMARY_STYLES[tone];
-  const isZero = Math.round(value) === 0;
-
+function EmptyListState({ message }: { message: string }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35 }}
-      className={cn(
-        'relative overflow-hidden rounded-[24px] border px-4 py-4 shadow-[0_20px_60px_-35px_rgba(15,23,42,0.35)]',
-        theme.card,
-      )}
-    >
-      <div className={cn('pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-gradient-to-br blur-2xl', theme.orb)} />
-      <div className="relative flex items-center justify-between">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">{label}</p>
-          <p className="mt-3 text-xl font-bold tracking-tight text-slate-900 tabular-nums md:text-2xl">{formatCurrency(value)}</p>
-          <p className={cn('mt-1 text-xs font-medium', isZero ? 'text-slate-400' : theme.badge)}>
-            {isZero ? 'Chưa phát sinh trong kỳ' : 'Dữ liệu cập nhật theo bộ lọc hiện tại'}
-          </p>
-        </div>
-
-        <div className={cn('relative rounded-2xl p-3 backdrop-blur-sm', theme.iconWrap)}>
-          <span className="absolute inset-0 rounded-2xl bg-white/30 opacity-60" />
-          <span className="relative">{icon}</span>
-        </div>
-      </div>
-    </motion.div>
+    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+      {message}
+    </div>
   );
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="min-w-0 rounded-[28px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.35)] backdrop-blur-xl"
-    >
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500">Dữ liệu thực</span>
-      </div>
-      {children}
-    </motion.div>
-  );
+function formatDateInput(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDisplayDate(value?: string) {
+  if (!value) return '--';
+  const [year, month, day] = value.split('-');
+  return year && month && day ? `${day}/${month}/${year}` : value;
+}
+
+function getDefaultCustomRange() {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - 29);
+
+  return {
+    from: formatDateInput(start),
+    to: formatDateInput(end),
+  };
+}
+
+function buildAiQuestion(periodLabel: string, walletLabel: string) {
+  return `Hãy đóng vai chuyên gia tài chính cá nhân và phân tích ngắn gọn sức khỏe tài chính của tôi trong ${periodLabel} cho ${walletLabel}. Nêu 1 insight quan trọng nhất, 1 nguyên nhân chính và 1-2 hành động cụ thể.`;
 }
 
 export const Analytics = () => {
-  const [selectedMonth, setSelectedMonth] = useState('');
-  const [selectedWallet, setSelectedWallet] = useState('');
-  const [activeSlice, setActiveSlice] = useState(0);
+  const [selectedRange, setSelectedRange] = useState<TimeRange>('month');
+  const [selectedWallet, setSelectedWallet] = useState('all');
+  const [customDateDraft, setCustomDateDraft] = useState(getDefaultCustomRange);
+  const [appliedCustomRange, setAppliedCustomRange] = useState(getDefaultCustomRange);
 
-  const { data, isLoading, isError, error } = useQuery<AnalyticsDashboardResponse>({
-    queryKey: ['analytics-dashboard', selectedMonth || 'all', selectedWallet || 'all'],
-    queryFn: () =>
-      apiClient.getAnalyticsDashboard({
-        month: selectedMonth || undefined,
-        walletId: selectedWallet || undefined,
-      }),
-    staleTime: 60 * 1000,
-  });
+  const activeWalletId = selectedWallet === 'all' ? undefined : selectedWallet;
+  const effectiveFrom = selectedRange === 'custom' ? appliedCustomRange.from : undefined;
+  const effectiveTo = selectedRange === 'custom' ? appliedCustomRange.to : undefined;
+  const isCustomRangeInvalid =
+    selectedRange === 'custom' &&
+    Boolean(customDateDraft.from) &&
+    Boolean(customDateDraft.to) &&
+    customDateDraft.from > customDateDraft.to;
 
   const { data: wallets = [] } = useQuery<Wallet[]>({
-    queryKey: ['wallet-options'],
+    queryKey: ['wallets', 'analytics-filter'],
     queryFn: () => apiClient.getWallets(),
     staleTime: 5 * 60 * 1000,
   });
 
-  const monthOptions = useMemo(() => {
-    return (data?.trend ?? []).map((point) => ({
-      value: point.monthKey,
-      label: point.month,
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    isFetching,
+    refetch,
+  } = useQuery<AnalyticsDashboardResponse>({
+    queryKey: ['analytics-dashboard-live', selectedRange, activeWalletId ?? 'all', effectiveFrom ?? 'na', effectiveTo ?? 'na'],
+    queryFn: () =>
+      apiClient.getAnalyticsDashboard({
+        range: selectedRange,
+        walletId: activeWalletId,
+        from: effectiveFrom,
+        to: effectiveTo,
+      }),
+    staleTime: 60 * 1000,
+  });
+
+  const walletOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Tất cả ví' },
+      ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.walletName })),
+    ],
+    [wallets]
+  );
+
+  const walletLabel = walletOptions.find((item) => item.value === selectedWallet)?.label ?? 'Tất cả ví';
+  const periodLabel = data?.period?.label ?? (
+    selectedRange === 'custom'
+      ? `${formatDisplayDate(appliedCustomRange.from)} - ${formatDisplayDate(appliedCustomRange.to)}`
+      : TIME_FILTERS.find((item) => item.value === selectedRange)?.label ?? 'Kỳ hiện tại'
+  );
+
+  const summary = {
+    totalIncome: data?.summary?.totalIncome ?? 0,
+    totalExpense: data?.summary?.totalExpense ?? 0,
+    netIncome: data?.summary?.net ?? 0,
+    savingsRate: data?.kpis?.savingsRate ?? data?.insights?.savingsRate ?? 0,
+    dailyAverage: data?.kpis?.dailyAverageExpense ?? data?.insights?.dailyAverageExpense ?? 0,
+  };
+
+  const {
+    data: aiInsightResult,
+    isFetching: isAiFetching,
+  } = useQuery({
+    queryKey: [
+      'analytics-ai-insight',
+      selectedRange,
+      activeWalletId ?? 'all',
+      effectiveFrom ?? 'na',
+      effectiveTo ?? 'na',
+      summary.totalIncome,
+      summary.totalExpense,
+      summary.netIncome,
+    ],
+    enabled: Boolean(data),
+    staleTime: 60 * 1000,
+    retry: 1,
+    queryFn: () =>
+      apiClient.askAI({
+        question: buildAiQuestion(periodLabel, walletLabel),
+        useLlm: true,
+        walletId: activeWalletId,
+        range: selectedRange,
+        from: effectiveFrom,
+        to: effectiveTo,
+        context: {
+          period: data?.period,
+          summary: data?.summary,
+          kpis: data?.kpis,
+          breakdown: data?.breakdown?.slice(0, 6),
+          comparison: data?.comparison?.slice(0, 6),
+          budgetProgress: data?.budgetProgress?.slice(0, 5),
+          topTransactions: data?.topTransactions?.slice(0, 5),
+          subscriptions: data?.subscriptions?.slice(0, 5),
+        },
+      }),
+  });
+
+  const comparisonData = useMemo(() => {
+    const liveData = data?.comparison ?? [];
+    if (liveData.length > 0) return liveData;
+
+    const fromTrend = (data?.trend ?? []).map((item) => ({
+      label: item.month,
+      income: item.income,
+      expense: item.expense,
+    }));
+
+    return fromTrend.length > 0 ? fromTrend : buildFallbackComparison();
+  }, [data]);
+
+  const categoryData = useMemo(
+    () =>
+      (data?.breakdown ?? []).slice(0, 5).map((item) => ({
+        icon: getCategoryIcon(item.name),
+        name: item.name,
+        value: item.value,
+        color: item.color ?? '#14b8a6',
+      })),
+    [data]
+  );
+
+  const budgetData = useMemo(() => {
+    if ((data?.budgetProgress ?? []).length > 0) {
+      return data?.budgetProgress ?? [];
+    }
+
+    return (data?.breakdown ?? []).slice(0, 4).map((item) => {
+      const limit = Math.max(item.value, Math.ceil(item.value * 1.15));
+      return {
+        category: item.name,
+        spent: item.value,
+        limit,
+        remaining: Math.max(limit - item.value, 0),
+        percent: limit > 0 ? Math.round((item.value / limit) * 100) : 0,
+      };
+    });
+  }, [data]);
+
+  const trendData = useMemo(() => {
+    if ((data?.forecast ?? []).length > 0) {
+      return data?.forecast ?? [];
+    }
+
+    return (data?.trend ?? []).slice(-6).map((item) => ({
+      label: item.month,
+      actual: item.net,
     }));
   }, [data]);
 
-  const categoryData = useMemo(() => {
-    return (data?.breakdown ?? []).map((item, index) => ({
-      ...item,
-      color: item.color ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length],
-    }));
-  }, [data]);
-
-  const totalCategoryAmount = useMemo(() => {
-    return categoryData.reduce((sum, item) => sum + Number(item.value || 0), 0);
-  }, [categoryData]);
+  const topTransactions = data?.topTransactions ?? [];
+  const subscriptions = data?.subscriptions ?? [];
+  const recurringSpend = data?.kpis?.recurringSpend ?? subscriptions.reduce((sum, item) => sum + item.amount, 0);
+  const totalCategorySpend = categoryData.reduce((sum, item) => sum + item.value, 0);
+  const riskiestBudget = budgetData[0];
+  const insights = data?.insights;
+  const aiInsightText = (aiInsightResult?.answer ?? '').trim();
+  const aiInsightParts = aiInsightText ? aiInsightText.split(/(?<=[.!?])\s+/).filter(Boolean) : [];
+  const aiHeadline = aiInsightParts[0] ?? insights?.headline ?? 'Hệ thống đang tổng hợp insight từ dữ liệu hiện tại.';
+  const aiMessage = aiInsightParts.slice(1).join(' ') || insights?.message || 'Dữ liệu đang được phân tích theo ví và khoảng thời gian bạn đã chọn.';
+  const aiRecommendation = insights?.recommendation ?? 'Tiếp tục theo dõi dòng tiền và tối ưu nhóm chi lớn nhất để cải thiện tỷ lệ tiết kiệm.';
+  const aiBadge = isAiFetching ? 'Gemini đang phân tích...' : aiInsightResult?.llmUsed ? 'Gemini Live' : aiInsightResult ? 'AI Service' : 'Live Insight';
 
   if (isLoading) {
     return <AnalyticsSkeleton />;
@@ -197,243 +287,322 @@ export const Analytics = () => {
     );
   }
 
-  const summary = data?.summary ?? { totalIncome: 0, totalExpense: 0, net: 0 };
-  const trend = data?.trend ?? [];
-
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45 }}
+      transition={{ duration: 0.4 }}
       className="space-y-6"
     >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-            <Sparkles className="h-3.5 w-3.5" />
-            Bảng điều khiển phân tích nâng cao
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">Phân tích tài chính</h1>
-          <p className="mt-1 text-sm text-slate-500">Theo dõi xu hướng thu chi và cơ cấu danh mục.</p>
-        </div>
+      <div className="sticky top-0 z-20 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm backdrop-blur md:px-5">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                <Sparkles className="h-3.5 w-3.5" />
+                Trung tâm phân tích chuyên sâu • Live API
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+                Phân tích tài chính chuyên sâu
+              </h1>
+              <p className="mt-1 text-sm text-slate-500">
+                {periodLabel} • {walletLabel} • Dữ liệu đồng bộ theo giao dịch thực tế từ backend.
+              </p>
+            </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <select
-            className="h-10 rounded-xl border border-slate-200 bg-white/90 px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
-            value={selectedMonth}
-            onChange={(event) => setSelectedMonth(event.target.value)}
-          >
-            <option value="">Tất cả các tháng</option>
-            {monthOptions.map((month) => (
-              <option key={month.value} value={month.value}>
-                {month.label}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="h-10 rounded-xl border border-slate-200 bg-white/90 px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
-            value={selectedWallet}
-            onChange={(event) => setSelectedWallet(event.target.value)}
-          >
-            <option value="">Tất cả các ví</option>
-            {wallets.map((wallet) => (
-              <option key={wallet.id} value={wallet.id}>
-                {wallet.walletName}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <SummaryCard
-          label="Tổng thu nhập"
-          value={summary.totalIncome}
-          tone="income"
-          icon={<TrendingUp className="h-4 w-4" />}
-        />
-        <SummaryCard
-          label="Tổng chi tiêu"
-          value={summary.totalExpense}
-          tone="expense"
-          icon={<TrendingDown className="h-4 w-4" />}
-        />
-        <SummaryCard
-          label="Dòng tiền ròng"
-          value={summary.net}
-          tone="net"
-          icon={<Landmark className="h-4 w-4" />}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <ChartCard title="Xu hướng thu chi & dòng tiền ròng">
-          <div className="h-[380px] w-full min-w-0" style={{ width: '100%', minHeight: 340 }}>
-            <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={300}>
-              <ComposedChart data={trend} margin={{ top: 10, right: 12, left: 8, bottom: 4 }}>
-                <defs>
-                  <linearGradient id="incomeBarGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.95} />
-                    <stop offset="100%" stopColor="#6ee7b7" stopOpacity={0.75} />
-                  </linearGradient>
-                  <linearGradient id="expenseBarGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f97316" stopOpacity={0.95} />
-                    <stop offset="100%" stopColor="#fdba74" stopOpacity={0.8} />
-                  </linearGradient>
-                  <linearGradient id="netLineGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#2563eb" />
-                    <stop offset="100%" stopColor="#38bdf8" />
-                  </linearGradient>
-                  <filter id="softLineGlow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="4" result="coloredBlur" />
-                    <feMerge>
-                      <feMergeNode in="coloredBlur" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                </defs>
-
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis
-                  dataKey="month"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: '#64748b', fontSize: 12 }}
-                  minTickGap={18}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: '#64748b', fontSize: 12 }}
-                  width={84}
-                  tickFormatter={(value) => formatCompactNumber(Number(value))}
-                />
-                <Tooltip content={<CurrencyTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.08)' }} />
-                <Legend wrapperStyle={{ paddingTop: 10 }} />
-                <Bar
-                  dataKey="income"
-                  name="Thu nhập"
-                  stackId="flow"
-                  fill="url(#incomeBarGradient)"
-                  radius={[10, 10, 6, 6]}
-                  barSize={22}
-                  animationDuration={900}
-                />
-                <Bar
-                  dataKey="expense"
-                  name="Chi tiêu"
-                  stackId="flow"
-                  fill="url(#expenseBarGradient)"
-                  radius={[10, 10, 6, 6]}
-                  barSize={22}
-                  animationDuration={1100}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="net"
-                  name="Dòng tiền ròng"
-                  stroke="url(#netLineGradient)"
-                  strokeWidth={3}
-                  filter="url(#softLineGlow)"
-                  dot={{ r: 0 }}
-                  activeDot={{ r: 5, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }}
-                  animationDuration={1200}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
-
-        <ChartCard title="Cơ cấu chi tiêu theo danh mục">
-          {categoryData.length > 0 ? (
-            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-              <div className="h-[360px] w-full min-w-0" style={{ width: '100%', minHeight: 320 }}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={280}>
-                  <PieChart>
-                    <defs>
-                      {categoryData.map((entry, index) => (
-                        <linearGradient key={entry.name} id={`pieGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
-                          <stop offset="0%" stopColor={entry.color} stopOpacity={0.98} />
-                          <stop offset="100%" stopColor={entry.color} stopOpacity={0.65} />
-                        </linearGradient>
-                      ))}
-                      <filter id="donutShadow" x="-50%" y="-50%" width="200%" height="200%">
-                        <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#0f172a" floodOpacity="0.12" />
-                      </filter>
-                    </defs>
-
-                    <Pie
-                      data={categoryData}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={78}
-                      outerRadius={118}
-                      paddingAngle={4}
-                      cx="50%"
-                      cy="50%"
-                      onMouseEnter={(_, index) => setActiveSlice(index)}
-                      labelLine={false}
-                      label={({ percent }) => (percent && percent >= 0.08 ? `${Math.round(percent * 100)}%` : '')}
-                      filter="url(#donutShadow)"
-                      animationDuration={1100}
-                    >
-                      {categoryData.map((entry, index) => (
-                        <Cell
-                          key={`${entry.name}-${index}`}
-                          fill={`url(#pieGradient-${index})`}
-                          stroke="rgba(255,255,255,0.9)"
-                          strokeWidth={activeSlice === index ? 4 : 2}
-                          opacity={activeSlice === index ? 1 : 0.72}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CurrencyTooltip />} />
-                    <text x="50%" y="46%" textAnchor="middle" className="fill-slate-500 text-[12px] font-medium">
-                      Tổng chi tiêu
-                    </text>
-                    <text x="50%" y="54%" textAnchor="middle" className="fill-slate-900 text-[18px] font-bold">
-                      {formatCurrency(totalCategoryAmount)}
-                    </text>
-                  </PieChart>
-                </ResponsiveContainer>
+            <div className="grid gap-3 md:grid-cols-[auto_220px_auto]">
+              <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
+                {TIME_FILTERS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setSelectedRange(item.value)}
+                    className={cn(
+                      'rounded-lg px-3 py-2 text-sm font-medium transition-all',
+                      selectedRange === item.value
+                        ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100'
+                        : 'text-slate-500 hover:bg-white hover:text-slate-800'
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </div>
 
-              <div className="space-y-2">
-                {categoryData.map((item, index) => {
-                  const percent = totalCategoryAmount > 0 ? (item.value / totalCategoryAmount) * 100 : 0;
-                  return (
-                    <button
-                      key={`${item.name}-${index}`}
-                      type="button"
-                      onMouseEnter={() => setActiveSlice(index)}
-                      className={cn(
-                        'flex w-full items-center justify-between rounded-2xl border px-3 py-2.5 text-left transition-all',
-                        activeSlice === index
-                          ? 'border-slate-300 bg-slate-50 shadow-sm'
-                          : 'border-transparent bg-slate-50/70 hover:border-slate-200 hover:bg-white',
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="h-3 w-3 rounded-full" style={{ background: item.color }} />
-                        <div>
-                          <p className="text-sm font-semibold text-slate-800">{item.name}</p>
-                          <p className="text-xs text-slate-500">{percent.toFixed(1)}%</p>
-                        </div>
-                      </div>
-                      <span className="text-sm font-semibold text-slate-900">{formatCurrency(item.value)}</span>
-                    </button>
-                  );
-                })}
+              <div className="relative">
+                <Wallet2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <select
+                  value={selectedWallet}
+                  onChange={(event) => setSelectedWallet(event.target.value)}
+                  className="h-full w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                >
+                  {walletOptions.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                disabled={isFetching}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                <RefreshCcw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
+                {isFetching ? 'Đang cập nhật' : 'Làm mới'}
+              </button>
+            </div>
+          </div>
+
+          {selectedRange === 'custom' ? (
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3.5">
+              <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+                <label className="space-y-1.5 text-sm">
+                  <span className="font-medium text-slate-700">Từ ngày</span>
+                  <input
+                    type="date"
+                    value={customDateDraft.from}
+                    onChange={(event) => setCustomDateDraft((prev) => ({ ...prev, from: event.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                  />
+                </label>
+
+                <label className="space-y-1.5 text-sm">
+                  <span className="font-medium text-slate-700">Đến ngày</span>
+                  <input
+                    type="date"
+                    value={customDateDraft.to}
+                    onChange={(event) => setCustomDateDraft((prev) => ({ ...prev, to: event.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isCustomRangeInvalid) {
+                      setAppliedCustomRange(customDateDraft);
+                    }
+                  }}
+                  disabled={isCustomRangeInvalid || !customDateDraft.from || !customDateDraft.to}
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                >
+                  Áp dụng khoảng ngày
+                </button>
+              </div>
+
+              <p className={cn('mt-2 text-xs', isCustomRangeInvalid ? 'text-rose-600' : 'text-slate-500')}>
+                {isCustomRangeInvalid
+                  ? 'Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.'
+                  : `Khoảng đang áp dụng: ${formatDisplayDate(appliedCustomRange.from)} - ${formatDisplayDate(appliedCustomRange.to)}`}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <AnalyticsCard
+          title="AI Financial Insight"
+          description={`${periodLabel} • ${walletLabel}`}
+          badge={aiBadge}
+          className="xl:col-span-2 bg-gradient-to-br from-emerald-50 via-white to-rose-50"
+          headerRight={
+            <span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white">
+              <BrainCircuit className="mr-1 inline h-3 w-3" />
+              {aiInsightResult?.llmUsed ? 'Gemini' : 'AI Insight'}
+            </span>
+          }
+        >
+          <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
+            <div className="space-y-3">
+              <div
+                className={cn(
+                  'rounded-2xl border bg-white/80 p-4',
+                  insights?.severity === 'warning'
+                    ? 'border-rose-100'
+                    : insights?.severity === 'good'
+                      ? 'border-emerald-100'
+                      : 'border-slate-100'
+                )}
+              >
+                <p className="text-sm font-semibold text-slate-900">
+                  {insights?.severity === 'warning' ? '⚠️' : insights?.severity === 'good' ? '✅' : '📊'}{' '}
+                  {aiHeadline}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {isAiFetching ? 'Gemini đang đọc dữ liệu thực tế để sinh insight cá nhân hóa...' : aiMessage}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-100 bg-white/80 p-4">
+                <p className="text-sm font-semibold text-slate-900">
+                  💡 {aiInsightResult?.answer ? aiRecommendation : insights?.recommendation ?? 'Ưu tiên duy trì thói quen theo dõi ngân sách để tối ưu quỹ dự phòng.'}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Danh mục cần lưu ý nhất hiện tại: <strong>{insights?.riskiestCategory ?? riskiestBudget?.category ?? 'Chưa xác định'}</strong>.
+                  {aiInsightResult?.llmUsed ? ' Insight này đang được sinh từ Gemini dựa trên dữ liệu dashboard thật.' : ''}
+                </p>
               </div>
             </div>
-          ) : (
-            <div className="flex h-[340px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 text-sm text-slate-500">
-              Chưa có dữ liệu chi tiêu trong kỳ đã chọn.
+
+            <div className="grid gap-3">
+              <div className="rounded-2xl border border-slate-100 bg-white/80 p-4">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <TrendingUp className="h-4 w-4 text-emerald-600" /> Net Income
+                </div>
+                <p className="text-2xl font-bold text-slate-900">{formatCurrency(summary.netIncome)}</p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-white/80 p-4">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <PiggyBank className="h-4 w-4 text-emerald-600" /> Savings Rate
+                </div>
+                <p className="text-2xl font-bold text-slate-900">{summary.savingsRate.toFixed(1)}%</p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-white/80 p-4">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <CalendarRange className="h-4 w-4 text-rose-500" /> Daily Average
+                </div>
+                <p className="text-2xl font-bold text-slate-900">{formatCurrency(summary.dailyAverage)}</p>
+              </div>
             </div>
-          )}
-        </ChartCard>
-      </div>
+          </div>
+        </AnalyticsCard>
+
+        <div className="grid gap-3">
+          {[
+            { label: 'Thu nhập ròng', value: summary.netIncome, icon: <TrendingUp className="h-4 w-4 text-emerald-600" /> },
+            { label: 'Chi tiêu kỳ này', value: summary.totalExpense, icon: <TrendingDown className="h-4 w-4 text-rose-600" /> },
+            { label: 'Tỷ lệ tiết kiệm', value: summary.savingsRate, icon: <PiggyBank className="h-4 w-4 text-emerald-600" />, isPercent: true },
+          ].map((item) => (
+            <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-medium text-slate-500">{item.label}</p>
+                {item.icon}
+              </div>
+              <p className="text-2xl font-bold text-slate-900">
+                {'isPercent' in item && item.isPercent ? `${Number(item.value).toFixed(1)}%` : formatCurrency(Number(item.value))}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-5">
+        <AnalyticsCard
+          title="So sánh Thu - Chi"
+          description="Quan sát nhanh giai đoạn nào chi tiêu đang bám sát hoặc vượt thu nhập."
+          badge="Live comparison"
+          className="xl:col-span-3"
+        >
+          <IncomeExpenseComparisonChart data={comparisonData} />
+        </AnalyticsCard>
+
+        <AnalyticsCard
+          title="Phân tích theo Danh mục"
+          description="Tỷ trọng chi tiêu theo nhóm chính trong kỳ hiện tại."
+          badge={`${categoryData.length} nhóm`}
+          className="xl:col-span-2"
+        >
+          <CategoryChart total={totalCategorySpend} categories={categoryData} />
+        </AnalyticsCard>
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <AnalyticsCard
+          title="Theo dõi Ngân sách"
+          description="Progress bar chuyển đỏ khi tiến sát ngưỡng ngân sách đề xuất."
+          badge="Budget tracking"
+        >
+          {budgetData.length > 0 ? <BudgetProgress items={budgetData} /> : <EmptyListState message="Chưa có đủ dữ liệu để gợi ý ngân sách theo danh mục." />}
+        </AnalyticsCard>
+
+        <AnalyticsCard
+          title="Dự báo & Trend số dư"
+          description="Đường liền là số dư thực tế theo giao dịch hiện có, đường đứt là dự báo cuối kỳ."
+          badge="Forecast"
+        >
+          <ForecastTrendChart data={trendData} />
+        </AnalyticsCard>
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <AnalyticsCard
+          title="Top Giao dịch"
+          description="Những giao dịch lớn nhất trong kỳ giúp bạn nhận diện điểm rơi dòng tiền."
+          badge={`Top ${topTransactions.length || 0}`}
+        >
+          <div className="space-y-3">
+            {topTransactions.length > 0 ? (
+              topTransactions.map((item) => (
+                <div key={`${item.id}-${item.date}`} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-lg shadow-sm">
+                      {getCategoryIcon(item.category)}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{item.merchant}</p>
+                      <p className="text-xs text-slate-500">{item.category} • {item.date}</p>
+                    </div>
+                  </div>
+
+                  <span className={cn('text-sm font-bold', item.amount >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
+                    {item.amount >= 0 ? '+' : '-'}{formatCurrency(Math.abs(item.amount))}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <EmptyListState message="Chưa có giao dịch nổi bật trong kỳ đã chọn." />
+            )}
+          </div>
+        </AnalyticsCard>
+
+        <AnalyticsCard
+          title="Chi tiêu Định kỳ"
+          description="Tổng các khoản cố định được lấy từ recurring rules thực tế."
+          badge="Subscriptions"
+          headerRight={
+            <div className="rounded-xl bg-rose-50 px-3 py-1.5 text-right">
+              <p className="text-[11px] font-medium text-rose-500">Tổng cố định / kỳ</p>
+              <p className="text-sm font-bold text-rose-600">{formatCurrency(recurringSpend)}</p>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            {subscriptions.length > 0 ? (
+              subscriptions.map((item) => (
+                <div key={item.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-lg shadow-sm">
+                      {getCategoryIcon(item.name)}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{item.name}</p>
+                      <p className="text-xs text-slate-500">{item.date}</p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-slate-900">{formatCurrency(item.amount)}</p>
+                    <p className="text-[11px] text-slate-500">{item.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm dừng'}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <EmptyListState message="Bạn chưa có khoản chi định kỳ nào để phân tích." />
+            )}
+
+            <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800">
+              <ArrowUpRight className="mr-2 inline h-4 w-4" />
+              Gợi ý tự động: ưu tiên tối ưu các khoản định kỳ ít sử dụng để tăng nhanh tỷ lệ tiết kiệm.
+            </div>
+          </div>
+        </AnalyticsCard>
+      </section>
     </motion.div>
   );
 };

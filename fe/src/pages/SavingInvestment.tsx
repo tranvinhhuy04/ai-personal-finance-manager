@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import {
   AlertCircle,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { cn, formatCurrency } from '@/lib/utils';
+import { CurrencyInput } from '@/components/common/CurrencyInput';
 import type { CreateSavingInput, SavingPackage, SavingProductType, Wallet as WalletItem } from '@/types/finance';
 
 type ToastState = {
@@ -55,11 +57,9 @@ const initialCreateForm: CreateSavingInput = {
 
 export function SavingInvestment() {
   const [tab, setTab] = useState<SavingProductType>('SAVING');
-  const [savings, setSavings] = useState<SavingPackage[]>([]);
-  const [wallets, setWallets] = useState<WalletItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const queryClient = useQueryClient();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState<CreateSavingInput>(initialCreateForm);
@@ -70,28 +70,39 @@ export function SavingInvestment() {
   const [settleTarget, setSettleTarget] = useState<SavingPackage | null>(null);
   const [settleForm, setSettleForm] = useState<SettleFormState>({ destinationWalletId: '' });
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [savingItems, walletItems] = await Promise.all([
-        apiClient.getSavings(),
-        apiClient.getWallets(),
-      ]);
-      setSavings(savingItems);
-      setWallets(walletItems.filter((wallet) => wallet.status === 1));
-    } catch (error) {
-      setToast({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Không thể tải dữ liệu tiết kiệm/đầu tư.',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const savingsQuery = useQuery({
+    queryKey: ['savings', 'all'],
+    queryFn: () => apiClient.getSavings(),
+    staleTime: 60 * 1000,
+  });
+
+  const walletsQuery = useQuery({
+    queryKey: ['wallets'],
+    queryFn: () => apiClient.getWallets(),
+    staleTime: 60 * 1000,
+    select: (items: WalletItem[]) => items.filter((wallet) => wallet.status === 1),
+  });
+
+  const savings = savingsQuery.data ?? [];
+  const wallets = walletsQuery.data ?? [];
+  const loading = savingsQuery.isLoading || walletsQuery.isLoading;
+
+  const refreshData = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['savings'] }),
+      queryClient.invalidateQueries({ queryKey: ['wallets'] }),
+    ]);
+  }, [queryClient]);
 
   useEffect(() => {
-    void loadData();
-  }, []);
+    const loadError = savingsQuery.error ?? walletsQuery.error;
+    if (!loadError) return;
+
+    setToast({
+      type: 'error',
+      message: loadError instanceof Error ? loadError.message : 'Không thể tải dữ liệu tiết kiệm/đầu tư.',
+    });
+  }, [savingsQuery.error, walletsQuery.error]);
 
   useEffect(() => {
     if (!toast) return;
@@ -133,7 +144,7 @@ export function SavingInvestment() {
       });
       setIsCreateOpen(false);
       setCreateForm(initialCreateForm);
-      await loadData();
+      await refreshData();
       setToast({ type: 'success', message: 'Đã tạo gói tiết kiệm/đầu tư mới.' });
     } catch (error) {
       setToast({ type: 'error', message: error instanceof Error ? error.message : 'Tạo gói thất bại.' });
@@ -154,7 +165,7 @@ export function SavingInvestment() {
       await apiClient.depositToSaving(depositTarget.id, depositForm);
       setDepositTarget(null);
       setDepositForm({ sourceWalletId: '', amount: '' });
-      await loadData();
+      await refreshData();
       setToast({ type: 'success', message: 'Nạp tiền thành công, thông báo realtime sẽ xuất hiện ngay.' });
     } catch (error) {
       setToast({ type: 'error', message: error instanceof Error ? error.message : 'Nạp tiền thất bại.' });
@@ -173,7 +184,7 @@ export function SavingInvestment() {
       });
       setSettleTarget(null);
       setSettleForm({ destinationWalletId: '' });
-      await loadData();
+      await refreshData();
       setToast({ type: 'success', message: 'Đã tất toán gói thành công.' });
     } catch (error) {
       setToast({ type: 'error', message: error instanceof Error ? error.message : 'Tất toán thất bại.' });
@@ -392,11 +403,9 @@ export function SavingInvestment() {
                   <option value="SAVING">Tiết kiệm</option>
                   <option value="INVESTMENT">Đầu tư</option>
                 </select>
-                <input
+                <CurrencyInput
                   value={String(createForm.targetAmount ?? '')}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, targetAmount: e.target.value }))}
-                  type="number"
-                  min="0"
+                  onValueChange={(value) => setCreateForm((prev) => ({ ...prev, targetAmount: value }))}
                   placeholder="Mục tiêu (VND)"
                   className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
                 />
@@ -444,11 +453,9 @@ export function SavingInvestment() {
                 ))}
               </select>
 
-              <input
+              <CurrencyInput
                 value={depositForm.amount}
-                onChange={(e) => setDepositForm((prev) => ({ ...prev, amount: e.target.value }))}
-                type="number"
-                min="1"
+                onValueChange={(value) => setDepositForm((prev) => ({ ...prev, amount: value }))}
                 placeholder="Số tiền muốn nạp"
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
               />

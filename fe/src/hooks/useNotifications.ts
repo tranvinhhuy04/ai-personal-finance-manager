@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   useMutation,
   useQuery,
@@ -72,13 +72,19 @@ export function useNotifications(params?: NotificationParams) {
   const enabled = params?.enabled ?? true;
 
   const queryClient = useQueryClient();
+  const invalidateTimeoutRef = useRef<number | null>(null);
 
   const query = useQuery({
     queryKey: ['notifications', page, limit],
     queryFn: () => fetchNotifications(page, limit),
-    staleTime: 20 * 1000,
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     enabled,
-    refetchInterval: enabled ? 30000 : false,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchInterval: enabled ? 2 * 60 * 1000 : false,
+    refetchIntervalInBackground: false,
   });
 
   const markAsReadMutation = useMutation({
@@ -92,7 +98,10 @@ export function useNotifications(params?: NotificationParams) {
     mutationFn: async () => {
       const currentItems = query.data?.data ?? [];
       const unreadIds = currentItems.filter((item) => !item.is_read).map((item) => item._id);
-      await Promise.all(unreadIds.map((id) => markRead(id)));
+
+      for (const id of unreadIds) {
+        await markRead(id);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
@@ -112,15 +121,29 @@ export function useNotifications(params?: NotificationParams) {
     const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
     const eventSource = new EventSource(`${baseUrl}/api/v1/notifications/stream?token=${encodeURIComponent(token)}`);
 
-    eventSource.onmessage = () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    const scheduleInvalidate = () => {
+      if (invalidateTimeoutRef.current !== null) {
+        return;
+      }
+
+      invalidateTimeoutRef.current = window.setTimeout(() => {
+        invalidateTimeoutRef.current = null;
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      }, 750);
     };
 
+    eventSource.onmessage = scheduleInvalidate;
+
     eventSource.onerror = () => {
-      // Browser will retry automatically; keep query polling as fallback.
+      // Browser will retry automatically; the slow polling fallback above is enough here.
     };
 
     return () => {
+      if (invalidateTimeoutRef.current !== null) {
+        window.clearTimeout(invalidateTimeoutRef.current);
+        invalidateTimeoutRef.current = null;
+      }
+
       eventSource.close();
     };
   }, [enabled, queryClient]);

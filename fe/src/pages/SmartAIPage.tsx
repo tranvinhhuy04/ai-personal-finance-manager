@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, FileImage, FileText, Loader2, Search, Sparkles, UploadCloud } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { formatVND } from '@/lib/utils';
+import { CurrencyInput } from '@/components/common/CurrencyInput';
 import type { AIChatResponse, AIOcrResponse } from '@/types/finance';
 
 const SUGGESTED_QUESTIONS = [
@@ -252,12 +253,11 @@ export const SmartAIPage = () => {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="space-y-1 text-sm">
                     <span className="text-gray-600">Số tiền</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={ocrForm.totalAmount}
-                      onChange={(event) => setOcrForm((prev) => ({ ...prev, totalAmount: event.target.value }))}
+                      onValueChange={(value) => setOcrForm((prev) => ({ ...prev, totalAmount: value }))}
                       className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2"
-                      placeholder="VD: 58000"
+                      placeholder="VD: 58.000 đ"
                     />
                     <p className="text-xs text-emerald-700">{formatVND(Number(ocrForm.totalAmount || 0))}</p>
                   </label>

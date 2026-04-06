@@ -1,20 +1,16 @@
-import React from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { ArrowDownLeft, ArrowUpRight, Filter, Plus, Search, Settings2 } from 'lucide-react';
+import { apiClient } from '@/lib/apiClient';
 import { formatVND } from '@/lib/utils';
-import { useState, useEffect, useRef } from 'react';
-import { useTransactionStore, useWalletStore } from '@/store/useFinanceStore';
 import { CreateTransactionModal } from '@/components/dashboard/CreateTransactionModal';
 import { CategoryManagerModal } from '../components/dashboard/CategoryManagerModal';
 
 export const Transactions = () => {
-  const { transactions, categories, fetchTransactions, fetchCategories, isLoading, error } =
-    useTransactionStore();
-  const { wallets } = useWalletStore();
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [isError, setIsError] = useState(false);
-  const didFetchRef = useRef(false);
   const [searchText, setSearchText] = useState('');
   const [filters, setFilters] = useState({
     walletId: '',
@@ -26,21 +22,39 @@ export const Transactions = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (didFetchRef.current) return;
-    didFetchRef.current = true;
+  const transactionsQuery = useQuery({
+    queryKey: ['transactions', 50, 0],
+    queryFn: () => apiClient.getTransactions(50, 0),
+    staleTime: 30 * 1000,
+  });
 
-    const load = async () => {
-      try {
-        await Promise.all([fetchTransactions(), fetchCategories()]);
-        setIsError(false);
-      } catch {
-        setIsError(true);
-      }
-    };
+  const categoriesQuery = useQuery({
+    queryKey: ['categories', 'all'],
+    queryFn: () => apiClient.getCategories(),
+    staleTime: 5 * 60 * 1000,
+  });
 
-    void load();
-  }, []);
+  const walletsQuery = useQuery({
+    queryKey: ['wallets'],
+    queryFn: () => apiClient.getWallets(),
+    staleTime: 60 * 1000,
+  });
+
+  const transactions = useMemo(() => transactionsQuery.data ?? [], [transactionsQuery.data]);
+  const categories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data]);
+  const wallets = useMemo(() => walletsQuery.data ?? [], [walletsQuery.data]);
+  const isLoading = transactionsQuery.isLoading || categoriesQuery.isLoading || walletsQuery.isLoading;
+  const error = transactionsQuery.error ?? categoriesQuery.error ?? walletsQuery.error;
+  const isError = Boolean(error);
+  const errorMessage = error instanceof Error ? error.message : 'Vui lòng thử lại sau';
+
+  const handleMutationSuccess = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['wallets'] }),
+      queryClient.invalidateQueries({ queryKey: ['categories'] }),
+    ]);
+  }, [queryClient]);
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> =
@@ -164,7 +178,7 @@ export const Transactions = () => {
             <p className="text-red-700 text-sm font-medium">
               Không thể tải lịch sử giao dịch
             </p>
-            <p className="text-red-600 text-xs mt-1">{error ?? 'Vui lòng thử lại sau'}</p>
+            <p className="text-red-600 text-xs mt-1">{errorMessage}</p>
           </div>
         )}
 
@@ -400,11 +414,13 @@ export const Transactions = () => {
       <CreateTransactionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSuccess={handleMutationSuccess}
       />
 
       <CategoryManagerModal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
+        onSuccess={handleMutationSuccess}
       />
     </>
   );

@@ -111,11 +111,71 @@ export interface AnalyticsCategoryBreakdown {
   transactionCount?: number;
 }
 
+export interface AnalyticsComparisonPoint {
+  label: string;
+  income: number;
+  expense: number;
+}
+
+export interface AnalyticsBudgetProgressItem {
+  category: string;
+  spent: number;
+  limit: number;
+  remaining: number;
+  percent: number;
+}
+
+export interface AnalyticsForecastPoint {
+  label: string;
+  actual?: number;
+  forecast?: number;
+}
+
+export interface AnalyticsTopTransaction {
+  id: string;
+  merchant: string;
+  category: string;
+  date: string;
+  amount: number;
+  transactionType: TransactionDirection;
+  source?: string;
+}
+
+export interface AnalyticsSubscriptionItem {
+  id: string;
+  name: string;
+  date: string;
+  amount: number;
+  frequency: RecurringFrequency;
+  status: RecurringRuleStatus;
+}
+
+export interface AnalyticsInsight {
+  severity: 'good' | 'warning' | 'neutral';
+  headline: string;
+  message: string;
+  recommendation: string;
+  spendingChangePercent: number;
+  incomeChangePercent: number;
+  savingsRate: number;
+  dailyAverageExpense: number;
+  riskiestCategory: string | null;
+}
+
 export interface AnalyticsDashboardResponse {
   currentMonth: string;
   filters: {
     month: string | null;
     walletId: string | null;
+    range?: string | null;
+    from?: string | null;
+    to?: string | null;
+  };
+  period?: {
+    range: string;
+    label: string;
+    startDate: string;
+    endDate: string;
   };
   summary: {
     totalIncome: number;
@@ -123,8 +183,20 @@ export interface AnalyticsDashboardResponse {
     net: number;
     netCashFlow?: number;
   };
+  kpis?: {
+    savingsRate: number;
+    dailyAverageExpense: number;
+    recurringSpend: number;
+    transactionCount: number;
+  };
+  insights?: AnalyticsInsight;
   trend: AnalyticsTrendPoint[];
   breakdown: AnalyticsCategoryBreakdown[];
+  comparison?: AnalyticsComparisonPoint[];
+  budgetProgress?: AnalyticsBudgetProgressItem[];
+  forecast?: AnalyticsForecastPoint[];
+  topTransactions?: AnalyticsTopTransaction[];
+  subscriptions?: AnalyticsSubscriptionItem[];
 }
 
 // ─── Invoice ──────────────────────────────────────────────────────────────────
@@ -243,6 +315,11 @@ export interface AIChatRequest {
   question: string;
   context?: Record<string, unknown>;
   useLlm?: boolean;
+  month?: string;
+  walletId?: string;
+  range?: 'month' | 'quarter' | 'year' | 'custom' | string;
+  from?: string;
+  to?: string;
 }
 
 export interface AIChatResponse {
