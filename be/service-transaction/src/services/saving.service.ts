@@ -25,10 +25,14 @@ type DepositSavingInput = {
   authorization?: string;
 };
 
+type SettleSavingType = 'FULL' | 'PARTIAL';
+
 type SettleSavingInput = {
   saving_id: string;
   user_id: string;
+  settle_type?: SettleSavingType;
   destination_wallet_id?: string | null;
+  amount?: string | number | null;
   authorization?: string;
 };
 
@@ -188,23 +192,45 @@ class SavingService {
     if (!saving) throw new AppError('Saving package not found', 404);
     if (saving.status === 'SETTLED') throw new AppError('Saving package is already settled', 400);
 
+    const settleType = input.settle_type ?? 'FULL';
+    if (settleType !== 'FULL' && settleType !== 'PARTIAL') {
+      throw new AppError('settle_type must be FULL or PARTIAL', 400);
+    }
+
+    if (settleType === 'PARTIAL' && !input.destination_wallet_id) {
+      throw new AppError('destinationWalletId is required for partial settlement', 400);
+    }
+
+    if (settleType === 'PARTIAL' && (input.amount === undefined || input.amount === null || input.amount === '')) {
+      throw new AppError('amount is required for partial settlement', 400);
+    }
+
     const currentAmount = Number(saving.current_amount?.toString?.() ?? 0);
+    const settleAmount = settleType === 'PARTIAL'
+      ? parsePositiveAmount(input.amount as string | number, 'amount')
+      : currentAmount;
+
+    if (settleType === 'PARTIAL' && settleAmount > currentAmount) {
+      throw new AppError('Partial settlement amount cannot exceed package balance', 400);
+    }
+
+    const remainingAmount = Math.max(0, currentAmount - settleAmount);
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
       let transaction: Record<string, unknown> | null = null;
 
-      if (input.destination_wallet_id && currentAmount > 0) {
+      if (input.destination_wallet_id && settleAmount > 0) {
         await this.getWalletSnapshot(input.destination_wallet_id, input.authorization);
 
         transaction = await transactionService.createTransaction({
           user_id: input.user_id,
           wallet_id: input.destination_wallet_id,
-          amount: String(currentAmount),
+          amount: String(settleAmount),
           transaction_type: 'INCOME',
           currency: 'VND',
-          description: `Tất toán gói ${saving.name}`,
+          description: settleType === 'PARTIAL' ? `Tất toán bán phần gói ${saving.name}` : `Tất toán gói ${saving.name}`,
           occurred_at: new Date(),
           idempotency_key: `saving-settle-${saving._id.toString()}-${uuidv4()}`,
           source: 'SAVING',
@@ -212,22 +238,27 @@ class SavingService {
         });
       }
 
-      saving.status = 'SETTLED';
+      saving.current_amount = mongoose.Types.Decimal128.fromString(String(remainingAmount));
+      saving.status = remainingAmount > 0 ? 'ACTIVE' : 'SETTLED';
       await saving.save({ session });
       await session.commitTransaction();
 
       await this.publishNotification({
         userId: input.user_id,
-        title: 'Tất toán thành công',
-        message: input.destination_wallet_id
-          ? `Đã tất toán gói ${saving.name} và chuyển ${currentAmount.toLocaleString('vi-VN')}đ về ví đích.`
-          : `Đã tất toán gói ${saving.name} thành công.`,
+        title: settleType === 'PARTIAL' ? 'Tất toán bán phần thành công' : 'Tất toán thành công',
+        message: settleType === 'PARTIAL'
+          ? `Đã tất toán bán phần ${settleAmount.toLocaleString('vi-VN')}đ từ gói ${saving.name}. Số dư còn lại ${remainingAmount.toLocaleString('vi-VN')}đ.`
+          : input.destination_wallet_id
+            ? `Đã tất toán gói ${saving.name} và chuyển ${settleAmount.toLocaleString('vi-VN')}đ về ví đích.`
+            : `Đã tất toán gói ${saving.name} thành công.`,
         type: 'SUCCESS',
         metadata: {
           savingId: saving._id.toString(),
           savingType: saving.type,
+          settleType,
           destinationWalletId: input.destination_wallet_id ?? null,
-          amount: currentAmount,
+          amount: settleAmount,
+          remainingAmount,
           action: 'settle',
           transactionId: (transaction as any)?.id ?? null,
         },

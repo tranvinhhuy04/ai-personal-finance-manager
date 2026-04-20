@@ -16,7 +16,7 @@ import {
 import { apiClient } from '@/lib/apiClient';
 import { cn, formatCurrency } from '@/lib/utils';
 import { CurrencyInput } from '@/components/common/CurrencyInput';
-import type { CreateSavingInput, SavingPackage, SavingProductType, Wallet as WalletItem } from '@/types/finance';
+import type { CreateSavingInput, SavingPackage, SavingProductType, SettleSavingType, Wallet as WalletItem } from '@/types/finance';
 
 type ToastState = {
   type: 'success' | 'error';
@@ -29,7 +29,9 @@ type DepositFormState = {
 };
 
 type SettleFormState = {
+  settleType: SettleSavingType;
   destinationWalletId: string;
+  amount: string;
 };
 
 const productMeta: Record<SavingProductType, { label: string; icon: typeof PiggyBank; card: string; chip: string }> = {
@@ -55,6 +57,12 @@ const initialCreateForm: CreateSavingInput = {
   endDate: '',
 };
 
+const initialSettleForm: SettleFormState = {
+  settleType: 'FULL',
+  destinationWalletId: '',
+  amount: '',
+};
+
 export function SavingInvestment() {
   const [tab, setTab] = useState<SavingProductType>('SAVING');
   const [submitting, setSubmitting] = useState(false);
@@ -68,7 +76,7 @@ export function SavingInvestment() {
   const [depositForm, setDepositForm] = useState<DepositFormState>({ sourceWalletId: '', amount: '' });
 
   const [settleTarget, setSettleTarget] = useState<SavingPackage | null>(null);
-  const [settleForm, setSettleForm] = useState<SettleFormState>({ destinationWalletId: '' });
+  const [settleForm, setSettleForm] = useState<SettleFormState>(initialSettleForm);
 
   const savingsQuery = useQuery({
     queryKey: ['savings', 'all'],
@@ -177,15 +185,38 @@ export function SavingInvestment() {
   const handleSettle = async () => {
     if (!settleTarget) return;
 
+    if (settleForm.settleType === 'PARTIAL') {
+      if (!settleForm.destinationWalletId) {
+        setToast({ type: 'error', message: 'Vui lòng chọn ví nhận tiền cho tất toán bán phần.' });
+        return;
+      }
+
+      const partialAmount = Number(settleForm.amount);
+      if (!Number.isFinite(partialAmount) || partialAmount <= 0) {
+        setToast({ type: 'error', message: 'Vui lòng nhập số tiền tất toán bán phần hợp lệ.' });
+        return;
+      }
+
+      if (partialAmount > Number(settleTarget.currentAmount ?? 0)) {
+        setToast({ type: 'error', message: 'Số tiền tất toán bán phần không được vượt quá số dư trong gói.' });
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       await apiClient.settleSaving(settleTarget.id, {
+        settleType: settleForm.settleType,
         destinationWalletId: settleForm.destinationWalletId || null,
+        amount: settleForm.settleType === 'PARTIAL' ? settleForm.amount : null,
       });
       setSettleTarget(null);
-      setSettleForm({ destinationWalletId: '' });
+      setSettleForm(initialSettleForm);
       await refreshData();
-      setToast({ type: 'success', message: 'Đã tất toán gói thành công.' });
+      setToast({
+        type: 'success',
+        message: settleForm.settleType === 'PARTIAL' ? 'Đã tất toán bán phần thành công.' : 'Đã tất toán toàn phần thành công.',
+      });
     } catch (error) {
       setToast({ type: 'error', message: error instanceof Error ? error.message : 'Tất toán thất bại.' });
     } finally {
@@ -369,7 +400,11 @@ export function SavingInvestment() {
                         disabled={item.status !== 'ACTIVE'}
                         onClick={() => {
                           setSettleTarget(item);
-                          setSettleForm({ destinationWalletId: wallets[0]?.id ?? '' });
+                          setSettleForm({
+                            settleType: 'FULL',
+                            destinationWalletId: wallets[0]?.id ?? '',
+                            amount: '',
+                          });
                         }}
                         className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:disabled:text-slate-500"
                       >
@@ -478,25 +513,77 @@ export function SavingInvestment() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
             <h3 className="text-xl font-bold text-slate-900">Tất toán {settleTarget.name}</h3>
-            <p className="mt-2 text-sm text-slate-500">Bạn có thể chọn ví đích để hoàn tiền về ngay.</p>
-            <div className="mt-4">
+            <p className="mt-2 text-sm text-slate-500">Chọn tất toán toàn phần hoặc bán phần để rút tiền từ gói về ví.</p>
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => setSettleForm((prev) => ({ ...prev, settleType: 'FULL', amount: '' }))}
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    settleForm.settleType === 'FULL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  )}
+                >
+                  Toàn phần
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSettleForm((prev) => ({
+                      ...prev,
+                      settleType: 'PARTIAL',
+                      destinationWalletId: prev.destinationWalletId || (wallets[0]?.id ?? ''),
+                    }))
+                  }
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    settleForm.settleType === 'PARTIAL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  )}
+                >
+                  Bán phần
+                </button>
+              </div>
+
               <select
                 value={settleForm.destinationWalletId}
-                onChange={(e) => setSettleForm({ destinationWalletId: e.target.value })}
+                onChange={(e) => setSettleForm((prev) => ({ ...prev, destinationWalletId: e.target.value }))}
                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-700 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-600"
               >
-                <option value="" className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-100">Không chuyển về ví</option>
+                {settleForm.settleType === 'FULL' ? (
+                  <option value="" className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-100">Không chuyển về ví</option>
+                ) : (
+                  <option value="" className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-100">Chọn ví nhận tiền</option>
+                )}
                 {wallets.map((wallet) => (
                   <option key={wallet.id} value={wallet.id} className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-100">
                     {wallet.walletName}
                   </option>
                 ))}
               </select>
+
+              {settleForm.settleType === 'PARTIAL' && (
+                <div className="space-y-2">
+                  <CurrencyInput
+                    value={settleForm.amount}
+                    onValueChange={(value) => setSettleForm((prev) => ({ ...prev, amount: value }))}
+                    placeholder="Số tiền tất toán bán phần"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+                  />
+                  <p className="text-xs text-slate-500">Số dư hiện tại trong gói: {formatCurrency(Number(settleTarget.currentAmount ?? 0))}</p>
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setSettleTarget(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600">Hủy</button>
-              <button type="button" onClick={() => void handleSettle()} disabled={submitting} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:bg-emerald-300">{submitting ? 'Đang tất toán...' : 'Tất toán ngay'}</button>
+              <button
+                type="button"
+                onClick={() => void handleSettle()}
+                disabled={submitting}
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:bg-emerald-300"
+              >
+                {submitting ? 'Đang tất toán...' : settleForm.settleType === 'PARTIAL' ? 'Xác nhận bán phần' : 'Tất toán toàn phần'}
+              </button>
             </div>
           </div>
         </div>

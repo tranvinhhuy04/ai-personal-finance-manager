@@ -552,8 +552,12 @@ class ApiClient {
   }
 
   async settleSaving(savingId: string, data?: SettleSavingInput): Promise<{ saving: SavingPackage; transaction: Transaction | null }> {
+    const settleType = data?.settleType ?? 'FULL';
+
     const response = await axiosClient.post(`/api/v1/savings/${savingId}/settle`, {
+      settleType,
       destinationWalletId: data?.destinationWalletId ?? null,
+      amount: settleType === 'PARTIAL' ? data?.amount ?? null : null,
     });
 
     return {
