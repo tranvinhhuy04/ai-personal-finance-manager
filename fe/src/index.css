@@ -9,20 +9,134 @@
 
 :root {
   color-scheme: light;
+  --surface-base: rgb(248 250 252);
+  --surface-elevated: rgb(255 255 255);
+  --surface-muted: rgb(241 245 249);
+  --surface-soft: rgb(226 232 240);
+  --border-soft: rgb(226 232 240);
+  --text-primary: rgb(15 23 42);
+  --text-secondary: rgb(51 65 85);
+  --text-muted: rgb(100 116 139);
 }
 
 html.dark {
   color-scheme: dark;
+  --surface-base: rgb(2 6 23);
+  --surface-elevated: rgb(15 23 42);
+  --surface-muted: rgb(30 41 59);
+  --surface-soft: rgb(51 65 85);
+  --border-soft: rgb(51 65 85);
+  --text-primary: rgb(241 245 249);
+  --text-secondary: rgb(203 213 225);
+  --text-muted: rgb(148 163 184);
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: rgb(248 250 252);
-  color: rgb(15 23 42);
+  background-color: var(--surface-base);
+  color: var(--text-primary);
   transition: background-color 220ms ease, color 220ms ease;
 }
 
 html.dark body {
-  background-color: rgb(2 6 23);
-  color: rgb(226 232 240);
+  background-color: var(--surface-base);
+  color: var(--text-secondary);
+}
+
+/*
+  Fallback dark tokens for legacy/light-only utility classes.
+  This keeps old components readable in dark mode without rewriting every file.
+*/
+html.dark :where(.bg-white):not([class*='dark:bg-']) {
+  background-color: var(--surface-elevated);
+}
+
+html.dark :where(.bg-white\/70):not([class*='dark:bg-']) {
+  background-color: rgb(2 6 23 / 0.72);
+}
+
+html.dark :where(.bg-white\/80):not([class*='dark:bg-']) {
+  background-color: rgb(2 6 23 / 0.82);
+}
+
+html.dark :where(.bg-gray-50):not([class*='dark:bg-']),
+html.dark :where(.bg-slate-50):not([class*='dark:bg-']),
+html.dark :where(.bg-gray-50\/50):not([class*='dark:bg-']),
+html.dark :where(.bg-gray-50\/70):not([class*='dark:bg-']) {
+  background-color: var(--surface-elevated);
+}
+
+html.dark :where(.bg-gray-100):not([class*='dark:bg-']),
+html.dark :where(.bg-slate-100):not([class*='dark:bg-']) {
+  background-color: var(--surface-muted);
+}
+
+html.dark :where(.bg-gray-200):not([class*='dark:bg-']),
+html.dark :where(.bg-slate-200):not([class*='dark:bg-']) {
+  background-color: var(--surface-soft);
+}
+
+html.dark :where(.border-gray-50):not([class*='dark:border-']),
+html.dark :where(.border-gray-100):not([class*='dark:border-']),
+html.dark :where(.border-gray-200):not([class*='dark:border-']),
+html.dark :where(.border-gray-300):not([class*='dark:border-']),
+html.dark :where(.border-slate-100):not([class*='dark:border-']),
+html.dark :where(.border-slate-200):not([class*='dark:border-']) {
+  border-color: var(--border-soft);
+}
+
+html.dark :where(.text-gray-900):not([class*='dark:text-']),
+html.dark :where(.text-slate-900):not([class*='dark:text-']) {
+  color: var(--text-primary);
+}
+
+html.dark :where(.text-gray-800):not([class*='dark:text-']),
+html.dark :where(.text-gray-700):not([class*='dark:text-']),
+html.dark :where(.text-slate-800):not([class*='dark:text-']),
+html.dark :where(.text-slate-700):not([class*='dark:text-']) {
+  color: var(--text-secondary);
+}
+
+html.dark :where(.text-gray-600):not([class*='dark:text-']),
+html.dark :where(.text-gray-500):not([class*='dark:text-']),
+html.dark :where(.text-gray-400):not([class*='dark:text-']),
+html.dark :where(.text-slate-600):not([class*='dark:text-']),
+html.dark :where(.text-slate-500):not([class*='dark:text-']),
+html.dark :where(.text-slate-400):not([class*='dark:text-']) {
+  color: var(--text-muted);
+}
+
+html.dark :where(.fill-slate-900):not([class*='dark:fill-']) {
+  fill: var(--text-primary);
+}
+
+html.dark :where(.fill-slate-500):not([class*='dark:fill-']) {
+  fill: var(--text-muted);
+}
+
+html.dark :where(.placeholder-gray-400)::placeholder,
+html.dark :where(.placeholder-gray-500)::placeholder {
+  color: var(--text-muted);
+}
+
+html.dark :where([class*='hover:bg-gray-50']):hover,
+html.dark :where([class*='hover:bg-slate-50']):hover {
+  background-color: var(--surface-muted);
+}
+
+html.dark :where([class*='hover:bg-gray-100']):hover,
+html.dark :where([class*='hover:bg-slate-100']):hover,
+html.dark :where([class*='hover:bg-gray-200']):hover,
+html.dark :where([class*='hover:bg-slate-200']):hover {
+  background-color: var(--surface-soft);
+}
+
+html.dark :where([class*='hover:text-gray-900']):hover,
+html.dark :where([class*='hover:text-slate-900']):hover {
+  color: var(--text-primary);
+}
+
+html.dark :where([class*='hover:text-gray-700']):hover,
+html.dark :where([class*='hover:text-slate-700']):hover {
+  color: var(--text-secondary);
 }

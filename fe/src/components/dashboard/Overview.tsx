@@ -8,16 +8,16 @@ export const Overview = ({ data }: { data: DashboardData['overview'] }) => {
     <section className="mb-8">
       <div className="flex items-end justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1 tracking-tight">Tổng quan</h1>
-          <p className="text-sm text-gray-500">Dưới đây là tóm tắt dữ liệu tổng thể</p>
+          <h1 className="mb-1 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Tổng quan</h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400">Dưới đây là tóm tắt dữ liệu tổng thể</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
+          <button className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
             Tháng này
-            <ChevronDown className="w-4 h-4 text-gray-400" />
+            <ChevronDown className="w-4 h-4 text-gray-400 dark:text-slate-400" />
           </button>
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
-            <RotateCcw className="w-4 h-4 text-gray-400" />
+          <button className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
+            <RotateCcw className="w-4 h-4 text-gray-400 dark:text-slate-400" />
             Làm mới dữ liệu
           </button>
         </div>
