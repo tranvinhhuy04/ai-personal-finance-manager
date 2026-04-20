@@ -36,14 +36,14 @@ const productMeta: Record<SavingProductType, { label: string; icon: typeof Piggy
   SAVING: {
     label: 'Tiết kiệm',
     icon: PiggyBank,
-    card: 'border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50',
-    chip: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    card: 'border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50 dark:border-emerald-900/60 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/25',
+    chip: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300',
   },
   INVESTMENT: {
     label: 'Đầu tư',
     icon: TrendingUp,
-    card: 'border-violet-200/80 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50',
-    chip: 'border-violet-200 bg-violet-50 text-violet-700',
+    card: 'border-violet-200/80 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 dark:border-violet-900/60 dark:from-slate-900 dark:via-slate-900 dark:to-violet-950/25',
+    chip: 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900/60 dark:bg-violet-950/35 dark:text-violet-300',
   },
 };
 
@@ -297,16 +297,16 @@ export function SavingInvestment() {
                 <motion.div
                   key={item.id}
                   whileHover={{ y: -4 }}
-                  className={cn('rounded-[24px] border p-5 shadow-[0_18px_50px_-32px_rgba(15,23,42,0.35)]', meta.card)}
+                  className={cn('rounded-[24px] border p-5 shadow-[0_18px_50px_-32px_rgba(15,23,42,0.35)] dark:shadow-[0_20px_56px_-32px_rgba(2,6,23,0.95)]', meta.card)}
                 >
                   <div className="space-y-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/80 bg-white/80 shadow-sm">
-                          <Icon className="h-5 w-5 text-slate-800" />
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/80 bg-white/80 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+                          <Icon className="h-5 w-5 text-slate-800 dark:text-slate-200" />
                         </div>
                         <div>
-                          <h3 className="text-lg font-bold text-slate-900">{item.name}</h3>
+                          <h3 className="text-lg font-bold text-slate-900 dark:text-white">{item.name}</h3>
                           <div className={cn('mt-1 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold', meta.chip)}>
                             {meta.label}
                           </div>
@@ -315,32 +315,37 @@ export function SavingInvestment() {
 
                       <span className={cn(
                         'rounded-full px-2.5 py-1 text-xs font-semibold',
-                        item.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'
+                        item.status === 'ACTIVE'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                          : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
                       )}>
                         {item.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã tất toán'}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm">
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Đã tích lũy</p>
-                        <p className="mt-2 text-2xl font-bold text-slate-900">{formatCurrency(item.currentAmount)}</p>
+                      <div className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Đã tích lũy</p>
+                        <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(item.currentAmount)}</p>
                       </div>
-                      <div className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm">
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Mục tiêu</p>
-                        <p className="mt-2 text-2xl font-bold text-slate-900">{item.targetAmount ? formatCurrency(item.targetAmount) : 'Chưa đặt'}</p>
+                      <div className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Mục tiêu</p>
+                        <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{item.targetAmount ? formatCurrency(item.targetAmount) : 'Chưa đặt'}</p>
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm">
-                      <div className="mb-2 flex items-center justify-between text-sm text-slate-600">
+                    <div className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+                      <div className="mb-2 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
                         <span>Tiến độ</span>
                         <span>{item.targetAmount ? `${progress}%` : 'Linh hoạt'}</span>
                       </div>
-                      <div className="h-2 rounded-full bg-slate-200">
-                        <div className="h-2 rounded-full bg-slate-900 transition-all" style={{ width: `${item.targetAmount ? progress : 20}%` }} />
+                      <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
+                        <div
+                          className="h-2 rounded-full bg-slate-900 transition-all dark:bg-emerald-500"
+                          style={{ width: `${item.targetAmount ? progress : 20}%` }}
+                        />
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                      <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
                         <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" /> Bắt đầu: {new Date(item.startDate).toLocaleDateString('vi-VN')}</span>
                         <span className="inline-flex items-center gap-1"><Target className="h-3.5 w-3.5" /> Kết thúc: {item.endDate ? new Date(item.endDate).toLocaleDateString('vi-VN') : 'Không giới hạn'}</span>
                       </div>
@@ -354,7 +359,7 @@ export function SavingInvestment() {
                           setDepositTarget(item);
                           setDepositForm({ sourceWalletId: wallets[0]?.id ?? '', amount: '' });
                         }}
-                        className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                        className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:disabled:bg-slate-700"
                       >
                         <ArrowDownToLine className="h-4 w-4" />
                         Nạp tiền
@@ -366,7 +371,7 @@ export function SavingInvestment() {
                           setSettleTarget(item);
                           setSettleForm({ destinationWalletId: wallets[0]?.id ?? '' });
                         }}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:disabled:text-slate-500"
                       >
                         <Wallet className="h-4 w-4" />
                         Tất toán
@@ -398,10 +403,10 @@ export function SavingInvestment() {
                 <select
                   value={createForm.type}
                   onChange={(e) => setCreateForm((prev) => ({ ...prev, type: e.target.value as SavingProductType }))}
-                  className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-700 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-600"
                 >
-                  <option value="SAVING">Tiết kiệm</option>
-                  <option value="INVESTMENT">Đầu tư</option>
+                  <option value="SAVING" className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-100">Tiết kiệm</option>
+                  <option value="INVESTMENT" className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-100">Đầu tư</option>
                 </select>
                 <CurrencyInput
                   value={String(createForm.targetAmount ?? '')}
@@ -443,11 +448,11 @@ export function SavingInvestment() {
               <select
                 value={depositForm.sourceWalletId}
                 onChange={(e) => setDepositForm((prev) => ({ ...prev, sourceWalletId: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-700 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-600"
               >
-                <option value="">Chọn ví nguồn</option>
+                <option value="" className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-100">Chọn ví nguồn</option>
                 {wallets.map((wallet) => (
-                  <option key={wallet.id} value={wallet.id}>
+                  <option key={wallet.id} value={wallet.id} className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-100">
                     {wallet.walletName} - {formatCurrency(Number(wallet.balance))}
                   </option>
                 ))}
@@ -478,11 +483,11 @@ export function SavingInvestment() {
               <select
                 value={settleForm.destinationWalletId}
                 onChange={(e) => setSettleForm({ destinationWalletId: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-700 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-600"
               >
-                <option value="">Không chuyển về ví</option>
+                <option value="" className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-100">Không chuyển về ví</option>
                 {wallets.map((wallet) => (
-                  <option key={wallet.id} value={wallet.id}>
+                  <option key={wallet.id} value={wallet.id} className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-100">
                     {wallet.walletName}
                   </option>
                 ))}

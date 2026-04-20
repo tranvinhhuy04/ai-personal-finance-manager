@@ -1,5 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { DashboardData } from '@/hooks/useDashboardData';
+import { useTheme } from '@/contexts/theme-context';
 import { cn, formatVND } from '@/lib/utils';
 import { motion } from 'motion/react';
 
@@ -35,23 +36,26 @@ export const CashFlow = ({
   cashflowFilter?: 'monthly' | 'yearly';
   onCashflowFilterChange?: (filter: 'monthly' | 'yearly') => void;
 }) => {
+  const { isDark } = useTheme();
   const maxCashflow = Math.max(0, ...data.data.map((entry) => Number(entry.cashflow) || 0));
+  const gridStroke = isDark ? '#334155' : '#f1f5f9';
+  const axisTick = isDark ? '#cbd5e1' : '#94a3b8';
 
   return (
     <motion.section 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.3 }}
-      className="bg-white p-6 rounded-3xl border border-gray-100 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.03)] min-h-[360px] min-w-0 flex flex-col"
+      className="min-h-[360px] min-w-0 rounded-3xl border border-gray-100 bg-white p-6 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.03)] flex flex-col dark:border-slate-800 dark:bg-slate-900"
     >
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h2 className="text-sm font-medium text-gray-500 mb-1">Dòng tiền</h2>
-          <div className="text-3xl font-bold text-gray-900 tracking-tight">
+          <h2 className="mb-1 text-sm font-medium text-gray-500 dark:text-slate-400">Dòng tiền</h2>
+          <div className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
             {formatVND(data.total)}
           </div>
         </div>
-        <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100">
+        <div className="flex items-center rounded-xl border border-gray-100 bg-gray-50 p-1 dark:border-slate-700 dark:bg-slate-800">
           <button
             type="button"
             onClick={() => onCashflowFilterChange?.('monthly')}
@@ -59,7 +63,7 @@ export const CashFlow = ({
               'px-4 py-1.5 text-sm font-medium rounded-lg transition-colors',
               cashflowFilter === 'monthly'
                 ? 'bg-[#046A38] text-white shadow-lg shadow-emerald-900/20'
-                : 'bg-transparent text-gray-500 hover:text-gray-900'
+                : 'bg-transparent text-gray-500 hover:text-gray-900 dark:text-slate-300 dark:hover:text-white'
             )}
           >
             Hàng tháng
@@ -71,10 +75,15 @@ export const CashFlow = ({
               'px-4 py-1.5 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5',
               cashflowFilter === 'yearly'
                 ? 'bg-gradient-to-br from-emerald-700 via-emerald-800 to-teal-900 text-white shadow-lg shadow-emerald-900/40 hover:brightness-110'
-                : 'bg-gray-100 text-gray-500 hover:text-gray-900'
+                : 'bg-gray-100 text-gray-500 hover:text-gray-900 dark:bg-slate-700 dark:text-slate-300 dark:hover:text-white'
             )}
           >
-            <span className={cn('w-1.5 h-1.5 rounded-full', cashflowFilter === 'yearly' ? 'bg-white/80' : 'bg-gray-400')} />
+            <span
+              className={cn(
+                'h-1.5 w-1.5 rounded-full',
+                cashflowFilter === 'yearly' ? 'bg-white/80' : 'bg-gray-400 dark:bg-slate-400'
+              )}
+            />
             Hàng năm
           </button>
         </div>
@@ -83,21 +92,21 @@ export const CashFlow = ({
       <div className="h-72 w-full min-w-0" style={{ width: '100%', height: '288px' }}>
         <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={240}>
           <BarChart data={data.data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }} barSize={36}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
             <XAxis 
               dataKey="month" 
               type="category"
               scale="band"
               axisLine={false} 
               tickLine={false} 
-              tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500, textAnchor: 'middle' }}
+              tick={{ fill: axisTick, fontSize: 12, fontWeight: 500, textAnchor: 'middle' }}
               dy={10}
             />
             <YAxis 
               width={80}
               axisLine={false} 
               tickLine={false} 
-              tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
+              tick={{ fill: axisTick, fontSize: 12, fontWeight: 500 }}
               tickFormatter={(value) => {
                 const amount = Number(value) || 0;
                 if (Math.abs(amount) >= 1000000) {
@@ -111,7 +120,7 @@ export const CashFlow = ({
               {data.data.map((entry, index) => (
                 <Cell 
                   key={`cell-${index}`} 
-                  fill={(Number(entry.cashflow) || 0) === maxCashflow ? '#059669' : '#A7F3D0'} 
+                  fill={(Number(entry.cashflow) || 0) === maxCashflow ? '#059669' : isDark ? '#34d399' : '#A7F3D0'} 
                   className="transition-all duration-300 hover:opacity-80 cursor-pointer"
                 />
               ))}

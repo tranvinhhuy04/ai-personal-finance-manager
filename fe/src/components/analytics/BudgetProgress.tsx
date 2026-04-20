@@ -19,19 +19,19 @@ export function BudgetProgress({ items }: Props) {
         const isCritical = ratio >= 80;
 
         return (
-          <div key={item.category} className="rounded-xl border border-slate-100 bg-slate-50 p-3.5">
+          <div key={item.category} className="rounded-xl border border-slate-100 bg-slate-50 p-3.5 dark:border-slate-700 dark:bg-slate-800">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-slate-800">{item.category}</p>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{item.category}</p>
               <span className={cn('text-xs font-semibold', isCritical ? 'text-rose-600' : 'text-emerald-600')}>
                 {ratio}%
               </span>
             </div>
 
-            <p className="mb-2 text-xs text-slate-500">
+            <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
               {formatCurrency(item.spent)} / {formatCurrency(item.limit)}
             </p>
 
-            <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
+            <div className="h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
               <div
                 className={cn('h-full rounded-full transition-all', isCritical ? 'bg-rose-500' : 'bg-emerald-500')}
                 style={{ width: `${ratio}%` }}

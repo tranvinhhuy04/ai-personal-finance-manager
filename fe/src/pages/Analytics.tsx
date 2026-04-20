@@ -55,18 +55,18 @@ function buildFallbackComparison() {
 function AnalyticsSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="h-24 animate-pulse rounded-2xl bg-slate-200" />
+      <div className="h-24 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
       <div className="grid gap-6 xl:grid-cols-3">
-        <div className="h-64 animate-pulse rounded-2xl bg-slate-200 xl:col-span-2" />
+        <div className="h-64 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800 xl:col-span-2" />
         <div className="space-y-3">
-          <div className="h-20 animate-pulse rounded-2xl bg-slate-200" />
-          <div className="h-20 animate-pulse rounded-2xl bg-slate-200" />
-          <div className="h-20 animate-pulse rounded-2xl bg-slate-200" />
+          <div className="h-20 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+          <div className="h-20 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+          <div className="h-20 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
         </div>
       </div>
       <div className="grid gap-6 xl:grid-cols-2">
-        <div className="h-[340px] animate-pulse rounded-2xl bg-slate-200" />
-        <div className="h-[340px] animate-pulse rounded-2xl bg-slate-200" />
+        <div className="h-[340px] animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-[340px] animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
       </div>
     </div>
   );
@@ -74,7 +74,7 @@ function AnalyticsSkeleton() {
 
 function EmptyListState({ message }: { message: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
       {message}
     </div>
   );
@@ -277,12 +277,12 @@ export const Analytics = () => {
 
   if (isError) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-6 text-red-700">
+      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-6 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
         <div className="flex items-center gap-2 font-semibold">
           <AlertTriangle className="h-5 w-5" />
           Không tải được dữ liệu phân tích tài chính
         </div>
-        <p className="mt-2 text-sm text-red-600">{error instanceof Error ? error.message : 'Vui lòng thử lại sau.'}</p>
+        <p className="mt-2 text-sm text-red-600 dark:text-red-300/90">{error instanceof Error ? error.message : 'Vui lòng thử lại sau.'}</p>
       </div>
     );
   }
@@ -294,24 +294,24 @@ export const Analytics = () => {
       transition={{ duration: 0.4 }}
       className="space-y-6"
     >
-      <div className="sticky top-0 z-20 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm backdrop-blur md:px-5">
+      <div className="sticky top-0 z-20 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-950/80 md:px-5">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
                 <Sparkles className="h-3.5 w-3.5" />
                 Trung tâm phân tích chuyên sâu • Live API
               </div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white md:text-3xl">
                 Phân tích tài chính chuyên sâu
               </h1>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 {periodLabel} • {walletLabel} • Dữ liệu đồng bộ theo giao dịch thực tế từ backend.
               </p>
             </div>
 
             <div className="grid gap-3 md:grid-cols-[auto_220px_auto]">
-              <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900">
                 {TIME_FILTERS.map((item) => (
                   <button
                     key={item.value}
@@ -320,8 +320,8 @@ export const Analytics = () => {
                     className={cn(
                       'rounded-lg px-3 py-2 text-sm font-medium transition-all',
                       selectedRange === item.value
-                        ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100'
-                        : 'text-slate-500 hover:bg-white hover:text-slate-800'
+                        ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100 dark:bg-slate-800 dark:text-emerald-300 dark:ring-emerald-900/50'
+                        : 'text-slate-500 hover:bg-white hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
                     )}
                   >
                     {item.label}
@@ -330,11 +330,11 @@ export const Analytics = () => {
               </div>
 
               <div className="relative">
-                <Wallet2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Wallet2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <select
                   value={selectedWallet}
                   onChange={(event) => setSelectedWallet(event.target.value)}
-                  className="h-full w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                  className="h-full w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-700 dark:focus:ring-emerald-900/40"
                 >
                   {walletOptions.map((item) => (
                     <option key={item.value} value={item.value}>
@@ -348,7 +348,7 @@ export const Analytics = () => {
                 type="button"
                 onClick={() => void refetch()}
                 disabled={isFetching}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
               >
                 <RefreshCcw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
                 {isFetching ? 'Đang cập nhật' : 'Làm mới'}
@@ -357,25 +357,25 @@ export const Analytics = () => {
           </div>
 
           {selectedRange === 'custom' ? (
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3.5">
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/20">
               <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
                 <label className="space-y-1.5 text-sm">
-                  <span className="font-medium text-slate-700">Từ ngày</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-200">Từ ngày</span>
                   <input
                     type="date"
                     value={customDateDraft.from}
                     onChange={(event) => setCustomDateDraft((prev) => ({ ...prev, from: event.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-700 dark:focus:ring-emerald-900/40"
                   />
                 </label>
 
                 <label className="space-y-1.5 text-sm">
-                  <span className="font-medium text-slate-700">Đến ngày</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-200">Đến ngày</span>
                   <input
                     type="date"
                     value={customDateDraft.to}
                     onChange={(event) => setCustomDateDraft((prev) => ({ ...prev, to: event.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-700 dark:focus:ring-emerald-900/40"
                   />
                 </label>
 
@@ -393,7 +393,7 @@ export const Analytics = () => {
                 </button>
               </div>
 
-              <p className={cn('mt-2 text-xs', isCustomRangeInvalid ? 'text-rose-600' : 'text-slate-500')}>
+              <p className={cn('mt-2 text-xs', isCustomRangeInvalid ? 'text-rose-600 dark:text-rose-300' : 'text-slate-500 dark:text-slate-400')}>
                 {isCustomRangeInvalid
                   ? 'Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.'
                   : `Khoảng đang áp dụng: ${formatDisplayDate(appliedCustomRange.from)} - ${formatDisplayDate(appliedCustomRange.to)}`}
@@ -408,9 +408,9 @@ export const Analytics = () => {
           title="AI Financial Insight"
           description={`${periodLabel} • ${walletLabel}`}
           badge={aiBadge}
-          className="xl:col-span-2 bg-gradient-to-br from-emerald-50 via-white to-rose-50"
+          className="xl:col-span-2 bg-gradient-to-br from-emerald-50 via-white to-rose-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800"
           headerRight={
-            <span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white">
+            <span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white dark:bg-slate-800">
               <BrainCircuit className="mr-1 inline h-3 w-3" />
               {aiInsightResult?.llmUsed ? 'Gemini' : 'AI Insight'}
             </span>
@@ -420,28 +420,28 @@ export const Analytics = () => {
             <div className="space-y-3">
               <div
                 className={cn(
-                  'rounded-2xl border bg-white/80 p-4',
+                  'rounded-2xl border bg-white/80 p-4 dark:bg-slate-900/80',
                   insights?.severity === 'warning'
-                    ? 'border-rose-100'
+                    ? 'border-rose-100 dark:border-rose-900/50'
                     : insights?.severity === 'good'
-                      ? 'border-emerald-100'
-                      : 'border-slate-100'
+                      ? 'border-emerald-100 dark:border-emerald-900/50'
+                      : 'border-slate-100 dark:border-slate-700'
                 )}
               >
-                <p className="text-sm font-semibold text-slate-900">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">
                   {insights?.severity === 'warning' ? '⚠️' : insights?.severity === 'good' ? '✅' : '📊'}{' '}
                   {aiHeadline}
                 </p>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                   {isAiFetching ? 'Gemini đang đọc dữ liệu thực tế để sinh insight cá nhân hóa...' : aiMessage}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-emerald-100 bg-white/80 p-4">
-                <p className="text-sm font-semibold text-slate-900">
+              <div className="rounded-2xl border border-emerald-100 bg-white/80 p-4 dark:border-emerald-900/50 dark:bg-slate-900/80">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">
                   💡 {aiInsightResult?.answer ? aiRecommendation : insights?.recommendation ?? 'Ưu tiên duy trì thói quen theo dõi ngân sách để tối ưu quỹ dự phòng.'}
                 </p>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                   Danh mục cần lưu ý nhất hiện tại: <strong>{insights?.riskiestCategory ?? riskiestBudget?.category ?? 'Chưa xác định'}</strong>.
                   {aiInsightResult?.llmUsed ? ' Insight này đang được sinh từ Gemini dựa trên dữ liệu dashboard thật.' : ''}
                 </p>
@@ -449,25 +449,25 @@ export const Analytics = () => {
             </div>
 
             <div className="grid gap-3">
-              <div className="rounded-2xl border border-slate-100 bg-white/80 p-4">
-                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-900/80">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
                   <TrendingUp className="h-4 w-4 text-emerald-600" /> Net Income
                 </div>
-                <p className="text-2xl font-bold text-slate-900">{formatCurrency(summary.netIncome)}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(summary.netIncome)}</p>
               </div>
 
-              <div className="rounded-2xl border border-slate-100 bg-white/80 p-4">
-                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-900/80">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
                   <PiggyBank className="h-4 w-4 text-emerald-600" /> Savings Rate
                 </div>
-                <p className="text-2xl font-bold text-slate-900">{summary.savingsRate.toFixed(1)}%</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{summary.savingsRate.toFixed(1)}%</p>
               </div>
 
-              <div className="rounded-2xl border border-slate-100 bg-white/80 p-4">
-                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-900/80">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
                   <CalendarRange className="h-4 w-4 text-rose-500" /> Daily Average
                 </div>
-                <p className="text-2xl font-bold text-slate-900">{formatCurrency(summary.dailyAverage)}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(summary.dailyAverage)}</p>
               </div>
             </div>
           </div>
@@ -479,12 +479,12 @@ export const Analytics = () => {
             { label: 'Chi tiêu kỳ này', value: summary.totalExpense, icon: <TrendingDown className="h-4 w-4 text-rose-600" /> },
             { label: 'Tỷ lệ tiết kiệm', value: summary.savingsRate, icon: <PiggyBank className="h-4 w-4 text-emerald-600" />, isPercent: true },
           ].map((item) => (
-            <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-500">{item.label}</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{item.label}</p>
                 {item.icon}
               </div>
-              <p className="text-2xl font-bold text-slate-900">
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">
                 {'isPercent' in item && item.isPercent ? `${Number(item.value).toFixed(1)}%` : formatCurrency(Number(item.value))}
               </p>
             </div>
@@ -539,14 +539,14 @@ export const Analytics = () => {
           <div className="space-y-3">
             {topTransactions.length > 0 ? (
               topTransactions.map((item) => (
-                <div key={`${item.id}-${item.date}`} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3">
+                <div key={`${item.id}-${item.date}`} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3 dark:border-slate-700 dark:bg-slate-800">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-lg shadow-sm">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-lg shadow-sm dark:bg-slate-900">
                       {getCategoryIcon(item.category)}
                     </span>
                     <div>
-                      <p className="text-sm font-semibold text-slate-800">{item.merchant}</p>
-                      <p className="text-xs text-slate-500">{item.category} • {item.date}</p>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{item.merchant}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{item.category} • {item.date}</p>
                     </div>
                   </div>
 
@@ -566,8 +566,8 @@ export const Analytics = () => {
           description="Tổng các khoản cố định được lấy từ recurring rules thực tế."
           badge="Subscriptions"
           headerRight={
-            <div className="rounded-xl bg-rose-50 px-3 py-1.5 text-right">
-              <p className="text-[11px] font-medium text-rose-500">Tổng cố định / kỳ</p>
+            <div className="rounded-xl bg-rose-50 px-3 py-1.5 text-right dark:bg-rose-950/30">
+              <p className="text-[11px] font-medium text-rose-500 dark:text-rose-300">Tổng cố định / kỳ</p>
               <p className="text-sm font-bold text-rose-600">{formatCurrency(recurringSpend)}</p>
             </div>
           }
@@ -575,20 +575,20 @@ export const Analytics = () => {
           <div className="space-y-3">
             {subscriptions.length > 0 ? (
               subscriptions.map((item) => (
-                <div key={item.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3">
+                <div key={item.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3 dark:border-slate-700 dark:bg-slate-800">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-lg shadow-sm">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-lg shadow-sm dark:bg-slate-900">
                       {getCategoryIcon(item.name)}
                     </span>
                     <div>
-                      <p className="text-sm font-semibold text-slate-800">{item.name}</p>
-                      <p className="text-xs text-slate-500">{item.date}</p>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{item.name}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{item.date}</p>
                     </div>
                   </div>
 
                   <div className="text-right">
-                    <p className="text-sm font-bold text-slate-900">{formatCurrency(item.amount)}</p>
-                    <p className="text-[11px] text-slate-500">{item.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm dừng'}</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(item.amount)}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{item.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm dừng'}</p>
                   </div>
                 </div>
               ))
@@ -596,7 +596,7 @@ export const Analytics = () => {
               <EmptyListState message="Bạn chưa có khoản chi định kỳ nào để phân tích." />
             )}
 
-            <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800">
+            <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
               <ArrowUpRight className="mr-2 inline h-4 w-4" />
               Gợi ý tự động: ưu tiên tối ưu các khoản định kỳ ít sử dụng để tăng nhanh tỷ lệ tiết kiệm.
             </div>
