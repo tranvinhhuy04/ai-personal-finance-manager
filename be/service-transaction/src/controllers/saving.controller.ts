@@ -49,12 +49,14 @@ export const depositSaving = catchAsync(async (req: Request, res: Response) => {
 export const settleSaving = catchAsync(async (req: Request, res: Response) => {
   const userId = String((req as any).userId ?? '');
   const savingId = req.params.id;
-  const { destinationWalletId, destination_wallet_id } = req.body ?? {};
+  const { destinationWalletId, destination_wallet_id, settleType, settle_type, amount } = req.body ?? {};
 
   const result = await savingService.settleSaving({
     saving_id: savingId,
     user_id: userId,
+    settle_type: settleType ?? settle_type ?? 'FULL',
     destination_wallet_id: destinationWalletId ?? destination_wallet_id ?? null,
+    amount: amount ?? null,
     authorization: req.headers.authorization,
   });
 

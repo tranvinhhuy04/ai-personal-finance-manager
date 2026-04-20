@@ -57,6 +57,7 @@ export interface Transaction {
 
 export type SavingProductType = 'SAVING' | 'INVESTMENT';
 export type SavingStatus = 'ACTIVE' | 'SETTLED';
+export type SettleSavingType = 'FULL' | 'PARTIAL';
 
 export interface SavingPackage {
   id: string;
@@ -263,7 +264,9 @@ export interface DepositSavingInput {
 }
 
 export interface SettleSavingInput {
+  settleType?: SettleSavingType;
   destinationWalletId?: string | null;
+  amount?: number | string | null;
 }
 
 export interface CreateRecurringRuleInput {
