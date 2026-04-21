@@ -24,9 +24,6 @@
     "web": {
       "bundler": "metro"
     },
-    "extra": {
-      "apiBaseUrl": "http://192.168.57.31:3000",
-      "aiServiceUrl": "http://192.168.57.31:3000"
-    }
+    "extra": {}
   }
 }

@@ -34,22 +34,28 @@ const inferredLanBaseUrl = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(inferredExpoHost)
   ? `http://${inferredExpoHost}:3000`
   : undefined;
 
-const fallbackBaseUrl =
-  inferredLanBaseUrl ||
-  Platform.select({
-    android: 'http://10.0.2.2:3000',
-    ios: 'http://127.0.0.1:3000',
-    default: 'http://127.0.0.1:3000',
-  });
+function normalizeBaseUrl(value?: string) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.replace(/\/+$/, '') : undefined;
+}
+
+const fallbackBaseUrl = Platform.select({
+  android: 'http://10.0.2.2:3000',
+  ios: 'http://127.0.0.1:3000',
+  default: 'http://127.0.0.1:3000',
+});
 
 export const API_BASE_URL =
-  expoEnv.EXPO_PUBLIC_API_BASE_URL?.trim() ||
-  expoExtra.apiBaseUrl ||
-  fallbackBaseUrl;
+  normalizeBaseUrl(expoEnv.EXPO_PUBLIC_API_BASE_URL) ||
+  normalizeBaseUrl(inferredLanBaseUrl) ||
+  normalizeBaseUrl(expoExtra.apiBaseUrl) ||
+  normalizeBaseUrl(fallbackBaseUrl) ||
+  'http://127.0.0.1:3000';
 
 export const AI_SERVICE_BASE_URL =
-  expoEnv.EXPO_PUBLIC_AI_SERVICE_URL?.trim() ||
-  expoExtra.aiServiceUrl ||
+  normalizeBaseUrl(expoEnv.EXPO_PUBLIC_AI_SERVICE_URL) ||
+  normalizeBaseUrl(inferredLanBaseUrl) ||
+  normalizeBaseUrl(expoExtra.aiServiceUrl) ||
   API_BASE_URL;
 
 function normalizeToken(value: unknown) {
