@@ -6,9 +6,11 @@ import { MyWallet } from '@/components/dashboard/MyWallet';
 import { CashFlow } from '@/components/dashboard/CashFlow';
 import { CreateWalletModal } from '@/components/dashboard/CreateWalletModal';
 import { apiClient } from '@/lib/apiClient';
-import { cn } from '@/lib/utils';
+import { cn, formatVND } from '@/lib/utils';
 import type { DashboardData, WalletCurrency } from '@/hooks/useDashboardData';
 import type { Wallet } from '@/types/finance';
+import { useSavingsMetrics, useInvestmentMetrics } from '@/hooks/usePerformanceMetrics';
+import { useSavingsGrowth } from '@/hooks/useSavingsGrowth';
 
 const DEFAULT_DASHBOARD_DATA: DashboardData = {
   overview: {
@@ -126,13 +128,16 @@ async function fetchCashflow(filter: 'monthly' | 'yearly' = 'yearly'): Promise<D
   const dashboard = await apiClient.getAnalyticsDashboard({ type: filter });
   const trend = dashboard.trend ?? [];
 
+  const data = trend.map((item) => ({
+    month: item.month,
+    cashflow: toNumber(item.income),
+    outflow: Math.abs(toNumber(item.expense)),
+    inflow: -Math.abs(toNumber(item.expense)),
+  }));
+
   return {
-    total: trend.reduce((sum, item) => sum + toNumber(item.income), 0),
-    data: trend.map((item) => ({
-      month: item.month,
-      cashflow: toNumber(item.income),
-      inflow: -Math.abs(toNumber(item.expense)),
-    })),
+    total: data.reduce((sum, item) => sum + item.cashflow, 0),
+    data,
   };
 }
 
@@ -287,6 +292,12 @@ export const Dashboard = () => {
     staleTime: 30 * 1000,
   });
 
+  const transactionsQuery = useQuery({
+    queryKey: ['transactions', 'savings-history'],
+    queryFn: () => apiClient.getTransactions(200, 0),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const overviewData = useMemo<DashboardData['overview']>(() => {
     const wallets = walletsQuery.data ?? [];
     const savings = savingsQuery.data ?? [];
@@ -334,6 +345,13 @@ export const Dashboard = () => {
     };
   }, [walletsQuery.data]);
 
+  const savingsGrowth = useSavingsGrowth(savingsQuery.data ?? [], transactionsQuery.data ?? []);
+  const savingsMetrics = useSavingsMetrics(
+    savingsQuery.data ?? [],
+    savingsGrowth.hasEnoughData ? savingsGrowth.cagr : undefined,
+  );
+  const investmentMetrics = useInvestmentMetrics(investmentsQuery.data ?? [], savingsMetrics.totalCurrent);
+
   const cashflowData = cashflowQuery.data ?? DEFAULT_DASHBOARD_DATA.cashFlow;
   const isLoading =
     walletsQuery.isLoading ||
@@ -345,19 +363,34 @@ export const Dashboard = () => {
     await queryClient.invalidateQueries({ queryKey: ['wallets'] });
   }, [queryClient]);
 
+  const handleCashflowRefresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['dashboard', 'cashflow', cashflowFilter] });
+  }, [queryClient, cashflowFilter]);
+
   if (isLoading) {
     return <DashboardSkeleton />;
   }
 
   return (
     <>
-      <Overview data={overviewData} />
+      <Overview
+        data={overviewData}
+        savingsMetrics={savingsMetrics}
+        investmentMetrics={investmentMetrics}
+      />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <MyWallet data={walletsData} onAddWallet={() => setIsCreateModalOpen(true)} />
+        <MyWallet
+          data={walletsData}
+          rawWallets={walletsQuery.data ?? []}
+          onAddWallet={() => setIsCreateModalOpen(true)}
+          onWalletChanged={handleWalletCreateSuccess}
+        />
         <CashFlow
           data={cashflowData}
           cashflowFilter={cashflowFilter}
           onCashflowFilterChange={setCashflowFilter}
+          onRefresh={handleCashflowRefresh}
+          isRefreshing={cashflowQuery.isFetching}
         />
       </div>
       <CreateWalletModal

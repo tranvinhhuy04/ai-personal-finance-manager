@@ -2,8 +2,46 @@ import { ChevronDown, RotateCcw } from 'lucide-react';
 import { StatCard } from './StatCard';
 import { DashboardData } from '@/hooks/useDashboardData';
 import { motion } from 'motion/react';
+import type { SavingsMetrics, InvestmentMetrics } from '@/hooks/usePerformanceMetrics';
+import { formatVND } from '@/lib/utils';
 
-export const Overview = ({ data }: { data: DashboardData['overview'] }) => {
+interface OverviewProps {
+  data: DashboardData['overview'];
+  savingsMetrics?: SavingsMetrics;
+  investmentMetrics?: InvestmentMetrics;
+}
+
+export const Overview = ({ data, savingsMetrics, investmentMetrics }: OverviewProps) => {
+  const savingsExtras = savingsMetrics
+    ? [
+        {
+          label: 'Lãi dự tính',
+          value: formatVND(savingsMetrics.estimatedInterest),
+        },
+        {
+          label: 'Tốc độ tăng trưởng',
+          value: `${savingsMetrics.growthRate.toFixed(2)}%/năm`,
+        },
+      ]
+    : undefined;
+
+  const investmentExtras = investmentMetrics
+    ? [
+        {
+          label: 'Lợi nhuận',
+          value: `${investmentMetrics.returnRate >= 0 ? '+' : ''}${investmentMetrics.returnRate.toFixed(2)}% (${formatVND(investmentMetrics.returnAmount)})`,
+        },
+        {
+          label: 'Rủi ro',
+          value: investmentMetrics.riskScore,
+        },
+        {
+          label: 'Phân bổ danh mục',
+          value: `${investmentMetrics.allocationPercent.toFixed(1)}% tổng tài sản`,
+        },
+      ]
+    : undefined;
+
   return (
     <section className="mb-8">
       <div className="flex items-end justify-between mb-6">
@@ -29,9 +67,9 @@ export const Overview = ({ data }: { data: DashboardData['overview'] }) => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1 }}
       >
-        <StatCard data={data.balance} />
-        <StatCard data={data.savings} />
-        <StatCard data={data.investment} />
+        <StatCard data={data.balance} detailPath="/wallets" />
+        <StatCard data={data.savings} extras={savingsExtras} detailPath="/savings" />
+        <StatCard data={data.investment} extras={investmentExtras} detailPath="/investments" />
       </motion.div>
     </section>
   );

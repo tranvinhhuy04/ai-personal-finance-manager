@@ -2,6 +2,7 @@ import { json, Router } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { ClientRequest, IncomingMessage, ServerResponse } from 'http';
 import verifyToken from '../middlewares/verifyToken';
+import { handleAiAdvisorChat } from '../utils/aiAdvisorBff';
 import { handleAiChat } from '../utils/aiChatBff';
 
 const router = Router();
@@ -236,6 +237,9 @@ router.use(
 
 // /api/v1/ai/chat -> Node.js BFF enriches context from analytics-service before calling Python ai-service
 router.post('/ai/chat', verifyToken, json({ limit: '1mb' }), handleAiChat);
+
+// /api/v1/ai/advisor/chat -> Agentic RAG advisor pipeline (Python ai-service) with cache-aware BFF
+router.post('/ai/advisor/chat', verifyToken, json({ limit: '1mb' }), handleAiAdvisorChat);
 
 // /api/v1/ai/* -> ai-service (JWT required, still benefits from gateway rate limiting)
 router.use(

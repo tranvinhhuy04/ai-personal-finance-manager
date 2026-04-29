@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, ArrowRight, HelpCircle, Mail, Moon, Share2, ChevronRight, Menu, SunMedium, UserCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
 import { NotificationBell } from './NotificationBell';
 import { UserMenuDropdown } from './UserMenuDropdown';
 import { ShareModal } from './ShareModal';
@@ -16,13 +17,14 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const user = useAuthStore((s) => s.user);
   const { isDark, toggleTheme } = useTheme();
+  const navigate = useNavigate();
 
   return (
     <motion.header 
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, delay: 0.1 }}
-      className="sticky top-0 z-10 flex h-20 items-center justify-between border-b border-transparent bg-white/70 px-4 backdrop-blur-sm md:px-8 dark:border-slate-800 dark:bg-slate-950/80"
+      className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-gray-100/80 bg-white/80 px-4 backdrop-blur-md md:px-8 dark:border-slate-800 dark:bg-slate-950/90"
     >
       {/* Breadcrumbs & Mobile Menu */}
       <div className="flex items-center gap-4">
@@ -59,10 +61,22 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
           >
             {isDark ? <SunMedium className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
-          <button className="hidden rounded-full border border-gray-200 bg-white p-2.5 text-gray-500 transition-all hover:bg-gray-100 hover:text-gray-700 sm:block dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
+          <button
+            type="button"
+            onClick={() => navigate('/help')}
+            className="hidden rounded-full border border-gray-200 bg-white p-2.5 text-gray-500 transition-all hover:bg-gray-100 hover:text-gray-700 sm:block dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            title="Trợ giúp"
+            aria-label="Trợ giúp"
+          >
             <HelpCircle className="w-4 h-4" />
           </button>
-          <button className="hidden rounded-full border border-gray-200 bg-white p-2.5 text-gray-500 transition-all hover:bg-gray-100 hover:text-gray-700 sm:block dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
+          <button
+            type="button"
+            onClick={() => navigate('/contact')}
+            className="hidden rounded-full border border-gray-200 bg-white p-2.5 text-gray-500 transition-all hover:bg-gray-100 hover:text-gray-700 sm:block dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            title="Liên hệ / Tin nhắn"
+            aria-label="Liên hệ"
+          >
             <Mail className="w-4 h-4" />
           </button>
           <NotificationBell />

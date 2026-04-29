@@ -18,8 +18,9 @@ export interface WalletCurrency {
 
 export interface CashFlowData {
   month: string;
-  cashflow: number;
-  inflow: number;
+  cashflow: number; // income (inflow) — Bar
+  outflow: number;  // total expense (outflow) — Line (positive value)
+  inflow: number;   // kept for backward compat (negative expense)
 }
 
 export interface DashboardData {
@@ -76,13 +77,13 @@ export const useDashboardData = () => {
     cashFlow: {
       total: 8558086000,
       data: [
-        { month: 'Thg 1', cashflow: 750000000, inflow: -125000000 },
-        { month: 'Thg 2', cashflow: 700000000, inflow: -100000000 },
-        { month: 'Thg 3', cashflow: 1200000000, inflow: -186400000 },
-        { month: 'Thg 4', cashflow: 625000000, inflow: -75000000 },
-        { month: 'Thg 5', cashflow: 500000000, inflow: -50000000 },
-        { month: 'Thg 6', cashflow: 750000000, inflow: -100000000 },
-        { month: 'Thg 7', cashflow: 875000000, inflow: -150000000 },
+        { month: 'Thg 1', cashflow: 750000000, outflow: 125000000, inflow: -125000000 },
+        { month: 'Thg 2', cashflow: 700000000, outflow: 100000000, inflow: -100000000 },
+        { month: 'Thg 3', cashflow: 1200000000, outflow: 186400000, inflow: -186400000 },
+        { month: 'Thg 4', cashflow: 625000000, outflow: 75000000, inflow: -75000000 },
+        { month: 'Thg 5', cashflow: 500000000, outflow: 50000000, inflow: -50000000 },
+        { month: 'Thg 6', cashflow: 750000000, outflow: 100000000, inflow: -100000000 },
+        { month: 'Thg 7', cashflow: 875000000, outflow: 150000000, inflow: -150000000 },
       ],
     },
   };

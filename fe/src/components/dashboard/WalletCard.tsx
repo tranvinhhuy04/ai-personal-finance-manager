@@ -1,30 +1,35 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CreditCard, Smartphone, Wallet, Banknote, Edit, Trash2 } from 'lucide-react';
+import { CreditCard, Smartphone, Wallet, Banknote, Edit, Trash2, EyeOff } from 'lucide-react';
 import { WalletCurrency } from '@/hooks/useDashboardData';
 import { cn, formatVND } from '@/lib/utils';
 import { motion } from 'motion/react';
 
-export const WalletCard: React.FC<{ data: WalletCurrency; logoSrc?: string | null }> = ({ data, logoSrc }) => {
-  const { id, name, type, amount, status } = data;
+interface WalletCardProps {
+  data: WalletCurrency;
+  logoSrc?: string | null;
+  hasTransactions?: boolean;
+  onEdit?: () => void;
+  onDeactivate?: () => void;
+  onDelete?: () => void;
+}
+
+export const WalletCard: React.FC<WalletCardProps> = ({
+  data,
+  logoSrc,
+  hasTransactions = false,
+  onEdit,
+  onDeactivate,
+  onDelete,
+}) => {
+  const { name, type, amount, status } = data;
   const [hasImageError, setHasImageError] = useState(false);
+  const [deleteTooltip, setDeleteTooltip] = useState(false);
 
   useEffect(() => {
     setHasImageError(false);
   }, [logoSrc]);
 
   const isActive = status === 'Hoạt động';
-
-  const walletCode = useMemo(() => {
-    const normalizedName = name
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9]/g, '')
-      .toLowerCase();
-
-    const prefix = normalizedName.slice(0, 2) || 'wv';
-    const suffix = String(id ?? '').replace(/[^a-zA-Z0-9]/g, '').slice(-2).toLowerCase() || '00';
-    return `${prefix}${suffix}`;
-  }, [id, name]);
 
   const getWalletStyle = () => {
     const normalizedName = name.toLowerCase();
@@ -111,12 +116,49 @@ export const WalletCard: React.FC<{ data: WalletCurrency; logoSrc?: string | nul
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <button className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-sky-600" title="Sửa ví">
-              <Edit className="w-4 h-4" />
+            {/* Edit button */}
+            <button
+              type="button"
+              onClick={onEdit}
+              className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-sky-600"
+              title="Chỉnh sửa ví"
+            >
+              <Edit className="w-3.5 h-3.5" />
             </button>
-            <button className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-red-600" title="Xóa ví">
-              <Trash2 className="w-4 h-4" />
+
+            {/* Deactivate button */}
+            <button
+              type="button"
+              onClick={onDeactivate}
+              className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-orange-500"
+              title={isActive ? 'Vô hiệu hóa ví' : 'Kích hoạt ví'}
+            >
+              <EyeOff className="w-3.5 h-3.5" />
             </button>
+
+            {/* Delete button — disabled if wallet has transactions */}
+            <div className="relative" onMouseEnter={() => hasTransactions && setDeleteTooltip(true)} onMouseLeave={() => setDeleteTooltip(false)}>
+              <button
+                type="button"
+                onClick={!hasTransactions ? onDelete : undefined}
+                disabled={hasTransactions}
+                className={cn(
+                  'rounded-lg p-1.5 transition-colors',
+                  hasTransactions
+                    ? 'cursor-not-allowed text-slate-200'
+                    : 'text-slate-400 hover:bg-slate-100 hover:text-red-600'
+                )}
+                title={hasTransactions ? 'Không thể xóa ví đã có dữ liệu giao dịch' : 'Xóa ví'}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+              {deleteTooltip && hasTransactions && (
+                <div className="absolute right-0 bottom-full mb-1.5 z-50 w-52 rounded-lg bg-gray-900 px-3 py-2 text-[11px] text-white shadow-lg">
+                  Không thể xóa ví đã có dữ liệu giao dịch
+                  <div className="absolute right-2 top-full -mt-px border-4 border-transparent border-t-gray-900" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -138,8 +180,6 @@ export const WalletCard: React.FC<{ data: WalletCurrency; logoSrc?: string | nul
         >
           {status}
         </span>
-
-        <span className="text-[11px] text-slate-500 font-medium">{walletCode}</span>
       </div>
     </motion.div>
   );

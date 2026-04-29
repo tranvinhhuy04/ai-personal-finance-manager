@@ -6,6 +6,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.services.advisor.orchestrator import get_advisor_orchestrator
+from app.services.advisor.schemas import AdvisorChatRequest
 from app.services.nlp_service import get_nlp_service
 
 router = APIRouter()
@@ -71,3 +73,21 @@ async def chat(payload: ChatRequest) -> dict[str, Any]:
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Không thể xử lý chatbot: {exc}") from exc
+
+
+@router.post("/advisor/chat")
+async def advisor_chat(payload: AdvisorChatRequest) -> dict[str, Any]:
+    """Agentic RAG + Function Calling pipeline cho Financial Advisor."""
+    try:
+        result = await get_advisor_orchestrator().run(payload)
+        return {
+            "success": True,
+            "message": result.answer,
+            "data": result.model_dump(),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Advisor pipeline failed: {exc}") from exc

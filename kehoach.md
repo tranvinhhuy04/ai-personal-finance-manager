@@ -6,7 +6,7 @@ Tài liệu này mô tả lộ trình triển khai theo 4 giai đoạn nhằm đ
 
 ## 2. Kiến trúc và Stack thống nhất
 
-- **Frontend:** Next.js/React.
+- **Frontend:** Next.js/Reac/
 - **Backend:** Kiến trúc Microservices phân tán với API Gateway (Node.js).
 - **Core Services:** Wallet Service, Transaction Service.
 - **AI Service:** Python.
