@@ -55,3 +55,29 @@ export async function upsertUserSettings(userId: string, update: Record<string, 
     { upsert: true }
   );
 }
+
+export async function appendAiUsageLog(
+  userId: string,
+  log: {
+    date: Date;
+    model: string;
+    tokens_used: number;
+    estimated_cost: number;
+  }
+) {
+  return UserSettings.findOneAndUpdate(
+    { userId },
+    {
+      $push: {
+        ai_usage_logs: {
+          $each: [log],
+          $slice: -500,
+        },
+      },
+      $set: {
+        updatedAt: new Date(),
+      },
+    },
+    { upsert: true }
+  );
+}

@@ -17,7 +17,6 @@ class RetrievalLayer:
         self.mongo_db = os.getenv("MONGODB_DB", "finance").strip()
         self.vector_index_name = os.getenv("ATLAS_VECTOR_INDEX", "knowledge_embedding_index").strip()
         self.exchangerate_api = os.getenv("EXCHANGE_RATE_API", "https://open.er-api.com/v6/latest/USD").strip()
-        self.stock_api = os.getenv("STOCK_API", "").strip()
 
         self.mongo_client: AsyncIOMotorClient | None = None
         if self.mongo_uri:
@@ -171,13 +170,12 @@ class RetrievalLayer:
                 response.raise_for_status()
                 return response.json()
 
-        exchange_task = fetch_json(self.exchangerate_api)
-        stock_task = fetch_json(self.stock_api) if self.stock_api else asyncio.sleep(0, result={})
-
-        exchange_data, stock_data = await asyncio.gather(exchange_task, stock_task, return_exceptions=True)
+        try:
+            exchange_data = await fetch_json(self.exchangerate_api)
+        except Exception:
+            exchange_data = {}
         return {
-            "exchange": {} if isinstance(exchange_data, Exception) else exchange_data,
-            "stocks": {} if isinstance(stock_data, Exception) else stock_data,
+            "exchange": exchange_data,
         }
 
     async def execute(

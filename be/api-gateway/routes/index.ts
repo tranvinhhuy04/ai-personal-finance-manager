@@ -49,6 +49,13 @@ function rewriteAuthPath(_path: string, req: IncomingMessage) {
   return rewritten.length > 0 ? rewritten : '/';
 }
 
+function rewriteSettingsPath(_path: string, req: IncomingMessage) {
+  const originalUrl = (req as any).originalUrl as string | undefined;
+  const sourcePath = originalUrl ?? _path;
+  const rewritten = sourcePath.replace(/^\/api\/v1\/settings/, '/settings');
+  return rewritten.length > 0 ? rewritten : '/settings';
+}
+
 function rewriteWalletPath(_path: string, req: IncomingMessage) {
   const originalUrl = (req as any).originalUrl as string | undefined;
   return originalUrl ?? _path;
@@ -97,6 +104,31 @@ router.use(
     changeOrigin: true,
     // Strip /api/v1/auth prefix because identity-service exposes /login, /register, etc.
     pathRewrite: rewriteAuthPath,
+    proxyTimeout: PROXY_TIMEOUT_MS,
+    timeout: PROXY_TIMEOUT_MS,
+    onProxyReq,
+    onProxyRes,
+    onError: onProxyError as any,
+  })
+);
+
+// Block internal settings sub-routes from public clients.
+router.all('/settings/runtime-ai', verifyToken, (_req, res) => {
+  return res.status(403).json({ message: 'Forbidden' });
+});
+
+router.all('/settings/usage/append', verifyToken, (_req, res) => {
+  return res.status(403).json({ message: 'Forbidden' });
+});
+
+// /api/v1/settings -> service-identity /settings (JWT required)
+router.use(
+  '/settings',
+  verifyToken,
+  createProxyMiddleware({
+    target: IDENTITY_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: rewriteSettingsPath,
     proxyTimeout: PROXY_TIMEOUT_MS,
     timeout: PROXY_TIMEOUT_MS,
     onProxyReq,

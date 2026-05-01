@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 
 const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL ?? 'http://analytics-service:3004';
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? 'http://ai-service:8000';
+const IDENTITY_SERVICE_URL = process.env.IDENTITY_SERVICE_URL ?? 'http://service-identity:3001';
 const AI_CONTEXT_TIMEOUT_MS = Number(process.env.AI_CONTEXT_TIMEOUT_MS ?? 8_000);
 const AI_CONTEXT_CACHE_TTL_MS = Number(process.env.AI_CONTEXT_CACHE_TTL_MS ?? 30_000);
 const AI_CHAT_UPSTREAM_TIMEOUT_MS = Number(process.env.AI_PROXY_TIMEOUT_MS ?? 60_000);
@@ -31,6 +32,13 @@ type DashboardResponse = {
     value?: number;
     transactionCount?: number;
   }>;
+};
+
+type RuntimeAiConfig = {
+  has_gemini_api_key: boolean;
+  gemini_api_key: string | null;
+  selected_ai_model: string;
+  available_models: string[];
 };
 
 const financialContextCache = new Map<string, { expiresAt: number; value: FinancialContext }>();
@@ -124,6 +132,78 @@ async function fetchAnalyticsDashboard(req: Request): Promise<FinancialContext> 
   return financialContext;
 }
 
+function parseUsageMeta(payload: Record<string, unknown>) {
+  const llm = typeof payload.llm === 'object' && payload.llm !== null
+    ? (payload.llm as Record<string, unknown>)
+    : {};
+
+  const meta = typeof payload.meta === 'object' && payload.meta !== null
+    ? (payload.meta as Record<string, unknown>)
+    : {};
+  const model = String(llm.model ?? meta.model ?? '').trim();
+  const usage = typeof llm.usage === 'object' && llm.usage !== null
+    ? (llm.usage as Record<string, unknown>)
+    : {};
+
+  const promptTokens = Number(usage.prompt_tokens ?? 0);
+  const completionTokens = Number(usage.completion_tokens ?? 0);
+  const totalTokens = Number(usage.total_tokens ?? promptTokens + completionTokens);
+
+  if (!model || !Number.isFinite(totalTokens) || totalTokens <= 0) {
+    return null;
+  }
+
+  const estimatedCost = Number((totalTokens / 1_000_000 * 0.3).toFixed(6));
+  return {
+    model,
+    tokens_used: Math.round(totalTokens),
+    estimated_cost: estimatedCost,
+  };
+}
+
+async function fetchRuntimeAiConfig(req: Request): Promise<RuntimeAiConfig | null> {
+  try {
+    const response = await fetch(`${IDENTITY_SERVICE_URL}/settings/runtime-ai`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: String(req.headers.authorization ?? ''),
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as RuntimeAiConfig;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+async function appendUsageLog(req: Request, usage: { model: string; tokens_used: number; estimated_cost: number }) {
+  try {
+    await fetch(`${IDENTITY_SERVICE_URL}/settings/usage/append`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: String(req.headers.authorization ?? ''),
+      },
+      body: JSON.stringify({
+        model: usage.model,
+        tokens_used: usage.tokens_used,
+        estimated_cost: usage.estimated_cost,
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+  } catch (error) {
+    console.warn('[api-gateway] failed to append AI usage log:', error);
+  }
+}
+
 export async function handleAiChat(req: Request, res: Response) {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const message = typeof body.message === 'string' && body.message.trim()
@@ -151,6 +231,10 @@ export async function handleAiChat(req: Request, res: Response) {
     console.warn('[api-gateway] failed to enrich AI chat context from analytics-service:', error);
   }
 
+  const runtimeAiConfig = await fetchRuntimeAiConfig(req);
+  const selectedModel = runtimeAiConfig?.selected_ai_model;
+  const runtimeApiKey = runtimeAiConfig?.gemini_api_key;
+
   const clientContext = typeof body.context === 'object' && body.context !== null
     ? (body.context as Record<string, unknown>)
     : {};
@@ -171,6 +255,8 @@ export async function handleAiChat(req: Request, res: Response) {
       topExpenses: financialContext.topExpenses,
     },
     use_llm: shouldUseLlm(message, body.use_llm ?? body.useLlm),
+    model: selectedModel,
+    gemini_api_key: runtimeApiKey,
   };
 
   try {
@@ -195,6 +281,11 @@ export async function handleAiChat(req: Request, res: Response) {
 
     if (!response.ok) {
       return res.status(response.status).json(data);
+    }
+
+    const usage = parseUsageMeta(data);
+    if (usage) {
+      void appendUsageLog(req, usage);
     }
 
     return res.status(200).json({

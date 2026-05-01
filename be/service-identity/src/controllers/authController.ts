@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import {
+  appendUsageLog,
   get2FAStatus,
+  getRuntimeAiConfig,
+  getSettings,
   getMe,
   login,
   loginWith2FA,
@@ -8,6 +11,7 @@ import {
   refreshTokens,
   register,
   setup2FA,
+  updateSettings,
   verify2FA,
 } from '../../services/authService';
 import { catchAsync } from '../middlewares/catchAsync';
@@ -70,5 +74,31 @@ export const verify2FAHandler = catchAsync(async (req: Request, res: Response) =
 export const get2FAStatusHandler = catchAsync(async (req: Request, res: Response) => {
   const userId = (req as any).userId as string;
   const result = await get2FAStatus(userId);
+  return res.status(200).json(result);
+});
+
+export const getSettingsHandler = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const result = await getSettings(userId);
+  return res.status(200).json(result);
+});
+
+export const updateSettingsHandler = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const { gemini_api_key, selected_ai_model, ai_usage_logs } = req.body ?? {};
+  const result = await updateSettings(userId, { gemini_api_key, selected_ai_model, ai_usage_logs });
+  return res.status(200).json(result);
+});
+
+export const getRuntimeAiConfigHandler = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const result = await getRuntimeAiConfig(userId);
+  return res.status(200).json(result);
+});
+
+export const appendUsageLogHandler = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const { model, tokens_used, estimated_cost, date } = req.body ?? {};
+  const result = await appendUsageLog(userId, { model, tokens_used, estimated_cost, date });
   return res.status(200).json(result);
 });

@@ -221,7 +221,13 @@ class NLPService:
             "Mình chưa chắc ý định câu hỏi. Bạn có thể hỏi rõ hơn về chi tiêu, thu nhập hoặc lời khuyên tài chính."
         )
 
-    async def answer_question(self, question: str, context: dict[str, Any] | None = None, use_llm: bool = False) -> dict[str, Any]:
+    async def answer_question(
+        self,
+        question: str,
+        context: dict[str, Any] | None = None,
+        use_llm: bool = False,
+        llm_config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         if not question.strip():
             raise ValueError("Question không được để trống")
 
@@ -231,16 +237,26 @@ class NLPService:
         query_plan = self.build_query_plan(intent=intent, question=question, context=safe_context)
         answer = self.build_rule_based_answer(question=question, intent=intent, context=safe_context)
         llm_used = False
+        llm_meta: dict[str, Any] | None = None
         auto_use_llm = use_llm or (
             os.getenv('AI_AUTO_USE_GEMINI', 'false').lower() == 'true'
             and intent in {'financial_advice', 'unknown'}
         )
 
         if auto_use_llm:
-            llm_answer = await self._call_gemini(question=question, intent=intent, context=safe_context)
-            if llm_answer:
-                answer = llm_answer
+            llm_result = await self._call_gemini(
+                question=question,
+                intent=intent,
+                context=safe_context,
+                llm_config=llm_config or {},
+            )
+            if llm_result and isinstance(llm_result.get("answer"), str):
+                answer = str(llm_result["answer"])
                 llm_used = True
+                llm_meta = {
+                    "model": llm_result.get("model"),
+                    "usage": llm_result.get("usage") or {},
+                }
 
         return {
             "question": question,
@@ -254,9 +270,16 @@ class NLPService:
                 "embedding_dimension": prediction["embedding_dimension"],
                 "model": PHOBERT_MODEL_NAME,
             },
+            "llm": llm_meta,
         }
 
-    async def _call_gemini(self, question: str, intent: str, context: dict[str, Any]) -> str | None:
+    async def _call_gemini(
+        self,
+        question: str,
+        intent: str,
+        context: dict[str, Any],
+        llm_config: dict[str, Any],
+    ) -> dict[str, Any] | None:
         """Dùng Gemini để diễn đạt câu trả lời tự nhiên hơn khi đã cấu hình API key trong `.env`."""
         fallback_answer = self.build_rule_based_answer(question=question, intent=intent, context=context)
         return await get_gemini_service().generate_financial_answer(
@@ -264,6 +287,8 @@ class NLPService:
             intent=intent,
             context=context,
             fallback_answer=fallback_answer,
+            model_override=str(llm_config.get("model") or "").strip() or None,
+            api_key_override=str(llm_config.get("gemini_api_key") or "").strip() or None,
         )
 
 

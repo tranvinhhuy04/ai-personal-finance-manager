@@ -13,6 +13,8 @@ class AdvisorChatRequest(BaseModel):
     risk_profile: str | None = Field(default=None)
     financial_profile: dict[str, Any] = Field(default_factory=dict)
     use_llm: bool = Field(default=True)
+    gemini_api_key: str | None = Field(default=None, description="User's runtime Gemini API key override")
+    selected_ai_model: str | None = Field(default=None, description="User's selected AI model override")
 
 
 class ExtractedEntities(BaseModel):
@@ -48,4 +50,5 @@ class AdvisorResponse(BaseModel):
     calculations: AdvisorMetrics
     tool_result: AdvisorToolResult
     guardrails: dict[str, Any] = Field(default_factory=dict)
+    llm: dict[str, Any] = Field(default_factory=dict, description="LLM usage metadata: {model, usage: {total_tokens, ...}}")
     memory: dict[str, Any] = Field(default_factory=dict)

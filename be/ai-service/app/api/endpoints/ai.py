@@ -28,6 +28,8 @@ class ChatRequest(BaseModel):
         default=False,
         description="Nếu true và có GEMINI_API_KEY, service sẽ thử gọi Gemini để sinh câu trả lời tự nhiên hơn.",
     )
+    model: str | None = Field(default=None, description="Model Gemini được user chọn từ settings")
+    gemini_api_key: str | None = Field(default=None, description="Gemini API key runtime của user")
 
 
 @router.post("/ocr")
@@ -65,6 +67,10 @@ async def chat(payload: ChatRequest) -> dict[str, Any]:
             question=resolved_question,
             context=merged_context,
             use_llm=payload.use_llm,
+            llm_config={
+                "model": payload.model,
+                "gemini_api_key": payload.gemini_api_key,
+            },
         )
         return {"success": True, **result}
     except RuntimeError as exc:

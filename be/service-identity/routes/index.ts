@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import requireAuth from '../middlewares/requireAuth';
 import {
+  appendUsageLogHandler,
   get2FAStatusHandler,
+  getRuntimeAiConfigHandler,
+  getSettingsHandler,
   getMeHandler,
   login2FAHandler,
   loginHandler,
@@ -9,6 +12,7 @@ import {
   refreshTokenHandler,
   registerHandler,
   setup2FAHandler,
+  updateSettingsHandler,
   verify2FAHandler,
 } from '../src/controllers/authController';
 
@@ -26,6 +30,10 @@ router.get('/me', requireAuth('access'), getMeHandler);
 router.post('/2fa/setup', requireAuth('access'), setup2FAHandler);
 router.post('/2fa/verify', requireAuth('access'), verify2FAHandler);
 router.get('/2fa/status', requireAuth('access'), get2FAStatusHandler);
+router.get('/settings', requireAuth('access'), getSettingsHandler);
+router.patch('/settings', requireAuth('access'), updateSettingsHandler);
+router.get('/settings/runtime-ai', requireAuth('access'), getRuntimeAiConfigHandler);
+router.post('/settings/usage/append', requireAuth('access'), appendUsageLogHandler);
 
 export default router;
 

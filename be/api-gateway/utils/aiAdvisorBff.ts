@@ -3,8 +3,67 @@ import crypto from 'crypto';
 import redisClient from './redisClient';
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? 'http://ai-service:8000';
+const IDENTITY_SERVICE_URL = process.env.IDENTITY_SERVICE_URL ?? 'http://service-identity:3001';
 const AI_ADVISOR_TIMEOUT_MS = Number(process.env.AI_ADVISOR_TIMEOUT_MS ?? 60_000);
 const AI_ADVISOR_CACHE_TTL_SECONDS = Number(process.env.AI_ADVISOR_CACHE_TTL_SECONDS ?? 120);
+
+type RuntimeAiConfig = {
+  has_gemini_api_key: boolean;
+  gemini_api_key: string | null;
+  selected_ai_model: string;
+  available_models: string[];
+};
+
+async function fetchRuntimeAiConfig(req: Request): Promise<RuntimeAiConfig | null> {
+  try {
+    const response = await fetch(`${IDENTITY_SERVICE_URL}/settings/runtime-ai`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: String(req.headers.authorization ?? ''),
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as RuntimeAiConfig;
+  } catch {
+    return null;
+  }
+}
+
+function parseAdvisorUsageMeta(data: Record<string, unknown>) {
+  const llm = typeof data.llm === 'object' && data.llm !== null
+    ? (data.llm as Record<string, unknown>)
+    : {};
+  const model = String(llm.model ?? '').trim();
+  const usage = typeof llm.usage === 'object' && llm.usage !== null
+    ? (llm.usage as Record<string, unknown>)
+    : {};
+  const totalTokens = Number(usage.total_tokens ?? 0);
+  if (!model || !Number.isFinite(totalTokens) || totalTokens <= 0) return null;
+  return {
+    model,
+    tokens_used: Math.round(totalTokens),
+    estimated_cost: Number((totalTokens / 1_000_000 * 0.3).toFixed(6)),
+  };
+}
+
+async function appendUsageLog(req: Request, usage: { model: string; tokens_used: number; estimated_cost: number }) {
+  try {
+    await fetch(`${IDENTITY_SERVICE_URL}/settings/usage/append`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: String(req.headers.authorization ?? ''),
+      },
+      body: JSON.stringify(usage),
+      signal: AbortSignal.timeout(6000),
+    });
+  } catch (error) {
+    console.warn('[api-gateway] advisor: failed to append AI usage log:', error);
+  }
+}
 
 type AdvisorRequestBody = {
   message?: string;
@@ -91,6 +150,8 @@ export async function handleAiAdvisorChat(req: Request, res: Response) {
     });
   }
 
+  const runtimeConfig = await fetchRuntimeAiConfig(req);
+
   const payload = {
     user_id: userId,
     session_id: sessionId,
@@ -98,6 +159,8 @@ export async function handleAiAdvisorChat(req: Request, res: Response) {
     risk_profile: body.riskProfile ?? null,
     financial_profile: body.financialProfile ?? {},
     use_llm: body.useLlm ?? true,
+    gemini_api_key: runtimeConfig?.gemini_api_key ?? null,
+    selected_ai_model: runtimeConfig?.selected_ai_model ?? null,
   };
 
   try {
@@ -131,6 +194,11 @@ export async function handleAiAdvisorChat(req: Request, res: Response) {
         cacheHit: false,
       },
     };
+
+    const usage = parseAdvisorUsageMeta(data);
+    if (usage) {
+      void appendUsageLog(req, usage);
+    }
 
     await writeCache(cacheKey, enriched);
     return res.status(200).json(enriched);

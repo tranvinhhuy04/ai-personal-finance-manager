@@ -17,7 +17,26 @@ from app.services.advisor.guardrails import apply_output_guardrails
 from app.services.advisor.memory_cache import MemoryStore
 from app.services.advisor.prompts import build_advisor_system_prompt
 from app.services.advisor.retrieval import RetrievalLayer
-from app.services.advisor.schemas import AdvisorChatRequest, AdvisorMetrics, AdvisorResponse, ExtractedEntities, IntentExtraction
+from app.services.advisor.schemas import AdvisorChatRequest, AdvisorMetrics, AdvisorResponse, AdvisorToolResult, ExtractedEntities, IntentExtraction
+from app.services.gemini_service import get_gemini_service
+
+
+ROUTE_INTERNAL_DATA = "internal_data"
+ROUTE_EXTERNAL_FINANCIAL_DATA = "external_financial_data"
+ROUTE_OUT_OF_SCOPE = "out_of_scope"
+
+INTERNAL_DATA_PATTERN = re.compile(
+    r"(chi tieu|chi tiêu|thu nhap|thu nhập|tiet kiem|tiết kiệm|so du|số dư|vi tien|ví tiền|giao dich|giao dịch|ngan sach|ngân sách)",
+    re.IGNORECASE,
+)
+EXTERNAL_FINANCIAL_PATTERN = re.compile(
+    r"(gia vang|giá vàng|vang sjc|ty gia|tỷ giá|lai suat|lãi suất|chung khoan|chứng khoán|co phieu|cổ phiếu|usd|eur|btc|bitcoin|crypto|gia xang|giá xăng)",
+    re.IGNORECASE,
+)
+OUT_OF_SCOPE_PATTERN = re.compile(
+    r"(thoi tiet|thời tiết|nau an|nấu ăn|bong da|bóng đá|am nhac|âm nhạc|giai tri|giải trí|phim|du lich|du lịch|game)",
+    re.IGNORECASE,
+)
 
 
 class AdvisorOrchestrator:
@@ -41,39 +60,63 @@ class AdvisorOrchestrator:
         return "advisor:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     async def _extract_intent_entities_with_llm(self, message: str) -> IntentExtraction | None:
+        import httpx as _httpx
+
         api_key = os.getenv("GEMINI_API_KEY", "").strip()
         if not api_key:
             return None
 
-        try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            from langchain_core.messages import HumanMessage, SystemMessage
-        except Exception:
-            return None
-
-        llm = ChatGoogleGenerativeAI(
-            model=self.model_name,
-            google_api_key=api_key,
-            temperature=0.0,
-            max_retries=0,
-            timeout=8,
-        )
-        extractor = llm.with_structured_output(IntentExtraction)
-
-        prompt = (
-            "Classify user intent and extract entities exactly. "
+        sys_prompt = (
+            "You are the intent router for Fin, a personal finance assistant. "
+            "Classify the message carefully. "
+            "Use transaction_lookup, chart_analysis, or financial_advice ONLY when the user is explicitly asking about their own money, spending, income, savings, balance, budget, or portfolio. "
+            "If the user asks about public financial information like gold price, exchange rate, stock market, interest rate, or macro finance, classify as general_knowledge. "
+            "If the user asks about weather, cooking, entertainment, sports, or other non-finance topics, also classify as general_knowledge. "
             "Valid intent: transaction_lookup | financial_advice | chart_analysis | general_knowledge. "
-            "Entities to extract: time_range, category, amount."
+            "Respond ONLY with valid JSON: "
+            '{\"intent\":\"...\",\"confidence\":0.9,\"time_range\":null,\"category\":null,\"amount\":null}'
+        )
+
+        payload = {
+            "contents": [{"parts": [{"text": f"{sys_prompt}\n\nUser message: {message}"}]}],
+            "generationConfig": {
+                "temperature": 0.0,
+                "maxOutputTokens": 128,
+                "responseMimeType": "application/json",
+                "thinkingConfig": {"thinkingBudget": 0},
+            },
+        }
+
+        model = self.model_name
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            f"?key={api_key}"
         )
 
         try:
-            response = await extractor.ainvoke(
-                [
-                    SystemMessage(content=prompt),
-                    HumanMessage(content=message),
-                ]
-            )
-            return response
+            async with _httpx.AsyncClient(timeout=_httpx.Timeout(8.0, connect=3.0)) as client:
+                resp = await client.post(url, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+                parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                text = "".join(p.get("text", "") for p in parts if isinstance(p, dict)).strip()
+                if not text:
+                    return None
+                parsed = json.loads(text)
+                intent_val = str(parsed.get("intent", "general_knowledge"))
+                valid_intents = {"transaction_lookup", "financial_advice", "chart_analysis", "general_knowledge"}
+                if intent_val not in valid_intents:
+                    intent_val = "general_knowledge"
+                confidence = float(parsed.get("confidence", 0.8) or 0.8)
+                return IntentExtraction(
+                    intent=intent_val,  # type: ignore[arg-type]
+                    confidence=min(1.0, max(0.0, confidence)),
+                    entities=ExtractedEntities(
+                        time_range=parsed.get("time_range") or None,
+                        category=parsed.get("category") or None,
+                        amount=float(parsed["amount"]) if parsed.get("amount") is not None else None,
+                    ),
+                )
         except Exception:
             return None
 
@@ -130,22 +173,75 @@ class AdvisorOrchestrator:
                 return llm_result
         return self._extract_intent_entities_rule_based(message)
 
+    @staticmethod
+    def _route_message(message: str, extraction: IntentExtraction) -> str:
+        if INTERNAL_DATA_PATTERN.search(message):
+            return ROUTE_INTERNAL_DATA
+
+        if EXTERNAL_FINANCIAL_PATTERN.search(message):
+            return ROUTE_EXTERNAL_FINANCIAL_DATA
+
+        if OUT_OF_SCOPE_PATTERN.search(message):
+            return ROUTE_OUT_OF_SCOPE
+
+        if extraction.intent in {"transaction_lookup", "chart_analysis", "financial_advice"}:
+            return ROUTE_INTERNAL_DATA
+
+        return ROUTE_OUT_OF_SCOPE
+
+    @staticmethod
+    def _empty_tool_result() -> AdvisorToolResult:
+        return AdvisorToolResult(
+            structured_data={},
+            unstructured_context=[],
+            external_data={},
+        )
+
+    @staticmethod
+    def _build_fallback_response(route: str) -> str:
+        if route == ROUTE_OUT_OF_SCOPE:
+            return "Minh la tro ly tai chinh Fin, minh chi co the giup ban cac van de ve quan ly tien bac va dau tu thoi nhe."
+
+        return (
+            "Minh co the trao doi ve cac chu de tai chinh cong khai nhu gia vang, ty gia hoac chung khoan, "
+            "nhung hien tai minh khong co cong cu du lieu realtime de xac nhan muc gia hom nay."
+        )
+
+    @staticmethod
+    def _build_external_financial_response(external_data: dict[str, Any]) -> str:
+        return (
+            "Minh co the trao doi ve cac chu de tai chinh cong khai nhu gia vang, ty gia hoac chung khoan, "
+            "nhung hien tai minh chua truy van duoc Google Search Grounding de xac nhan so lieu moi nhat."
+        )
+
+    @staticmethod
+    def _empty_metrics() -> AdvisorMetrics:
+        return AdvisorMetrics(
+            total_income=0,
+            total_expense=0,
+            savings_rate=0,
+            roi=0,
+        )
+
     async def _embed_for_vector_search(self, message: str) -> list[float] | None:
+        import httpx as _httpx
+
         api_key = os.getenv("GEMINI_API_KEY", "").strip()
         if not api_key:
             return None
 
-        try:
-            from langchain_google_genai import GoogleGenerativeAIEmbeddings
-        except Exception:
-            return None
-
-        embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/text-embedding-004",
-            google_api_key=api_key,
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
+            f"?key={api_key}"
         )
+        payload = {"content": {"parts": [{"text": message}]}}
         try:
-            return embeddings.embed_query(message)
+            async with _httpx.AsyncClient(timeout=_httpx.Timeout(8.0, connect=3.0)) as client:
+                resp = await client.post(url, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+                values = data.get("embedding", {}).get("values", [])
+                return values if isinstance(values, list) and values else None
         except Exception:
             return None
 
@@ -177,7 +273,7 @@ class AdvisorOrchestrator:
         calculations: AdvisorMetrics,
         tool_context: dict[str, Any],
         short_term_memory: list[dict[str, Any]],
-    ) -> str:
+    ) -> tuple[str, dict[str, Any]]:
         system_prompt = build_advisor_system_prompt(
             financial_profile=req.financial_profile,
             risk_profile=req.risk_profile,
@@ -186,60 +282,70 @@ class AdvisorOrchestrator:
             short_term_memory=short_term_memory,
         )
 
-        if not req.use_llm:
+        route = str(tool_context.get("route") or "unknown")
+
+        should_use_llm = req.use_llm or route == ROUTE_EXTERNAL_FINANCIAL_DATA
+        if not should_use_llm:
             return (
                 f"Ban dang co tong thu {calculations.total_income:,.0f} va tong chi {calculations.total_expense:,.0f}. "
                 f"Ty le tiet kiem hien tai la {calculations.savings_rate:.2f}% va ROI danh muc la {calculations.roi:.2f}%. "
-                "De xuat: gioi han danh muc chi lon nhat, dat auto-saving ngay dau thang, va ra soat lai muc tieu dau tu moi 30 ngay."
+                "De xuat: gioi han danh muc chi lon nhat, dat auto-saving ngay dau thang, va ra soat lai muc tieu dau tu moi 30 ngay.",
+                {},
             )
 
-        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        # Prefer user's runtime key, fall back to env var
+        api_key = (req.gemini_api_key or "").strip() or os.getenv("GEMINI_API_KEY", "").strip()
+        model_name = (req.selected_ai_model or "").strip() or self.model_name
+
         if not api_key:
+            if route == ROUTE_EXTERNAL_FINANCIAL_DATA:
+                return self._build_external_financial_response(tool_context.get("external", {})), {}
             return (
                 f"Ban dang co tong thu {calculations.total_income:,.0f} va tong chi {calculations.total_expense:,.0f}. "
                 f"Ty le tiet kiem la {calculations.savings_rate:.2f}% va ROI la {calculations.roi:.2f}%. "
-                "Hay uu tien quy khan cap truoc, sau do toi uu chi tieu danh muc bien dong cao."
+                "Hay uu tien quy khan cap truoc, sau do toi uu chi tieu danh muc bien dong cao.",
+                {},
             )
 
         try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            from langchain_core.messages import HumanMessage, SystemMessage
-        except Exception:
-            return (
-                f"Ban dang co tong thu {calculations.total_income:,.0f} va tong chi {calculations.total_expense:,.0f}. "
-                "Hay uu tien hanh dong tiet kiem theo ngan sach 50/30/20 trong 30 ngay toi."
+            llm_result = await get_gemini_service().generate_advisor_answer(
+                question=req.message,
+                system_prompt=system_prompt,
+                tool_context={
+                    **tool_context,
+                    "intent": extraction.intent,
+                    "entities": extraction.entities.model_dump(),
+                },
+                model_override=model_name,
+                api_key_override=api_key,
+                use_google_search=route == ROUTE_EXTERNAL_FINANCIAL_DATA,
             )
-
-        llm = ChatGoogleGenerativeAI(
-            model=self.model_name,
-            google_api_key=api_key,
-            temperature=0.2,
-            max_retries=0,
-            timeout=12,
-        )
-
-        human_prompt = (
-            f"Cau hoi: {req.message}\n"
-            f"Intent: {extraction.intent}\n"
-            f"Entities: {json.dumps(extraction.entities.model_dump(), ensure_ascii=False)}\n"
-            f"Tool context: {json.dumps(tool_context, ensure_ascii=False)}"
-        )
-
-        try:
-            response = await llm.ainvoke([
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=human_prompt),
-            ])
-            content = response.content
-            if isinstance(content, str):
-                return content.strip()
-            return str(content)
+            if llm_result and isinstance(llm_result.get("answer"), str):
+                answer_text = str(llm_result.get("answer") or "").strip()
+                llm_meta = {
+                    "model": llm_result.get("model", model_name),
+                    "usage": llm_result.get("usage", {}),
+                    "grounding_sources": llm_result.get("grounding_sources", []),
+                }
+                return answer_text, llm_meta
+            if route == ROUTE_EXTERNAL_FINANCIAL_DATA:
+                return self._build_external_financial_response(tool_context.get("external", {})), {}
         except Exception:
+            if route == ROUTE_EXTERNAL_FINANCIAL_DATA:
+                return self._build_external_financial_response(tool_context.get("external", {})), {}
             return (
                 f"Ban dang co tong thu {calculations.total_income:,.0f} va tong chi {calculations.total_expense:,.0f}. "
                 f"Ty le tiet kiem la {calculations.savings_rate:.2f}% va ROI la {calculations.roi:.2f}%. "
-                "Khuyen nghi ngay: dat gioi han chi tieu theo danh muc lon nhat va tu dong chuyen 20-25% thu nhap vao tiet kiem."
+                "Khuyen nghi ngay: dat gioi han chi tieu theo danh muc lon nhat va tu dong chuyen 20-25% thu nhap vao tiet kiem.",
+                {},
             )
+
+        return (
+            f"Ban dang co tong thu {calculations.total_income:,.0f} va tong chi {calculations.total_expense:,.0f}. "
+            f"Ty le tiet kiem la {calculations.savings_rate:.2f}% va ROI la {calculations.roi:.2f}%. "
+            "Khuyen nghi ngay: dat gioi han chi tieu theo danh muc lon nhat va tu dong chuyen 20-25% thu nhap vao tiet kiem.",
+            {},
+        )
 
     async def run(self, req: AdvisorChatRequest) -> AdvisorResponse:
         cache_key = self._cache_key(req)
@@ -250,37 +356,55 @@ class AdvisorOrchestrator:
         self.memory.session_memory.append(req.session_id, "user", req.message)
 
         extraction = await self._extract_intent_entities(req.message, allow_llm=req.use_llm)
-        embedding = await self._embed_for_vector_search(req.message)
+        route = self._route_message(req.message, extraction)
 
-        tool_result = await self.retrieval.execute(
-            user_id=req.user_id,
-            message=req.message,
-            intent=extraction.intent,
-            entities=extraction.entities,
-            embedding_vector=embedding,
-        )
+        tool_result = self._empty_tool_result()
+        calculations = self._empty_metrics()
 
-        calculations = self._build_calculations(tool_result.structured_data)
+        if route == ROUTE_INTERNAL_DATA:
+            embedding = await self._embed_for_vector_search(req.message)
+            tool_result = await self.retrieval.execute(
+                user_id=req.user_id,
+                message=req.message,
+                intent=extraction.intent,
+                entities=extraction.entities,
+                embedding_vector=embedding,
+            )
+            calculations = self._build_calculations(tool_result.structured_data)
+        elif route == ROUTE_EXTERNAL_FINANCIAL_DATA:
+            tool_result = AdvisorToolResult(
+                structured_data={},
+                unstructured_context=[],
+                external_data={
+                    "provider": "gemini_google_search_grounding",
+                    "enabled": True,
+                },
+            )
 
         long_term_prefs = await self.memory.get_user_preferences(req.user_id)
         merged_profile = {**long_term_prefs, **req.financial_profile}
 
-        answer = await self._generate_advice(
-            req=AdvisorChatRequest(
-                **{
-                    **req.model_dump(),
-                    "financial_profile": merged_profile,
-                }
-            ),
-            extraction=extraction,
-            calculations=calculations,
-            tool_context={
-                "structured": tool_result.structured_data,
-                "unstructured": tool_result.unstructured_context,
-                "external": tool_result.external_data,
-            },
-            short_term_memory=self.memory.session_memory.get(req.session_id),
-        )
+        if route == ROUTE_OUT_OF_SCOPE:
+            answer = self._build_fallback_response(route)
+            llm_meta: dict[str, Any] = {}
+        else:
+            answer, llm_meta = await self._generate_advice(
+                req=AdvisorChatRequest(
+                    **{
+                        **req.model_dump(),
+                        "financial_profile": merged_profile,
+                    }
+                ),
+                extraction=extraction,
+                calculations=calculations,
+                tool_context={
+                    "structured": tool_result.structured_data,
+                    "unstructured": tool_result.unstructured_context,
+                    "external": tool_result.external_data,
+                    "route": route,
+                },
+                short_term_memory=self.memory.session_memory.get(req.session_id),
+            )
 
         guard = apply_output_guardrails(answer)
         final_answer = str(guard["sanitized_answer"])
@@ -290,12 +414,13 @@ class AdvisorOrchestrator:
 
         response = AdvisorResponse(
             answer=final_answer,
-            intent=extraction.intent,
+            intent=route,
             confidence=extraction.confidence,
             entities=extraction.entities,
             calculations=calculations,
             tool_result=tool_result,
             guardrails=guard,
+            llm=llm_meta,
             memory={
                 "session_id": req.session_id,
                 "short_term_count": len(self.memory.session_memory.get(req.session_id)),

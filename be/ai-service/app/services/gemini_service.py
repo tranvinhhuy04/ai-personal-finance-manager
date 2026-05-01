@@ -21,10 +21,10 @@ class GeminiService:
     def is_enabled(self) -> bool:
         return bool(self.api_key)
 
-    def _url(self) -> str:
+    def _url(self, *, api_key: str, model: str) -> str:
         return (
-            f'https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent'
-            f'?key={self.api_key}'
+            f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
+            f'?key={api_key}'
         )
 
     @staticmethod
@@ -37,6 +37,40 @@ class GeminiService:
         except Exception:
             return None
 
+    @staticmethod
+    def _extract_usage(data: dict[str, Any]) -> dict[str, int]:
+        usage = data.get('usageMetadata', {}) if isinstance(data, dict) else {}
+        prompt_tokens = int(usage.get('promptTokenCount', 0) or 0)
+        completion_tokens = int(usage.get('candidatesTokenCount', 0) or 0)
+        total_tokens = int(usage.get('totalTokenCount', prompt_tokens + completion_tokens) or 0)
+        return {
+            'prompt_tokens': max(0, prompt_tokens),
+            'completion_tokens': max(0, completion_tokens),
+            'total_tokens': max(0, total_tokens),
+        }
+
+    @staticmethod
+    def _extract_grounding_sources(data: dict[str, Any]) -> list[dict[str, str]]:
+        candidates = data.get('candidates', []) if isinstance(data, dict) else []
+        if not isinstance(candidates, list) or not candidates:
+            return []
+
+        grounding = candidates[0].get('groundingMetadata', {}) if isinstance(candidates[0], dict) else {}
+        chunks = grounding.get('groundingChunks', []) if isinstance(grounding, dict) else []
+        if not isinstance(chunks, list):
+            return []
+
+        sources: list[dict[str, str]] = []
+        for chunk in chunks:
+            if not isinstance(chunk, dict):
+                continue
+            web = chunk.get('web', {}) if isinstance(chunk.get('web'), dict) else {}
+            uri = str(web.get('uri') or '').strip()
+            title = str(web.get('title') or '').strip()
+            if uri or title:
+                sources.append({'title': title, 'url': uri})
+        return sources[:8]
+
     async def generate_financial_answer(
         self,
         *,
@@ -44,8 +78,14 @@ class GeminiService:
         intent: str,
         context: dict[str, Any],
         fallback_answer: str,
-    ) -> str | None:
-        if not self.is_enabled():
+        model_override: str | None = None,
+        api_key_override: str | None = None,
+        use_google_search: bool = False,
+    ) -> dict[str, Any] | None:
+        resolved_api_key = (api_key_override or self.api_key or '').strip()
+        resolved_model = (model_override or self.model or GEMINI_MODEL).strip()
+
+        if not resolved_api_key:
             return None
 
         prompt = (
@@ -71,16 +111,74 @@ class GeminiService:
                 },
             },
         }
+        if use_google_search:
+            payload['tools'] = [{'googleSearch': {}}]
 
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(12.0, connect=4.0)) as client:
-                response = await client.post(self._url(), json=payload)
+                response = await client.post(self._url(api_key=resolved_api_key, model=resolved_model), json=payload)
                 response.raise_for_status()
                 data = response.json()
                 generated = self._extract_text(data)
                 if not generated or len(generated.strip()) < 12:
                     return None
-                return generated.strip()
+                return {
+                    'answer': generated.strip(),
+                    'model': resolved_model,
+                    'usage': self._extract_usage(data),
+                    'grounding_sources': self._extract_grounding_sources(data),
+                }
+        except Exception:
+            return None
+
+    async def generate_advisor_answer(
+        self,
+        *,
+        question: str,
+        system_prompt: str,
+        tool_context: dict[str, Any],
+        model_override: str | None = None,
+        api_key_override: str | None = None,
+        use_google_search: bool = False,
+    ) -> dict[str, Any] | None:
+        resolved_api_key = (api_key_override or self.api_key or '').strip()
+        resolved_model = (model_override or self.model or GEMINI_MODEL).strip()
+        if not resolved_api_key:
+            return None
+
+        prompt = (
+            f'{system_prompt}\n\n'
+            f'Cau hoi nguoi dung: {question}\n'
+            f'Ngu canh cong cu: {json.dumps(tool_context, ensure_ascii=False)}\n'
+            'Tra loi ngan gon, ro rang, uu tien tieng Viet tu nhien.'
+        )
+
+        payload: dict[str, Any] = {
+            'contents': [{'parts': [{'text': prompt}]}],
+            'generationConfig': {
+                'temperature': 0.2,
+                'topP': 0.8,
+                'maxOutputTokens': 512,
+                'thinkingConfig': {'thinkingBudget': 0},
+            },
+        }
+        if use_google_search:
+            payload['tools'] = [{'googleSearch': {}}]
+
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(14.0, connect=4.0)) as client:
+                response = await client.post(self._url(api_key=resolved_api_key, model=resolved_model), json=payload)
+                response.raise_for_status()
+                data = response.json()
+                generated = self._extract_text(data)
+                if not generated or len(generated.strip()) < 8:
+                    return None
+                return {
+                    'answer': generated.strip(),
+                    'model': resolved_model,
+                    'usage': self._extract_usage(data),
+                    'grounding_sources': self._extract_grounding_sources(data),
+                }
         except Exception:
             return None
 
@@ -107,7 +205,7 @@ class GeminiService:
         }
 
         try:
-            response = httpx.post(self._url(), json=payload, timeout=20.0)
+            response = httpx.post(self._url(api_key=self.api_key, model=self.model), json=payload, timeout=20.0)
             response.raise_for_status()
             data = response.json()
             text = self._extract_text(data)
