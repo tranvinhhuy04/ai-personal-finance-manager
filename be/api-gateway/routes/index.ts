@@ -4,6 +4,7 @@ import { ClientRequest, IncomingMessage, ServerResponse } from 'http';
 import verifyToken from '../middlewares/verifyToken';
 import { handleAiAdvisorChat } from '../utils/aiAdvisorBff';
 import { handleAiChat } from '../utils/aiChatBff';
+import { handleAiExtractText, handleAiProviderStatus } from '../utils/aiExtractBff';
 
 const router = Router();
 
@@ -273,6 +274,12 @@ router.post('/ai/chat', verifyToken, json({ limit: '1mb' }), handleAiChat);
 
 // /api/v1/ai/advisor/chat -> Agentic RAG advisor pipeline (Python ai-service) with cache-aware BFF
 router.post('/ai/advisor/chat', verifyToken, json({ limit: '1mb' }), handleAiAdvisorChat);
+
+// /api/v1/ai/extract-text -> BFF injects runtime model/key from user settings before calling ai-service
+router.post('/ai/extract-text', verifyToken, json({ limit: '1mb' }), handleAiExtractText);
+
+// /api/v1/ai/provider-status -> BFF probes actual Gemini provider status with runtime model/key from settings
+router.get('/ai/provider-status', verifyToken, handleAiProviderStatus);
 
 // /api/v1/ai/* -> ai-service (JWT required, still benefits from gateway rate limiting)
 router.use(

@@ -336,3 +336,19 @@ export interface AIChatResponse {
   queryPlan: Record<string, unknown>;
   meta: Record<string, unknown>;
 }
+
+export type ExtractedTransactionType = 'expense' | 'income';
+
+export interface ExtractedTransactionDraft {
+  title: string;
+  amount: number;
+  type: ExtractedTransactionType;
+  category: string;
+}
+
+export interface AIExtractTextResponse {
+  success: boolean;
+  input: string;
+  rawOutput: string;
+  model: string;
+}

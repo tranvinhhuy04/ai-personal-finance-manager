@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.services.advisor.orchestrator import get_advisor_orchestrator
 from app.services.advisor.schemas import AdvisorChatRequest
+from app.services.gemini_service import get_gemini_service
 from app.services.nlp_service import get_nlp_service
 from app.services.ocr_service import process_invoice_image
 
@@ -34,6 +35,18 @@ class ChatRequest(BaseModel):
     )
     model: str | None = Field(default=None, description="Model Gemini được user chọn từ settings")
     gemini_api_key: str | None = Field(default=None, description="Gemini API key runtime của user")
+
+
+class ExtractTextRequest(BaseModel):
+    input_text: str = Field(..., min_length=2, description="Natural language input or group chat text")
+    model: str | None = Field(default=None, description="Model Gemini override từ settings")
+    gemini_api_key: str | None = Field(default=None, description="Gemini API key runtime từ settings")
+
+
+class ProviderStatusRequest(BaseModel):
+    model: str | None = Field(default=None, description="Model Gemini override từ settings")
+    gemini_api_key: str | None = Field(default=None, description="Gemini API key runtime từ settings")
+    probe: bool = Field(default=True, description="Nếu true, gọi thử Gemini để xác định trạng thái key/quota")
 
 
 @router.post("/ocr")
@@ -115,6 +128,70 @@ async def chat(payload: ChatRequest) -> dict[str, Any]:
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Không thể xử lý chatbot: {exc}") from exc
+
+
+@router.post("/extract-text")
+async def extract_text(payload: ExtractTextRequest) -> dict[str, Any]:
+    """Extract financial transactions from free text/group chat by prompting Gemini to output JSON array."""
+    raw_text = payload.input_text.strip()
+    if len(raw_text) < 2:
+        raise HTTPException(status_code=400, detail="input_text must contain at least 2 characters")
+
+    gemini = get_gemini_service()
+    if not gemini.is_enabled():
+        raise HTTPException(status_code=503, detail="Gemini is not configured. Missing GEMINI_API_KEY")
+
+    try:
+        extraction = await gemini.extract_transactions_from_text(
+            input_text=raw_text,
+            model_override=payload.model,
+            api_key_override=payload.gemini_api_key,
+        )
+        if not extraction:
+            raise HTTPException(status_code=502, detail="Gemini returned empty extraction output")
+
+        return {
+            "success": True,
+            "input": raw_text,
+            "raw_output": str(extraction.get("text") or ""),
+            "model": str(extraction.get("model") or payload.model or gemini.model),
+            "llm": {
+                "provider": "gemini",
+                "model": str(extraction.get("model") or payload.model or gemini.model),
+                "usage": extraction.get("usage") or {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                },
+            },
+        }
+    except HTTPException:
+        raise
+    except RuntimeError as exc:
+        detail = str(exc)
+        lowered = detail.lower()
+        status_code = 429 if ('429' in detail or 'quota' in lowered or 'rate limit' in lowered) else 502
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Không thể trích xuất từ văn bản: {exc}") from exc
+
+
+@router.post("/provider-status")
+async def provider_status(payload: ProviderStatusRequest) -> dict[str, Any]:
+    """Return actual Gemini provider status for current credentials/model.
+
+    This endpoint helps frontend settings reflect real runtime state (ok/quota_exceeded/invalid_key).
+    """
+    gemini = get_gemini_service()
+    status = await gemini.provider_status(
+        model_override=payload.model,
+        api_key_override=payload.gemini_api_key,
+        probe=payload.probe,
+    )
+    return {
+        "success": True,
+        **status,
+    }
 
 
 @router.post("/advisor/chat")

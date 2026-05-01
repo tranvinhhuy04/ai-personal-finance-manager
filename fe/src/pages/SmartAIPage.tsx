@@ -1,11 +1,16 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowRight, FileImage, FileText, Loader2, Search, Sparkles, UploadCloud } from 'lucide-react';
+import { ArrowRight, FileText, Loader2, Search, Sparkles, Wallet2 } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { formatVND } from '@/lib/utils';
 import { CurrencyInput } from '@/components/common/CurrencyInput';
-import type { AIChatResponse, AIOcrResponse } from '@/types/finance';
+import type {
+  AIChatResponse,
+  Category,
+  ExtractedTransactionDraft,
+  TransactionDirection,
+  Wallet,
+} from '@/types/finance';
 
 const SUGGESTED_QUESTIONS = [
   'Tổng chi tiêu tháng này là bao nhiêu?',
@@ -13,104 +18,155 @@ const SUGGESTED_QUESTIONS = [
   'Làm sao để tiết kiệm 20% thu nhập?',
 ];
 
+const QUICK_ENTRY_SAMPLES = [
+  'Sáng ăn phở 40k, chiều gửi xe 10k',
+  'Nhóm đi ăn 1tr2, tôi trả trước, mỗi người 300k',
+  'Bán đồ cũ được 500k, nạp vào ví MoMo',
+];
+
+type EditableExtractedTransaction = {
+  id: string;
+  title: string;
+  amount: string;
+  type: 'expense' | 'income';
+  categoryName: string;
+  categoryId: string;
+  walletId: string;
+};
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Có lỗi xảy ra khi gọi AI service.';
 }
 
-function toDateInputValue(value?: string | null) {
-  if (!value) {
-    return new Date().toISOString().slice(0, 10);
+function normalizeType(type: string | undefined): 'expense' | 'income' {
+  return type?.toLowerCase() === 'income' ? 'income' : 'expense';
+}
+
+function stripMarkdownCodeFence(input: string): string {
+  const trimmed = input.trim();
+  const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fencedMatch?.[1]) {
+    return fencedMatch[1].trim();
+  }
+  return trimmed;
+}
+
+function parseExtractedTransactions(raw: string): ExtractedTransactionDraft[] {
+  const clean = stripMarkdownCodeFence(raw);
+  const parsed = JSON.parse(clean);
+
+  if (!Array.isArray(parsed)) {
+    throw new Error('Gemini output không phải JSON Array.');
   }
 
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return new Date().toISOString().slice(0, 10);
+  return parsed
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      title: String(item.title ?? '').trim(),
+      amount: Number(item.amount ?? 0),
+      type: normalizeType(String(item.type ?? 'expense')),
+      category: String(item.category ?? '').trim(),
+    }))
+    .filter((item) => item.title && Number.isFinite(item.amount) && item.amount > 0);
+}
+
+function mapDirection(type: 'expense' | 'income'): TransactionDirection {
+  return type === 'income' ? 'INCOME' : 'EXPENSE';
+}
+
+function guessCategoryId(
+  type: 'expense' | 'income',
+  categoryName: string,
+  expenseCategories: Category[],
+  incomeCategories: Category[],
+): string {
+  const source = type === 'income' ? incomeCategories : expenseCategories;
+  const normalized = categoryName.trim().toLowerCase();
+
+  if (!source.length) {
+    return '';
   }
 
-  return parsed.toISOString().slice(0, 10);
+  const exact = source.find((c) => c.name.trim().toLowerCase() === normalized);
+  if (exact) {
+    return exact.id;
+  }
+
+  const partial = source.find((c) => {
+    const name = c.name.trim().toLowerCase();
+    return normalized.includes(name) || name.includes(normalized);
+  });
+
+  return partial?.id ?? source[0].id;
 }
 
 export const SmartAIPage = () => {
-  const navigate = useNavigate();
-  const [isDragging, setIsDragging] = useState(false);
-  const [ocrLoading, setOcrLoading] = useState(false);
-  const [ocrSaving, setOcrSaving] = useState(false);
-  const [ocrError, setOcrError] = useState<string | null>(null);
-  const [ocrSuccess, setOcrSuccess] = useState<string | null>(null);
-  const [ocrResult, setOcrResult] = useState<AIOcrResponse | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [ocrForm, setOcrForm] = useState({
-    merchantName: '',
-    totalAmount: '',
-    transactionDate: new Date().toISOString().slice(0, 10),
-  });
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<Category[]>([]);
+  const [incomeCategories, setIncomeCategories] = useState<Category[]>([]);
+  const [resourceLoading, setResourceLoading] = useState(true);
+  const [resourceError, setResourceError] = useState<string | null>(null);
+
+  const [quickInput, setQuickInput] = useState('');
+  const [extractLoading, setExtractLoading] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [extractSuccess, setExtractSuccess] = useState<string | null>(null);
+  const [extractedTransactions, setExtractedTransactions] = useState<EditableExtractedTransaction[]>([]);
+
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
   const [question, setQuestion] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatResult, setChatResult] = useState<AIChatResponse | null>(null);
+
   const [analysisInput, setAnalysisInput] = useState('');
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AIChatResponse | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const defaultWalletId = useMemo(() => wallets[0]?.id ?? '', [wallets]);
 
-  const handleOcrFile = async (file: File) => {
-    setSelectedFile(file);
-    setOcrLoading(true);
-    setOcrError(null);
-    setOcrSuccess(null);
+  useEffect(() => {
+    let mounted = true;
 
-    try {
-      const result = await apiClient.ocrInvoice(file);
-      setOcrResult(result);
-      setOcrForm({
-        merchantName: result.data.merchantName || '',
-        totalAmount: result.data.totalAmount !== null ? String(result.data.totalAmount) : '',
-        transactionDate: toDateInputValue(result.data.transactionDate),
-      });
-    } catch (error) {
-      setOcrError(getErrorMessage(error));
-      setOcrResult(null);
-    } finally {
-      setOcrLoading(false);
-      setIsDragging(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+    const bootstrap = async () => {
+      setResourceLoading(true);
+      setResourceError(null);
+
+      try {
+        const [walletList, expenseList, incomeList] = await Promise.all([
+          apiClient.getWallets(),
+          apiClient.getCategories('EXPENSE'),
+          apiClient.getCategories('INCOME'),
+        ]);
+
+        if (!mounted) {
+          return;
+        }
+
+        setWallets(walletList.filter((w) => w.status === 1));
+        setExpenseCategories(expenseList.filter((c) => c.status === 1));
+        setIncomeCategories(incomeList.filter((c) => c.status === 1));
+      } catch (error) {
+        if (mounted) {
+          setResourceError(getErrorMessage(error));
+        }
+      } finally {
+        if (mounted) {
+          setResourceLoading(false);
+        }
       }
-    }
-  };
+    };
 
-  const handleSaveOcrResult = async () => {
-    if (!selectedFile) {
-      setOcrError('Vui lòng tải ảnh hóa đơn trước khi lưu.');
-      return;
-    }
+    void bootstrap();
 
-    setOcrSaving(true);
-    setOcrError(null);
-    setOcrSuccess(null);
-
-    try {
-      await apiClient.uploadInvoice(selectedFile, {
-        merchantName: ocrForm.merchantName.trim(),
-        totalAmount: Number(ocrForm.totalAmount || 0),
-        transactionDate: ocrForm.transactionDate
-          ? new Date(`${ocrForm.transactionDate}T00:00:00`).toISOString()
-          : null,
-        description: ocrForm.merchantName.trim() || 'Hóa đơn chờ xác nhận',
-        extractedBy: 'paddle-ocr',
-        reviewStatus: 'awaiting_manual_confirmation',
-      });
-
-      setOcrSuccess('Đã lưu hóa đơn thành công. Bạn có thể mở trang Hóa đơn để xác nhận và ghi nhận giao dịch.');
-      window.setTimeout(() => navigate('/invoices'), 700);
-    } catch (error) {
-      setOcrError(getErrorMessage(error));
-    } finally {
-      setOcrSaving(false);
-    }
-  };
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleAsk = async (nextQuestion?: string) => {
     const resolvedQuestion = (nextQuestion ?? question).trim();
@@ -155,6 +211,107 @@ export const SmartAIPage = () => {
     }
   };
 
+  const handleExtractTransactions = async () => {
+    const input = quickInput.trim();
+    if (!input) {
+      return;
+    }
+
+    if (!wallets.length) {
+      setExtractError('Không tìm thấy ví hoạt động. Vui lòng tạo ví trước khi nhập nhanh giao dịch.');
+      return;
+    }
+
+    setExtractLoading(true);
+    setExtractError(null);
+    setExtractSuccess(null);
+    setSaveSuccess(null);
+
+    try {
+      const result = await apiClient.extractTransactionsFromText(input);
+      const parsed = parseExtractedTransactions(result.rawOutput);
+
+      if (!parsed.length) {
+        throw new Error('AI không trích xuất được giao dịch hợp lệ từ nội dung đã nhập.');
+      }
+
+      const prepared: EditableExtractedTransaction[] = parsed.map((txn, index) => {
+        const type = normalizeType(txn.type);
+        const categoryId = guessCategoryId(type, txn.category, expenseCategories, incomeCategories);
+        return {
+          id: `${Date.now()}-${index}`,
+          title: txn.title,
+          amount: String(Math.round(txn.amount)),
+          type,
+          categoryName: txn.category,
+          categoryId,
+          walletId: defaultWalletId,
+        };
+      });
+
+      setExtractedTransactions(prepared);
+      setExtractSuccess(`AI đã trích xuất ${prepared.length} giao dịch. Vui lòng kiểm tra và xác nhận trước khi lưu.`);
+    } catch (error) {
+      setExtractError(getErrorMessage(error));
+      setExtractedTransactions([]);
+    } finally {
+      setExtractLoading(false);
+    }
+  };
+
+  const handleUpdateExtractedTransaction = (
+    id: string,
+    patch: Partial<Omit<EditableExtractedTransaction, 'id'>>,
+  ) => {
+    setExtractedTransactions((prev) => prev.map((txn) => (txn.id === id ? { ...txn, ...patch } : txn)));
+  };
+
+  const handleSaveTransactions = async () => {
+    if (!extractedTransactions.length) {
+      setSaveError('Chưa có giao dịch nào để lưu.');
+      return;
+    }
+
+    const invalid = extractedTransactions.find(
+      (txn) => !txn.title.trim() || !Number.isFinite(Number(txn.amount)) || Number(txn.amount) <= 0 || !txn.categoryId || !txn.walletId,
+    );
+
+    if (invalid) {
+      setSaveError('Vui lòng hoàn thiện đầy đủ tên giao dịch, số tiền > 0, danh mục và ví cho tất cả giao dịch.');
+      return;
+    }
+
+    setSaveLoading(true);
+    setSaveError(null);
+    setSaveSuccess(null);
+
+    try {
+      await Promise.all(
+        extractedTransactions.map((txn) =>
+          apiClient.createTransaction({
+            walletId: txn.walletId,
+            categoryId: txn.categoryId,
+            transactionType: mapDirection(txn.type),
+            amount: String(Math.round(Number(txn.amount))),
+            currency: 'VND',
+            description: txn.title.trim(),
+            occurredAt: new Date().toISOString(),
+          }),
+        ),
+      );
+
+      setSaveSuccess(`Đã lưu thành công ${extractedTransactions.length} giao dịch.`);
+      setExtractedTransactions([]);
+      setQuickInput('');
+    } catch (error) {
+      setSaveError(getErrorMessage(error));
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const categoriesForType = (type: 'expense' | 'income') => (type === 'income' ? incomeCategories : expenseCategories);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -168,7 +325,7 @@ export const SmartAIPage = () => {
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Trợ lý AI thông minh</h1>
-          <p className="text-sm text-gray-500">PaddleOCR (local) cho hóa đơn, kết hợp chatbot tài chính cho người dùng cuối.</p>
+          <p className="text-sm text-gray-500">Nhập nhanh giao dịch bằng ngôn ngữ tự nhiên, AI hiểu ngữ cảnh và tách giao dịch để bạn xác nhận trước khi lưu.</p>
         </div>
       </div>
 
@@ -179,109 +336,156 @@ export const SmartAIPage = () => {
         >
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <FileImage className="h-5 w-5" />
+              <FileText className="h-5 w-5" />
             </div>
-            <h2 className="text-lg font-bold text-gray-900">Trích xuất Hóa đơn bằng Vision-Language</h2>
+            <h2 className="text-lg font-bold text-gray-900">Nhập nhanh bằng Ngôn ngữ tự nhiên</h2>
           </div>
-          <p className="mb-6 text-sm text-gray-500">
-            Ảnh hóa đơn sẽ được PaddleOCR (chạy local, offline) đọc chữ và bóc tách thành form thân thiện để bạn rà soát.
-          </p>
 
-          <div
-            className={`flex min-h-[220px] flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 transition-colors ${
-              isDragging ? 'border-emerald-500 bg-emerald-50/50' : 'border-gray-200 hover:border-emerald-300 hover:bg-gray-50/50'
-            }`}
-            onDragOver={(event) => {
-              event.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={(event) => {
-              event.preventDefault();
-              const file = event.dataTransfer.files?.[0];
-              if (file) void handleOcrFile(file);
-            }}
+          <p className="mb-4 text-sm text-gray-500">Nhập một câu ngắn (VD: "Sáng ăn phở 40k") hoặc dán đoạn chat chia tiền nhóm. AI sẽ trích xuất giao dịch để bạn review.</p>
+
+          <textarea
+            rows={7}
+            value={quickInput}
+            onChange={(event) => setQuickInput(event.target.value)}
+            placeholder="Nhập giao dịch hoặc dán đoạn chat chia tiền vào đây..."
+            className="w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm transition-all focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+          />
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {QUICK_ENTRY_SAMPLES.map((sample) => (
+              <button
+                key={sample}
+                type="button"
+                onClick={() => setQuickInput(sample)}
+                className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
+              >
+                {sample}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            disabled={extractLoading || !quickInput.trim() || resourceLoading}
+            onClick={() => void handleExtractTransactions()}
+            className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {ocrLoading ? <Loader2 className="mb-3 h-10 w-10 animate-spin text-emerald-600" /> : <UploadCloud className="mb-3 h-10 w-10 text-gray-400" />}
-            <p className="mb-1 text-sm font-medium text-gray-700">Kéo thả hóa đơn vào đây</p>
-            <p className="mb-4 text-xs text-gray-500">Hỗ trợ JPG, PNG, WEBP · tối đa 8MB</p>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-            >
-              Chọn tập tin
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void handleOcrFile(file);
-              }}
-            />
-          </div>
+            {extractLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            Phân tích bằng AI
+          </button>
 
-          {ocrError ? <p className="mt-3 text-sm text-rose-600">{ocrError}</p> : null}
-          {ocrSuccess ? <p className="mt-3 text-sm text-emerald-700">{ocrSuccess}</p> : null}
+          {resourceLoading ? <p className="mt-3 text-sm text-gray-500">Đang tải ví và danh mục...</p> : null}
+          {resourceError ? <p className="mt-3 text-sm text-rose-600">{resourceError}</p> : null}
+          {extractError ? <p className="mt-3 text-sm text-rose-600">{extractError}</p> : null}
+          {extractSuccess ? <p className="mt-3 text-sm text-emerald-700">{extractSuccess}</p> : null}
 
-          {ocrResult ? (
+          {extractedTransactions.length ? (
             <div className="mt-4 space-y-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm text-gray-700">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-semibold text-emerald-900">Biểu mẫu đã điền sẵn</p>
-                  <p className="mt-1 text-xs text-emerald-700">Bạn có thể sửa lại nếu AI nhận diện chưa đúng.</p>
+                  <p className="font-semibold text-emerald-900">Review & Confirm giao dịch</p>
+                  <p className="mt-1 text-xs text-emerald-700">Bạn có thể chỉnh sửa mọi trường trước khi lưu vào hệ thống.</p>
                 </div>
                 <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-[11px] font-semibold text-emerald-700">
-                  PaddleOCR
+                  Gemini Extractor
                 </span>
               </div>
 
-              <div className="grid gap-3">
-                <label className="space-y-1 text-sm">
-                  <span className="text-gray-600">Tên người bán</span>
-                  <input
-                    value={ocrForm.merchantName}
-                    onChange={(event) => setOcrForm((prev) => ({ ...prev, merchantName: event.target.value }))}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2"
-                    placeholder="VD: Bông Trà CN Phạm Viết Chánh"
-                  />
-                </label>
+              {extractedTransactions.map((txn, index) => {
+                const availableCategories = categoriesForType(txn.type);
+                return (
+                  <div key={txn.id} className="space-y-3 rounded-xl border border-emerald-100 bg-white p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Giao dịch #{index + 1}</p>
+                      <select
+                        value={txn.type}
+                        onChange={(event) => {
+                          const nextType = normalizeType(event.target.value);
+                          const nextCategoryId = guessCategoryId(
+                            nextType,
+                            txn.categoryName,
+                            expenseCategories,
+                            incomeCategories,
+                          );
+                          handleUpdateExtractedTransaction(txn.id, {
+                            type: nextType,
+                            categoryId: nextCategoryId,
+                          });
+                        }}
+                        className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs"
+                      >
+                        <option value="expense">expense</option>
+                        <option value="income">income</option>
+                      </select>
+                    </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="space-y-1 text-sm">
-                    <span className="text-gray-600">Số tiền</span>
-                    <CurrencyInput
-                      value={ocrForm.totalAmount}
-                      onValueChange={(value) => setOcrForm((prev) => ({ ...prev, totalAmount: value }))}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2"
-                      placeholder="VD: 58.000 đ"
-                    />
-                    <p className="text-xs text-emerald-700">{formatVND(Number(ocrForm.totalAmount || 0))}</p>
-                  </label>
+                    <label className="space-y-1 text-xs">
+                      <span className="text-gray-600">Tên giao dịch</span>
+                      <input
+                        value={txn.title}
+                        onChange={(event) => handleUpdateExtractedTransaction(txn.id, { title: event.target.value })}
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        placeholder="Tên giao dịch"
+                      />
+                    </label>
 
-                  <label className="space-y-1 text-sm">
-                    <span className="text-gray-600">Ngày giao dịch</span>
-                    <input
-                      type="date"
-                      value={ocrForm.transactionDate}
-                      onChange={(event) => setOcrForm((prev) => ({ ...prev, transactionDate: event.target.value }))}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2"
-                    />
-                  </label>
-                </div>
-              </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <label className="space-y-1 text-xs">
+                        <span className="text-gray-600">Số tiền</span>
+                        <CurrencyInput
+                          value={txn.amount}
+                          onValueChange={(value) => handleUpdateExtractedTransaction(txn.id, { amount: value })}
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                          placeholder="VD: 40.000 đ"
+                        />
+                        <p className="text-[11px] text-emerald-700">{formatVND(Number(txn.amount || 0))}</p>
+                      </label>
+
+                      <label className="space-y-1 text-xs">
+                        <span className="text-gray-600">Danh mục</span>
+                        <select
+                          value={txn.categoryId}
+                          onChange={(event) => handleUpdateExtractedTransaction(txn.id, { categoryId: event.target.value })}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                        >
+                          <option value="">-- Chọn danh mục --</option>
+                          {availableCategories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <label className="space-y-1 text-xs">
+                      <span className="text-gray-600">Nguồn tiền / Ví (bắt buộc)</span>
+                      <select
+                        value={txn.walletId}
+                        onChange={(event) => handleUpdateExtractedTransaction(txn.id, { walletId: event.target.value })}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                      >
+                        <option value="">-- Chọn ví --</option>
+                        {wallets.map((wallet) => (
+                          <option key={wallet.id} value={wallet.id}>
+                            {wallet.walletName} ({wallet.walletType})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                );
+              })}
+
+              {saveError ? <p className="text-sm text-rose-600">{saveError}</p> : null}
+              {saveSuccess ? <p className="text-sm text-emerald-700">{saveSuccess}</p> : null}
 
               <button
                 type="button"
-                disabled={ocrSaving || !selectedFile}
-                onClick={() => void handleSaveOcrResult()}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saveLoading || !extractedTransactions.length}
+                onClick={() => void handleSaveTransactions()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {ocrSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                Xác nhận & Lưu giao dịch
+                {saveLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet2 className="h-4 w-4" />}
+                Lưu tất cả giao dịch
               </button>
             </div>
           ) : null}

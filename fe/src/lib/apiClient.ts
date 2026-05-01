@@ -19,6 +19,7 @@ import type {
   AIOcrResponse,
   AIChatRequest,
   AIChatResponse,
+  AIExtractTextResponse,
 } from '@/types/finance';
 import { aiAxiosClient, axiosClient } from '@/utils/axiosClient';
 
@@ -31,6 +32,7 @@ type RecurringRuleApiResponse = Record<string, any>;
 type SavingApiResponse = Record<string, any>;
 type AIOcrApiResponse = Record<string, any>;
 type AIChatApiResponse = Record<string, any>;
+type AIExtractTextApiResponse = Record<string, any>;
 
 class ApiClient {
   private normalizeWallet(raw: WalletApiResponse): Wallet {
@@ -284,6 +286,15 @@ class ApiClient {
       llmUsed: Boolean(raw.llm_used ?? raw.llmUsed),
       queryPlan: (raw.query_plan ?? raw.queryPlan ?? {}) as Record<string, unknown>,
       meta: (raw.meta ?? {}) as Record<string, unknown>,
+    };
+  }
+
+  private normalizeAIExtractTextResponse(raw: AIExtractTextApiResponse): AIExtractTextResponse {
+    return {
+      success: Boolean(raw.success),
+      input: String(raw.input ?? ''),
+      rawOutput: String(raw.raw_output ?? raw.rawOutput ?? ''),
+      model: String(raw.model ?? ''),
     };
   }
 
@@ -598,6 +609,14 @@ class ApiClient {
     });
 
     return this.normalizeAIChatResponse(response.data ?? {});
+  }
+
+  async extractTransactionsFromText(inputText: string): Promise<AIExtractTextResponse> {
+    const response = await aiAxiosClient.post('/api/v1/ai/extract-text', {
+      input_text: inputText,
+    });
+
+    return this.normalizeAIExtractTextResponse(response.data ?? {});
   }
 
   // ===== INVOICE ENDPOINTS =====

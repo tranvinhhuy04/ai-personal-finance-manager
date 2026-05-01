@@ -47,7 +47,18 @@ type SettingsApiResponse = {
   ai_usage_logs: AIUsageLog[];
 };
 
-const QUOTA_TOKEN_LIMIT = 500_000;
+type ProviderStatusResponse = {
+  success: boolean;
+  enabled?: boolean;
+  key_present?: boolean;
+  model?: string;
+  status?: string;
+  message?: string;
+  http_status?: number | null;
+  selected_ai_model?: string | null;
+  has_gemini_api_key?: boolean;
+  source?: string;
+};
 
 function inferTaskType(model: string) {
   return model.toLowerCase().includes('chat') ? 'Chat' : 'Text';
@@ -57,9 +68,11 @@ export const Settings = () => {
   const { theme, isDark, toggleTheme } = useTheme();
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [apiKeyMasked, setApiKeyMasked] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
-  const [availableModels, setAvailableModels] = useState<string[]>(['gemini-2.5-flash']);
+  const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
+  const [availableModels, setAvailableModels] = useState<string[]>(['gemini-2.0-flash']);
   const [aiUsageLogs, setAiUsageLogs] = useState<AIUsageLog[]>([]);
+  const [providerStatus, setProviderStatus] = useState<ProviderStatusResponse | null>(null);
+  const [providerLoading, setProviderLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -69,13 +82,33 @@ export const Settings = () => {
     return [...aiUsageLogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [aiUsageLogs]);
 
-  const totalTokensUsed = useMemo(
-    () => sortedUsageLogs.reduce((sum, item) => sum + Number(item.tokens_used || 0), 0),
-    [sortedUsageLogs]
-  );
+  const currentModel = providerStatus?.model || selectedModel || sortedUsageLogs[0]?.model || 'gemini-2.0-flash';
 
-  const quotaUsedPercent = Math.min(100, Math.round((totalTokensUsed / QUOTA_TOKEN_LIMIT) * 100));
-  const currentModel = selectedModel || sortedUsageLogs[0]?.model || 'gemini-2.5-flash';
+  const providerStatusLabel = useMemo(() => {
+    const status = providerStatus?.status;
+    if (status === 'ok') return { text: 'Hoạt động bình thường', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' };
+    if (status === 'quota_exceeded') return { text: 'Hết quota / rate limit', className: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' };
+    if (status === 'invalid_key') return { text: 'API Key không hợp lệ', className: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300' };
+    if (status === 'disabled') return { text: 'Chưa cấu hình API Key', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' };
+    if (status === 'network_error') return { text: 'Lỗi kết nối provider', className: 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300' };
+    return { text: 'Chưa xác định', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' };
+  }, [providerStatus?.status]);
+
+  async function fetchProviderStatus() {
+    setProviderLoading(true);
+    try {
+      const response = await axiosClient.get<ProviderStatusResponse>('/api/v1/ai/provider-status');
+      setProviderStatus(response.data ?? null);
+    } catch (error: any) {
+      setProviderStatus({
+        success: false,
+        status: 'network_error',
+        message: error?.message || 'Không thể kiểm tra trạng thái runtime của Gemini.',
+      });
+    } finally {
+      setProviderLoading(false);
+    }
+  }
 
   async function fetchSettings() {
     setIsLoading(true);
@@ -85,11 +118,11 @@ export const Settings = () => {
       const response = await axiosClient.get<SettingsApiResponse>('/api/v1/settings');
       const payload = response.data;
       setApiKeyMasked(payload?.gemini_api_key_masked ?? null);
-      setSelectedModel(payload?.selected_ai_model ?? 'gemini-2.5-flash');
+      setSelectedModel(payload?.selected_ai_model ?? 'gemini-2.0-flash');
       setAvailableModels(
         Array.isArray(payload?.available_models) && payload.available_models.length > 0
           ? payload.available_models
-          : ['gemini-2.5-flash']
+          : ['gemini-2.0-flash']
       );
       setAiUsageLogs(Array.isArray(payload?.ai_usage_logs) ? payload.ai_usage_logs : []);
     } catch (error: any) {
@@ -121,11 +154,12 @@ export const Settings = () => {
       setAvailableModels(
         Array.isArray(response.data?.available_models) && response.data.available_models.length > 0
           ? response.data.available_models
-          : ['gemini-2.5-flash']
+          : ['gemini-2.0-flash']
       );
       setAiUsageLogs(Array.isArray(response.data?.ai_usage_logs) ? response.data.ai_usage_logs : []);
       setApiKeyInput('');
       setSuccessMessage('Đã lưu cấu hình AI thành công.');
+      await fetchProviderStatus();
     } catch (error: any) {
       setErrorMessage(error?.message || 'Lưu API Key thất bại.');
     } finally {
@@ -135,6 +169,7 @@ export const Settings = () => {
 
   useEffect(() => {
     void fetchSettings();
+    void fetchProviderStatus();
   }, []);
 
   return (
@@ -271,20 +306,20 @@ export const Settings = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm text-gray-600 dark:text-slate-300">
-                <span>Đã dùng {quotaUsedPercent}%</span>
-                <span>
-                  {totalTokensUsed.toLocaleString('vi-VN')} / {QUOTA_TOKEN_LIMIT.toLocaleString('vi-VN')} token
-                </span>
-              </div>
-              <div className="h-2.5 w-full rounded-full bg-gray-100 dark:bg-slate-800">
-                <div
-                  className="h-2.5 rounded-full bg-emerald-500 transition-all"
-                  style={{ width: `${quotaUsedPercent}%` }}
-                />
-              </div>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm text-gray-600 dark:text-slate-300">Tình trạng key runtime</p>
+              <span className={cn('rounded-full px-3 py-1 text-xs font-semibold', providerStatusLabel.className)}>
+                {providerLoading ? 'Đang kiểm tra...' : providerStatusLabel.text}
+              </span>
             </div>
+
+            {providerStatus?.message ? (
+              <p className="mb-3 text-xs text-gray-500 dark:text-slate-400 line-clamp-3">{providerStatus.message}</p>
+            ) : null}
+
+            <p className="text-xs text-gray-500 dark:text-slate-400">
+              Trạng thái phía trên phản ánh kiểm tra runtime thật của key/model đang sử dụng để gọi AI.
+            </p>
           </div>
 
           <div className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
