@@ -119,13 +119,56 @@ def remove_accents_and_noise(text: str) -> str:
     return stripped.strip()
 
 # --- Merchant name ---
+# Patterns that indicate a mobile phone status bar block (not real receipt content)
+_STATUS_BAR_PATTERNS = [
+    re.compile(r'^\d{1,2}:\d{2}(\s*(AM|PM|SA|CH))?$', re.IGNORECASE),  # "17:28", "9:41 SA"
+    re.compile(r'\d+\s*%\s*$'),                                            # "85%", "100 %"
+    re.compile(r'\b(KB/s|MB/s|4G|5G|LTE|Volte|VoLTE)\b', re.IGNORECASE), # network/signal
+    re.compile(r'Z8111', re.IGNORECASE),                                   # known junk token
+]
+# Generic invoice header words that are NOT the merchant name
+_MERCHANT_JUNK_WORDS = re.compile(
+    r'^(hoa don|hóa đơn|phieu|phiếu|receipt|invoice|cua hang|cửa hàng bán lẻ'
+    r'|phieu thanh toan|phiếu thanh toán)$',
+    re.IGNORECASE,
+)
+
+def _is_status_bar_block(text: str) -> bool:
+    """Return True if the block looks like a mobile phone status bar element."""
+    t = text.strip()
+    return any(p.search(t) for p in _STATUS_BAR_PATTERNS)
+
+def _is_merchant_junk(text: str) -> bool:
+    """Return True if the block is a generic invoice header, not a real store name."""
+    return bool(_MERCHANT_JUNK_WORDS.match(remove_accents_and_noise(text)))
+
 def _extract_merchant_name(blocks: list[OcrBlock]) -> str | None:
-    """Extract merchant name from the very first 1 or 2 lines for thermal receipts."""
+    """Extract merchant name using a Smart Junk Filter.
+
+    Scans the first 7 blocks (sorted top-to-bottom), skips status bar noise
+    and generic invoice headers, then joins the first 1-2 valid blocks.
+    """
     if not blocks:
         return None
-    name = blocks[0].text
-    if len(name) < 15 and len(blocks) > 1:
-        name += " " + blocks[1].text
+
+    # Blocks are already sorted by center_y ascending from _run_ocr
+    candidates: list[str] = []
+    for b in blocks[:7]:
+        if _is_status_bar_block(b.text):
+            continue
+        if _is_merchant_junk(b.text):
+            continue
+        candidates.append(b.text)
+        if len(candidates) >= 2:
+            break
+
+    if not candidates:
+        return blocks[0].text  # absolute fallback
+
+    name = candidates[0]
+    # Append second block only if the first is very short (likely abbreviated)
+    if len(name) < 15 and len(candidates) > 1:
+        name += " " + candidates[1]
     return name
 
 # --- Total amount ---
