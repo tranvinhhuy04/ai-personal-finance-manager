@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 
 from app.services.advisor.orchestrator import get_advisor_orchestrator
 from app.services.advisor.schemas import AdvisorChatRequest
 from app.services.nlp_service import get_nlp_service
+from app.services.ocr_service import process_invoice_image
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -33,12 +37,44 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/ocr")
-async def ocr_invoice() -> dict[str, Any]:
-    """Legacy endpoint kept only to guide old clients to the new Node.js Vision+Gemini flow."""
-    raise HTTPException(
-        status_code=410,
-        detail="Invoice OCR has moved to POST /api/v1/invoices/extract in the Node.js transaction service.",
-    )
+async def ocr_invoice(file: UploadFile = File(...)) -> dict[str, Any]:
+    """Extract invoice data from an uploaded image using PaddleOCR (local, offline).
+
+    Accepts any image format supported by OpenCV (JPEG, PNG, WEBP, BMP …).
+    Returns the standard JSON expected by the frontend:
+
+        {
+            "success": true,
+            "data": {
+                "merchantName": "...",
+                "totalAmount": 58000,
+                "transactionDate": "2026-04-03T00:00:00.000Z"
+            }
+        }
+    """
+    try:
+        image_bytes = await file.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+        extracted = process_invoice_image(image_bytes)
+        logger.info(
+            "OCR result — merchant=%r  amount=%r  date=%r",
+            extracted.get("merchantName"),
+            extracted.get("totalAmount"),
+            extracted.get("transactionDate"),
+        )
+        return {"success": True, "data": extracted}
+
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Unexpected OCR error")
+        raise HTTPException(status_code=500, detail=f"OCR processing failed: {exc}") from exc
 
 
 @router.post("/chat")

@@ -47,7 +47,7 @@ router.post('/savings/:id/deposit', depositSaving);
 router.post('/savings/:id/settle', settleSaving);
 
 router.post('/invoices/extract', uploadInvoiceImage, extractInvoice);
-router.post('/invoices/upload', uploadInvoiceImage, uploadInvoice);
+router.post('/invoices/upload',  uploadInvoiceImage, uploadInvoice);
 router.get('/invoices', listInvoices);
 router.put('/invoices/:id', updateInvoice);
 router.delete('/invoices/:id', deleteInvoice);

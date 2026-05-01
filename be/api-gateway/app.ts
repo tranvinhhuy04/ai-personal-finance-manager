@@ -50,9 +50,11 @@ if (isDevelopment && disableRateLimitInDev) {
         sendCommand: (...args: string[]) => redisClient.sendCommand(args),
       }),
       skip: (req) => isDevelopment && req.originalUrl.includes('/notifications/stream'),
-      message: isDevelopment
-        ? 'Dev rate limit reached. Please slow down a bit.'
-        : 'Too many requests, please try again later.',
+      message: {
+        message: isDevelopment
+          ? 'Dev rate limit reached. Please slow down a bit.'
+          : 'Too many requests, please try again later.',
+      },
     })
   );
 }

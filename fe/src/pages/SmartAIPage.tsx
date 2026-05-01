@@ -99,7 +99,7 @@ export const SmartAIPage = () => {
           ? new Date(`${ocrForm.transactionDate}T00:00:00`).toISOString()
           : null,
         description: ocrForm.merchantName.trim() || 'Hóa đơn chờ xác nhận',
-        extractedBy: 'google-vision-gemini',
+        extractedBy: 'paddle-ocr',
         reviewStatus: 'awaiting_manual_confirmation',
       });
 
@@ -168,7 +168,7 @@ export const SmartAIPage = () => {
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Trợ lý AI thông minh</h1>
-          <p className="text-sm text-gray-500">Google Vision + Gemini cho hóa đơn, kết hợp chatbot tài chính cho người dùng cuối.</p>
+          <p className="text-sm text-gray-500">PaddleOCR (local) cho hóa đơn, kết hợp chatbot tài chính cho người dùng cuối.</p>
         </div>
       </div>
 
@@ -184,7 +184,7 @@ export const SmartAIPage = () => {
             <h2 className="text-lg font-bold text-gray-900">Trích xuất Hóa đơn bằng Vision-Language</h2>
           </div>
           <p className="mb-6 text-sm text-gray-500">
-            Ảnh hóa đơn sẽ được Google Vision đọc chữ, sau đó Gemini bóc tách thành form thân thiện để bạn rà soát.
+            Ảnh hóa đơn sẽ được PaddleOCR (chạy local, offline) đọc chữ và bóc tách thành form thân thiện để bạn rà soát.
           </p>
 
           <div
@@ -235,7 +235,7 @@ export const SmartAIPage = () => {
                   <p className="mt-1 text-xs text-emerald-700">Bạn có thể sửa lại nếu AI nhận diện chưa đúng.</p>
                 </div>
                 <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-[11px] font-semibold text-emerald-700">
-                  Google Vision + Gemini
+                  PaddleOCR
                 </span>
               </div>
 

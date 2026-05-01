@@ -80,13 +80,15 @@ services:
         condition: service_started
       ai-service:
         condition: service_started
+      cloud-service:
+        condition: service_started
     env_file:
       - ./api-gateway/.env
     environment:
       PORT: 3000
       NODE_ENV: development
       RATE_LIMIT_MAX_DEV: 1000
-      DISABLE_RATE_LIMIT_IN_DEV: "false"
+      DISABLE_RATE_LIMIT_IN_DEV: "true"
       REDIS_HOST: redis-cache
       REDIS_PORT: 6379
       REDIS_URL: redis://redis-cache:6379
@@ -98,6 +100,7 @@ services:
       AI_SERVICE_URL: http://ai-service:8000
       AI_PROXY_TIMEOUT_MS: 60000
       INVOICE_PROXY_TIMEOUT_MS: 120000
+      CLOUD_SERVICE_URL: http://cloud-service:3006
     networks:
       - fintech_net
 
@@ -150,17 +153,18 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      ai-service:
+        condition: service_started
     env_file:
       - ./service-transaction/.env
-      - ./ai-service/.env
     environment:
       NODE_ENV: development
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      GEMINI_INVOICE_MODEL: gemini-2.5-flash
-      GOOGLE_APPLICATION_CREDENTIALS: /app/config/gen-lang-client-0231948223-845422dd2868.json
-      GOOGLE_CLOUD_PROJECT: gen-lang-client-0231948223
+      # URL nội bộ Docker để gọi PaddleOCR service
+      AI_SERVICE_OCR_URL: http://ai-service:8000/api/v1/ai/ocr
     volumes:
-      - ./ai-service/config:/app/config:ro
+      # Persist uploaded invoice images across container rebuilds/restarts
+      - invoice_uploads:/app/public/uploads
     networks:
       - fintech_net
 
@@ -204,6 +208,20 @@ services:
     networks:
       - fintech_net
 
+  # Cloud Service — Cloudinary image upload/delete (Port 3006)
+  cloud-service:
+    build: ./cloud-service
+    container_name: cloud-service
+    restart: on-failure
+    ports:
+      - "3006:3006"
+    env_file:
+      - ./cloud-service/.env
+    environment:
+      NODE_ENV: development
+    networks:
+      - fintech_net
+
   # AI Service (Port 8000)
   ai-service:
     build: ./ai-service
@@ -227,6 +245,7 @@ volumes:
   mongodata:
   rabbitmqdata:
   ai_model_cache:
+  invoice_uploads:
 
 networks:
   fintech_net:
