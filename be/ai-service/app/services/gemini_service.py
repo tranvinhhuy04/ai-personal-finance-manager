@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from functools import lru_cache
 from typing import Any
 
@@ -83,45 +82,6 @@ class GeminiService:
                 return generated.strip()
         except Exception:
             return None
-
-    def refine_ocr_fields(self, *, raw_text: str, extracted_data: dict[str, Any]) -> dict[str, Any]:
-        """Dùng Gemini để tinh chỉnh field OCR từ raw text khi bật cờ cấu hình."""
-        if not self.is_enabled() or not raw_text.strip():
-            return extracted_data
-
-        prompt = (
-            'Trích xuất thông tin hóa đơn tiếng Việt từ raw text dưới đây. '
-            'Chỉ trả về JSON hợp lệ với các key: '
-            'merchant_name, total_amount, date, merchantName, totalAmount, transactionDate, description.\n'
-            f'Raw text:\n{raw_text}\n'
-            f'Kết quả heuristic hiện tại: {json.dumps(extracted_data, ensure_ascii=False)}'
-        )
-
-        payload = {
-            'contents': [{'parts': [{'text': prompt}]}],
-            'generationConfig': {
-                'temperature': 0.1,
-                'responseMimeType': 'application/json',
-                'maxOutputTokens': 300,
-            },
-        }
-
-        try:
-            response = httpx.post(self._url(), json=payload, timeout=20.0)
-            response.raise_for_status()
-            data = response.json()
-            text = self._extract_text(data)
-            if not text:
-                return extracted_data
-
-            cleaned = re.sub(r'^```json\s*|\s*```$', '', text.strip(), flags=re.MULTILINE)
-            refined = json.loads(cleaned)
-            if not isinstance(refined, dict):
-                return extracted_data
-            return {**extracted_data, **refined}
-        except Exception:
-            return extracted_data
-
 
 @lru_cache(maxsize=1)
 def get_gemini_service() -> GeminiService:

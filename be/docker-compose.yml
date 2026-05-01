@@ -80,6 +80,8 @@ services:
         condition: service_started
       ai-service:
         condition: service_started
+      cloud-service:
+        condition: service_started
     env_file:
       - ./api-gateway/.env
     environment:
@@ -98,6 +100,7 @@ services:
       AI_SERVICE_URL: http://ai-service:8000
       AI_PROXY_TIMEOUT_MS: 60000
       INVOICE_PROXY_TIMEOUT_MS: 120000
+      CLOUD_SERVICE_URL: http://cloud-service:3006
     networks:
       - fintech_net
 
@@ -202,6 +205,20 @@ services:
     environment:
       NODE_ENV: development
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    networks:
+      - fintech_net
+
+  # Cloud Service — Cloudinary image upload/delete (Port 3006)
+  cloud-service:
+    build: ./cloud-service
+    container_name: cloud-service
+    restart: on-failure
+    ports:
+      - "3006:3006"
+    env_file:
+      - ./cloud-service/.env
+    environment:
+      NODE_ENV: development
     networks:
       - fintech_net
 

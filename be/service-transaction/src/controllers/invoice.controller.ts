@@ -66,6 +66,7 @@ export const uploadInvoice = catchAsync(async (req: Request, res: Response) => {
   }
 
   const extractedData = parseJsonObject(req.body?.extracted_data, 'extracted_data') ?? {};
+
   const result = await invoiceService.uploadInvoice(
     {
       user_id: userId,

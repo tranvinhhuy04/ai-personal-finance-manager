@@ -4,7 +4,6 @@ import re
 import threading
 import unicodedata
 from datetime import datetime, timezone
-from functools import lru_cache
 from typing import Any
 
 import numpy as np
@@ -282,10 +281,3 @@ def process_invoice_image(image_bytes: bytes) -> dict[str, Any]:
             "transactionDate": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT00:00:00.000Z")
         }
 
-@lru_cache(maxsize=1)
-def get_ocr_service():
-    """Shim for DI."""
-    class _Shim:
-        def process_document(self, image_bytes: bytes) -> dict[str, Any]:
-            return process_invoice_image(image_bytes)
-    return _Shim()

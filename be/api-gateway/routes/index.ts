@@ -15,6 +15,7 @@ const TRANSACTION_SERVICE_URL  = process.env.TRANSACTION_SERVICE_URL  ?? 'http:/
 const ANALYTICS_SERVICE_URL    = process.env.ANALYTICS_SERVICE_URL    ?? 'http://analytics-service:3004';
 const NOTIFY_SERVICE_URL       = process.env.NOTIFICATION_SERVICE_URL ?? 'http://notification-service:3005';
 const AI_SERVICE_URL           = process.env.AI_SERVICE_URL           ?? 'http://ai-service:8000';
+const CLOUD_SERVICE_URL        = process.env.CLOUD_SERVICE_URL        ?? 'http://cloud-service:3006';
 const AI_PROXY_TIMEOUT_MS      = Number(process.env.AI_PROXY_TIMEOUT_MS ?? 60_000);
 const INVOICE_PROXY_TIMEOUT_MS = Number(process.env.INVOICE_PROXY_TIMEOUT_MS ?? 60_000);
 const NOTIFICATION_STREAM_TIMEOUT_MS = Number(process.env.NOTIFICATION_STREAM_TIMEOUT_MS ?? 600_000);
@@ -251,6 +252,25 @@ router.use(
     pathRewrite: rewriteAiPath,
     proxyTimeout: AI_PROXY_TIMEOUT_MS,
     timeout: AI_PROXY_TIMEOUT_MS,
+    onProxyReq,
+    onProxyRes,
+    onError: onProxyError as any,
+  })
+);
+
+// /api/v1/cloud/* -> cloud-service (JWT required): upload/delete images on Cloudinary
+router.use(
+  '/cloud',
+  verifyToken,
+  createProxyMiddleware({
+    target: CLOUD_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: (_path, req) => {
+      const originalUrl = (req as any).originalUrl as string | undefined;
+      return originalUrl ?? _path;
+    },
+    proxyTimeout: PROXY_TIMEOUT_MS,
+    timeout: PROXY_TIMEOUT_MS,
     onProxyReq,
     onProxyRes,
     onError: onProxyError as any,
