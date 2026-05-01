@@ -86,7 +86,7 @@ services:
       PORT: 3000
       NODE_ENV: development
       RATE_LIMIT_MAX_DEV: 1000
-      DISABLE_RATE_LIMIT_IN_DEV: "false"
+      DISABLE_RATE_LIMIT_IN_DEV: "true"
       REDIS_HOST: redis-cache
       REDIS_PORT: 6379
       REDIS_URL: redis://redis-cache:6379
@@ -150,17 +150,18 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      ai-service:
+        condition: service_started
     env_file:
       - ./service-transaction/.env
-      - ./ai-service/.env
     environment:
       NODE_ENV: development
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      GEMINI_INVOICE_MODEL: gemini-2.5-flash
-      GOOGLE_APPLICATION_CREDENTIALS: /app/config/gen-lang-client-0231948223-845422dd2868.json
-      GOOGLE_CLOUD_PROJECT: gen-lang-client-0231948223
+      # URL nội bộ Docker để gọi PaddleOCR service
+      AI_SERVICE_OCR_URL: http://ai-service:8000/api/v1/ai/ocr
     volumes:
-      - ./ai-service/config:/app/config:ro
+      # Persist uploaded invoice images across container rebuilds/restarts
+      - invoice_uploads:/app/public/uploads
     networks:
       - fintech_net
 
@@ -227,6 +228,7 @@ volumes:
   mongodata:
   rabbitmqdata:
   ai_model_cache:
+  invoice_uploads:
 
 networks:
   fintech_net:

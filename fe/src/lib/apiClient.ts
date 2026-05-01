@@ -572,10 +572,13 @@ class ApiClient {
     const formData = new FormData();
     formData.append('file', file);
 
+    // Calls Node.js service-transaction which saves the file then internally
+    // forwards to Python ai-service (PaddleOCR) for extraction.
     const response = await axiosClient.post('/api/v1/invoices/extract', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 120_000, // PaddleOCR cold-start can take ~30s on first call
     });
 
     return this.normalizeAIOcrResponse(response.data ?? {});

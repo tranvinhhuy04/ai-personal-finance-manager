@@ -216,8 +216,9 @@ export const Invoices = () => {
 
       setImagePreviews((prev) => {
         const next = { ...prev };
-        successfulEntries.forEach(([invoiceId, objectUrl]) => {
-          next[invoiceId] = objectUrl;
+        // Save both successful URLs and empty strings (failures) to prevent re-fetching
+        entries.forEach(([invoiceId, objectUrl]) => {
+          next[invoiceId] = objectUrl || '';
         });
         return next;
       });
@@ -271,7 +272,7 @@ export const Invoices = () => {
 
   const handleUpload = useCallback(async (file: File) => {
     setUploading(true);
-    setUploadPhase('Google Vision + Gemini đang phân tích hóa đơn...');
+    setUploadPhase('PaddleOCR đang phân tích hóa đơn...');
 
     try {
       let extractedData: Record<string, unknown> = {
@@ -288,7 +289,7 @@ export const Invoices = () => {
           ...ocrResult.data,
           description:
             String(ocrResult.data.merchantName ?? '').trim() || 'Xác nhận giao dịch từ hóa đơn',
-          extractedBy: 'google-vision-gemini',
+          extractedBy: 'paddle-ocr',
         };
         usedAiExtraction = Boolean(
           ocrResult.data.merchantName || ocrResult.data.totalAmount || ocrResult.data.transactionDate
@@ -724,11 +725,11 @@ export const Invoices = () => {
                     <div>
                       <p className="font-semibold text-emerald-900">Kết quả AI nhận diện</p>
                       <p className="mt-1 text-xs text-emerald-700">
-                        Dữ liệu đã được điền sẵn theo luồng Google Vision + Gemini và bạn có thể chỉnh sửa trước khi lưu.
+                        Dữ liệu đã được điền sẵn theo PaddleOCR (local) và bạn có thể chỉnh sửa trước khi lưu.
                       </p>
                     </div>
                     <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-[11px] font-semibold text-emerald-700">
-                      Vision + Gemini
+                      PaddleOCR
                     </span>
                   </div>
                 </div>
