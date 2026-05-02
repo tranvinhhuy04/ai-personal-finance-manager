@@ -10,49 +10,56 @@
 
 ---
 
-## 📊 Mock Financial Data (Base Data for All Test Cases)
+## 📊 Live Financial Data Baseline (Must Use Real DB)
+
+### Important Rule
+- TC-01 to TC-06 must validate against live DB values of user `hihihi@gmail.com`, not fixed mock numbers.
+- Run the DB snapshot query before each test run and use that result as the source of truth.
 
 ### Account Profile
 - **User Email:** hihihi@gmail.com
 - **Account Type:** Premium Personal
 - **Currency:** VND (Vietnamese Dong)
 
-### Wallet & Savings Summary (as of 2026-05-01)
-| Metric | Amount (VND) | Notes |
-|--------|--------------|-------|
-| **Active Wallet Balance** | 15,500,000 | Main spending account |
-| **Savings Account** | 50,000,000 | Emergency fund + medium-term savings |
-| **Investment Portfolio** | 12,000,000 | Diversified stocks & bonds |
+### Mandatory DB Snapshot Query
+Run from `be/seeds` with Node + mongodb package:
 
-### April 2026 Expense Breakdown (Full Month)
-| Category | Amount (VND) | Transactions Count |
-|----------|--------------|-------------------|
-| **Food & Dining** | 3,200,000 | 28 |
-| **Housing & Rent** | 5,000,000 | 1 |
-| **Utilities (Electricity, Water)** | 500,000 | 2 |
-| **Transportation (Fuel, Bus)** | 1,200,000 | 12 |
-| **Shopping & Retail** | 2,000,000 | 8 |
-| **Other Miscellaneous** | 800,000 | 5 |
-| **TOTAL APRIL 2026** | **12,700,000** | 56 |
+```powershell
+node -e "/* query identity + wallet + transaction DB, then aggregate month expense, category breakdown, wallet balance, savings and investment totals for user hihihi@gmail.com */"
+```
 
-### May 2026 Expense Breakdown (as of 2026-05-01 to present)
-| Category | Amount (VND) | Transactions Count |
-|----------|--------------|-------------------|
-| **Food & Dining** | 2,800,000 | 15 |
-| **Housing & Rent** | 5,000,000 | 1 |
-| **Utilities** | 400,000 | 1 |
-| **Transportation** | 900,000 | 6 |
-| **Shopping & Retail** | 1,500,000 | 4 |
-| **Other** | 300,000 | 2 |
-| **TOTAL MAY 2026 (YTD)** | **10,900,000** | 29 |
+Minimum fields required in output JSON:
+- `userId`
+- `walletBalance`
+- `savingsBalance`
+- `investmentValue`
+- `thisMonthExpense`
+- `prevMonthExpense`
+- `thisMonthByCategory[]`
+- `prevMonthByCategory[]`
 
-### Investment Portfolio (as of 2026-05-01)
-| Asset | Quantity | Purchase Price | Current Price | Current Value (VND) | Gain/Loss |
-|-------|----------|---------------|----|---------|----------|
-| **FPT (FPT Stock)** | 100 shares | 65,000/share | 72,500/share | 7,250,000 | +750,000 |
-| **VCB (Vietcombank)** | 50 shares | 95,000/share | 102,000/share | 5,100,000 | +350,000 |
-| **Bond Fund** | 500 units | 10,000/unit | 10,200/unit | 5,100,000 | +100,000 |
-| **TOTAL INVESTMENT** | - | - | - | **12,000,000** | **+1,200,000 (ROI: +11.1%)** |
+### Latest Verified Snapshot (queried on 2026-05-02T03:34:00Z)
+| Metric | Amount (VND) |
+|--------|---------------|
+| **userId** | `69f0880dec2d16af414e2f09` |
+| **Wallet Balance** | 40,591,265 |
+| **Savings Balance (type=SAVING)** | 260,000,000 |
+| **Investment Value (type=INVESTMENT)** | 78,000,000 |
+| **May Expense MTD** | 6,284,800 |
+| **April Expense Full Month** | 29,953,147 |
+
+April top categories from DB:
+- Mua sắm: 7,715,447 (5 tx)
+- Đầu tư: 7,524,121 (1 tx)
+- Hóa đơn: 5,563,981 (4 tx)
+- Nhà ở: 4,500,000 (1 tx)
+- Ăn uống: 3,751,636 (36 tx)
+
+May MTD top categories from DB:
+- Nhà ở: 4,500,000 (1 tx)
+- Hóa đơn: 1,428,000 (1 tx)
+- Giải trí: 298,000 (2 tx)
+- Ăn uống: 58,800 (1 tx)
 
 ### Reference External Data (Market Prices as of 2026-05-01 09:00 AM)
 | Asset | Price | Change (24h) |
@@ -74,15 +81,11 @@
   - *(Translation: "What is my total spending this month?")*
 - **Data Snapshot:** As of 2026-05-01, accumulated expenses from 2026-05-01 to present
 - **Calculation Steps:**
-  - Food & Dining: 2,800,000 VND
-  - Housing & Rent: 5,000,000 VND
-  - Utilities: 400,000 VND
-  - Transportation: 900,000 VND
-  - Shopping & Retail: 1,500,000 VND
-  - Other: 300,000 VND
-  - **Total = 2,800,000 + 5,000,000 + 400,000 + 900,000 + 1,500,000 + 300,000 = 10,900,000 VND**
+  - Lấy `thisMonthByCategory[]` từ DB snapshot mới nhất
+  - Tính `thisMonthExpense = SUM(category.amount)`
+  - Xác định category lớn nhất theo amount
 - **Expected Output:**
-  > "Tổng chi tiêu của bạn trong tháng 5 (tính từ 1/5 đến nay) là **10.9 triệu đồng**. Khoản chi tiêu lớn nhất là tiền nhà (5 triệu). Bạn đang có xu hướng chi tiêu ở mức trung bình. Nếu duy trì mức này đến cuối tháng, bạn sẽ chi khoảng 21-22 triệu. Hãy cân nhắc kiểm soát chi tiêu ăn uống để tiết kiệm hơn nhé."
+  > Trả đúng tổng chi tiêu tháng hiện tại theo DB snapshot (không hardcode), nêu đúng danh mục chi lớn nhất và có nhận xét ngắn gọn phù hợp.
 
 ---
 
@@ -92,16 +95,14 @@
 - **User Question (Input):** "Chi tiêu tháng 5 so với tháng 4 như thế nào?"
   - *(Translation: "How is my May spending compared to April?")*
 - **Data Snapshot:** 
-  - April 2026 Total: 12,700,000 VND
-  - May 2026 YTD: 10,900,000 VND (as of 2026-05-01)
+  - April Total: lấy từ `prevMonthExpense` trong DB snapshot
+  - May MTD: lấy từ `thisMonthExpense` trong DB snapshot
 - **Calculation Steps:**
-  - April Total Spending: 12,700,000 VND
-  - May Current Spending: 10,900,000 VND
-  - Difference: 12,700,000 - 10,900,000 = 1,800,000 VND
-  - Percentage Change: (1,800,000 / 12,700,000) × 100 = **14.17% reduction**
-  - Projected May (if trend continues): 10,900,000 × (30/1) = ~327,000,000 VND (prorated to 30 days, actual projection would be ~21.8M)
+  - Difference = `prevMonthExpense - thisMonthExpense`
+  - Percentage Change = `Difference / prevMonthExpense * 100`
+  - Projection chỉ được nêu khi có logic rõ ràng theo số ngày đã trôi qua trong tháng
 - **Expected Output:**
-  > "Bạn đã chi tiêu **10.9 triệu** trong tháng 5 (tính đến 1/5), so với **12.7 triệu** toàn bộ tháng 4. Điều này cho thấy bạn đang tiết kiệm tốt hơn - **giảm khoảng 1.8 triệu (14%)** so với tháng trước. Nếu giữ lại mức chi tiêu này, bạn dự kiến sẽ chi ~21.8 triệu trong toàn tháng 5, tiết kiệm được ~0.9 triệu so với tháng 4. Hãy tiếp tục duy trì thói quen này!"
+  > Trả đúng số so sánh tháng hiện tại với tháng trước theo DB snapshot, nêu rõ tăng/giảm bao nhiêu tiền và bao nhiêu phần trăm.
 
 ---
 
@@ -112,9 +113,9 @@
   - *(Translation: "What is my current wallet balance?")*
 - **Data Snapshot:** As of 2026-05-01T00:00:00Z
 - **Calculation Steps:**
-  - Direct lookup from wallet account: 15,500,000 VND
+  - Direct lookup `walletBalance` từ wallet DB theo đúng `userId`
 - **Expected Output:**
-  > "Số dư ví hiện tại của bạn là **15.5 triệu đồng**. Bạn còn đủ cơ động tài chính cho chi tiêu ngắn hạn. Tuy nhiên, nếu tiếp tục chi 10.9 triệu mỗi tháng, bạn nên tích lũy thêm để duy trì quỹ khẩn cấp. Bạn có 50 triệu trong tài khoản tiết kiệm, đó là một bộ đệm tốt."
+  > Trả đúng số dư ví theo DB snapshot, đơn vị tiền tệ đúng, không dùng số cứng từ tài liệu cũ.
 
 ---
 
@@ -124,17 +125,15 @@
 - **User Question (Input):** "Tỷ lệ tiết kiệm của tôi hiện tại bao nhiêu? Tôi đang tiết kiệm tốt không?"
   - *(Translation: "What is my current savings rate? Am I saving well?")*
 - **Data Snapshot:** 
-  - Total Savings: 50,000,000 VND
-  - Monthly Spending (April): 12,700,000 VND
-  - Investment Portfolio Value: 12,000,000 VND
-  - Total Liquid Assets: 15,500,000 VND (wallet)
+  - `savingsBalance` từ DB snapshot
+  - `walletBalance` từ DB snapshot
+  - `investmentValue` từ DB snapshot
+  - `prevMonthExpense` từ DB snapshot
 - **Calculation Steps:**
-  - Assuming monthly net income = monthly spending + savings target
-  - If spending is 12.7M/month (April average), and user has 50M savings
-  - Months of expenses covered by savings: 50,000,000 / 12,700,000 ≈ 3.94 months ≈ **~4 months emergency fund**
-  - Savings Rate = (Savings / Total Assets) × 100 = (50,000,000 / 77,500,000) × 100 = **64.5%**
+  - Emergency-months = `savingsBalance / prevMonthExpense`
+  - Asset-based savings rate = `savingsBalance / (walletBalance + savingsBalance + investmentValue) * 100`
 - **Expected Output:**
-  > "Tỷ lệ tiết kiệm của bạn rất tốt! **64.5%** tổng tài sản được lưu trong tiết kiệm, điều này cho thấy bạn có kỷ luật tài chính tuyệt vời. Bạn hiện có quỹ khẩn cấp khoảng **4 tháng** (50M ÷ 12.7M/tháng), vượt xa mục tiêu 3 tháng. Ngoài ra, bạn còn có 12 triệu trong danh mục đầu tư, mang lại thêm 1.2 triệu lợi nhuận. Tiếp tục duy trì thói quen này để đạt mục tiêu tài chính dài hạn!"
+  > Trả đúng tỷ lệ tiết kiệm và số tháng quỹ khẩn cấp theo DB snapshot tại thời điểm test, có làm tròn hợp lý và giải thích ngắn gọn.
 
 ---
 
@@ -145,15 +144,11 @@
   - *(Translation: "What is my expense breakdown by category in April? Which category costs the most?")*
 - **Data Snapshot:** April 2026 full month data
 - **Calculation Steps:**
-  - Housing & Rent: 5,000,000 VND = (5,000,000 / 12,700,000) × 100 = **39.4%**
-  - Food & Dining: 3,200,000 VND = (3,200,000 / 12,700,000) × 100 = **25.2%**
-  - Shopping & Retail: 2,000,000 VND = (2,000,000 / 12,700,000) × 100 = **15.7%**
-  - Transportation: 1,200,000 VND = (1,200,000 / 12,700,000) × 100 = **9.4%**
-  - Other: 800,000 VND = (800,000 / 12,700,000) × 100 = **6.3%**
-  - Utilities: 500,000 VND = (500,000 / 12,700,000) × 100 = **3.9%**
-  - **Total: 12,700,000 VND = 100%**
+  - Lấy `prevMonthByCategory[]` từ DB snapshot
+  - Tính tỷ trọng mỗi danh mục theo `category.amount / prevMonthExpense * 100`
+  - Sắp xếp giảm dần theo số tiền
 - **Expected Output:**
-  > "Trong tháng 4, chi tiêu của bạn được phân bổ như sau:\n\n1. **Nhà ở & Tiền nhà: 5 triệu (39.4%)** - Khoản chi lớn nhất\n2. **Ăn uống & Nhà hàng: 3.2 triệu (25.2%)**\n3. **Mua sắm & Bán lẻ: 2 triệu (15.7%)**\n4. **Giao thông & Xăng xe: 1.2 triệu (9.4%)**\n5. **Chi phí khác: 0.8 triệu (6.3%)**\n6. **Điện, nước, gas: 0.5 triệu (3.9%)**\n\nNhận xét: Chi tiêu tiền nhà chiếm tỷ lệ cao nhất (39.4%), điều này bình thường. Tuy nhiên, bạn có thể xem xét giảm chi tiêu ăn uống (25.2%) bằng cách nấu ăn tại nhà nhiều hơn để tiết kiệm thêm 500K-1M/tháng."
+  > Trả đúng breakdown danh mục tháng trước theo DB snapshot và xác định đúng danh mục tốn nhiều nhất.
 
 ---
 
@@ -164,15 +159,11 @@
   - *(Translation: "How much profit is my investment portfolio making? What is my ROI percentage?")*
 - **Data Snapshot:** Investment Portfolio as of 2026-05-01
 - **Calculation Steps:**
-  - FPT: 100 shares × (72,500 - 65,000) = **750,000 VND gain**
-  - VCB: 50 shares × (102,000 - 95,000) = **350,000 VND gain**
-  - Bond Fund: 500 units × (10,200 - 10,000) = **100,000 VND gain**
-  - Total Initial Investment Cost: (100 × 65,000) + (50 × 95,000) + (500 × 10,000) = 6,500,000 + 4,750,000 + 5,000,000 = **16,250,000 VND**
-  - Total Unrealized Gain: 750,000 + 350,000 + 100,000 = **1,200,000 VND**
-  - ROI = (1,200,000 / 16,250,000) × 100 = **7.38%**
-  - Note: Current portfolio value is 12,000,000, but cost basis is 16,250,000. This indicates a portfolio correction from initial state.
+  - `current = investmentValue` từ DB snapshot
+  - `invested` lấy từ nguồn DB đáng tin cậy (ưu tiên collection `investments`, fallback `savings.target_amount` với type `INVESTMENT`)
+  - ROI = `(current - invested) / invested * 100`
 - **Expected Output:**
-  > "Danh mục đầu tư của bạn đang sinh lợi tốt! Bạn đã đạt lợi nhuận chưa thực hiện (unrealized gain) là **1.2 triệu đồng**, tương đương **ROI 7.38%** so với giá vốn. Thành phần danh mục:\n\n- **FPT:** +750K (lãi suất +11.5%)\n- **VCB:** +350K (lãi suất +3.7%)\n- **Bond Fund:** +100K (lãi suất +2.0%)\n\nĐiểm mạnh: Danh mục của bạn đa dạng và cân bằng tốt giữa cổ phiếu (70%) và trái phiếu (30%). Khuyến cáo: Tiếp tục giữ vị thế dài hạn, đặc biệt là VCB và FPT vì chúng có tiềm năng tăng trưởng tốt trong thị trường hiện tại."
+  > Trả đúng lãi/lỗ và ROI theo dữ liệu đầu tư thực tế trong DB tại thời điểm test; nếu thiếu giá vốn thì phải nói rõ thiếu dữ liệu thay vì bịa số.
 
 ---
 
@@ -230,7 +221,7 @@
 - **Data Snapshot:** Not applicable (Out-of-domain query)
 - **Calculation Steps:** N/A
 - **Expected Output (Desired System Behavior - Out-of-Scope):**
-  > "[Out-of-domain detection] Xin lỗi, tôi là chatbot tài chính và không chuyên về nấu ăn. Để có công thức phở bò, bạn có thể:\n\n- Truy cập các trang web nấu ăn như Diadiem.com, Cooktips.vn\n- Xem các video hướng dẫn trên YouTube (từ khóa: 'Cách nấu phở bò ngon')\n- Hỏi các chatbot đa năng như ChatGPT, Gemini, Claude\n\n**💡 Gợi ý tài chính:** Tuy nhiên, nếu bạn muốn biết chi phí nấu phở bò tại nhà so với ăn ngoài, hoặc cách tiết kiệm chi tiêu ăn uống hàng tháng, tôi rất sẵn lòng giúp! Hiện tại, chi tiêu ăn uống của bạn là ~2.8-3.2 triệu/tháng, chúng ta có thể tìm cách giảm 10-20% bằng cách nấu tại nhà."
+  > "[Out-of-domain detection] Xin lỗi, tôi là chatbot tài chính và không chuyên về nấu ăn. Để có công thức phở bò, bạn có thể:\n\n- Truy cập các trang web nấu ăn như Diadiem.com, Cooktips.vn\n- Xem các video hướng dẫn trên YouTube (từ khóa: 'Cách nấu phở bò ngon')\n- Hỏi các chatbot đa năng như ChatGPT, Gemini, Claude\n\n**💡 Gợi ý tài chính:** Nếu bạn muốn, tôi có thể giúp so sánh chi phí nấu ăn tại nhà với ăn ngoài dựa trên dữ liệu chi tiêu thực tế mới nhất trong tài khoản của bạn."
 
 ---
 
@@ -238,16 +229,16 @@
 
 ### How to Execute These Test Cases
 1. **Login** with test account (hihihi@gmail.com / 12345678)
-2. **Prepare environment:** Ensure mock data is loaded into the AI backend
-3. **Run TC-01 through TC-06:** Validate numerical accuracy against Expected Output
+2. **Prepare environment:** Query live DB snapshot for the same user and store JSON evidence with timestamp
+3. **Run TC-01 through TC-06:** Validate numbers against the snapshot JSON (not against old fixed values)
 4. **Run TC-07 & TC-08:** Validate external data source integration
 5. **Run TC-09 & TC-10:** Validate graceful out-of-domain handling and context switching
-6. **Document results:** Record actual output vs. expected output, time taken, and any discrepancies
+6. **Document results:** Record actual output vs. DB snapshot, time taken, and any discrepancies
 
 ### Acceptance Criteria
-- ✅ **Pass:** If actual output matches expected output with correct numbers and appropriate context
-- ⚠️ **Conditional Pass:** If numbers are correct but explanation differs slightly (±5% tolerance for context quality)
-- ❌ **Fail:** If any numerical value is incorrect, or out-of-domain query is not handled gracefully
+- ✅ **Pass:** If all numerical values in TC-01..TC-06 match live DB snapshot (tolerance rounding <= 0.5%) and context is appropriate
+- ⚠️ **Conditional Pass:** Number is correct but wording/recommendation quality differs slightly
+- ❌ **Fail:** Any fabricated number, stale number from old mock data, or out-of-domain query not handled gracefully
 
 ### Known Limitations & Edge Cases
 1. External market data (TC-07, TC-08) may lag by 15-30 minutes depending on API refresh rate
@@ -268,7 +259,7 @@
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2026-05-01  
+**Document Version:** 1.1  
+**Last Updated:** 2026-05-02  
 **QA Engineer:** Senior QA / AI Evaluator  
-**Status:** Ready for Execution
+**Status:** Ready for Execution (Live DB Verified)

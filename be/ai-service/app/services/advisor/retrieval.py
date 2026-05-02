@@ -61,11 +61,18 @@ class RetrievalLayer:
         investments_col = self._collection("investments")
 
         start_date, end_date = self._resolve_time_range(entities.time_range)
-        match: dict[str, Any] = {"userId": user_id}
+        match_and: list[dict[str, Any]] = [{"$or": [{"userId": user_id}, {"user_id": user_id}]}]
         if start_date and end_date:
-            match["transactionDate"] = {"$gte": start_date, "$lte": end_date}
-        if entities.category:
-            match["category"] = entities.category
+            match_and.append(
+                {
+                    "$or": [
+                        {"transactionDate": {"$gte": start_date, "$lte": end_date}},
+                        {"transaction_date": {"$gte": start_date, "$lte": end_date}},
+                        {"occurred_at": {"$gte": start_date, "$lte": end_date}},
+                    ]
+                }
+            )
+        match: dict[str, Any] = {"$and": match_and}
 
         result: dict[str, Any] = {
             "transactions": [],
@@ -78,15 +85,47 @@ class RetrievalLayer:
             pipeline = [
                 {"$match": match},
                 {
+                    "$addFields": {
+                        "normalized_type": {"$ifNull": ["$type", "$transaction_type"]},
+                        "normalized_date": {"$ifNull": ["$transactionDate", {"$ifNull": ["$transaction_date", "$occurred_at"]}]},
+                        "categoryObjId": {
+                            "$convert": {
+                                "input": "$category_id",
+                                "to": "objectId",
+                                "onError": None,
+                                "onNull": None,
+                            }
+                        },
+                    }
+                },
+                {
+                    "$lookup": {
+                        "from": "categories",
+                        "localField": "categoryObjId",
+                        "foreignField": "_id",
+                        "as": "categoryDoc",
+                    }
+                },
+                {
+                    "$addFields": {
+                        "normalized_category": {
+                            "$ifNull": ["$category", {"$ifNull": ["$categoryName", {"$first": "$categoryDoc.name"}]}]
+                        }
+                    }
+                },
+                *([
+                    {"$match": {"normalized_category": entities.category}}
+                ] if entities.category else []),
+                {
                     "$group": {
-                        "_id": "$type",
-                        "total": {"$sum": "$amount"},
+                        "_id": "$normalized_type",
+                        "total": {"$sum": {"$toDouble": "$amount"}},
                         "items": {
                             "$push": {
                                 "amount": "$amount",
-                                "type": "$type",
-                                "category": "$category",
-                                "transactionDate": "$transactionDate",
+                                "type": "$normalized_type",
+                                "category": "$normalized_category",
+                                "transactionDate": "$normalized_date",
                             }
                         },
                     }
@@ -106,19 +145,43 @@ class RetrievalLayer:
 
         if savings_col is not None:
             saving_doc = await savings_col.aggregate([
-                {"$match": {"userId": user_id}},
-                {"$group": {"_id": None, "balance": {"$sum": "$currentAmount"}}},
+                {"$match": {"$or": [{"userId": user_id}, {"user_id": user_id}]}},
+                {"$group": {"_id": None, "balance": {"$sum": {"$toDouble": {"$ifNull": ["$currentAmount", "$current_amount"]}}}}},
             ]).to_list(length=1)
             result["savingsBalance"] = float((saving_doc[0].get("balance") if saving_doc else 0) or 0)
 
+        has_investment_data = False
         if investments_col is not None:
             investment_doc = await investments_col.aggregate([
-                {"$match": {"userId": user_id}},
+                {"$match": {"$or": [{"userId": user_id}, {"user_id": user_id}]}},
                 {
                     "$group": {
                         "_id": None,
-                        "totalCurrentValue": {"$sum": "$currentValue"},
-                        "totalInvested": {"$sum": "$investedAmount"},
+                        "totalCurrentValue": {"$sum": {"$toDouble": {"$ifNull": ["$currentValue", "$current_value"]}}},
+                        "totalInvested": {"$sum": {"$toDouble": {"$ifNull": ["$investedAmount", "$invested_amount"]}}},
+                    }
+                },
+            ]).to_list(length=1)
+            if investment_doc:
+                result["investment"] = {
+                    "totalCurrentValue": float(investment_doc[0].get("totalCurrentValue", 0) or 0),
+                    "totalInvested": float(investment_doc[0].get("totalInvested", 0) or 0),
+                }
+                has_investment_data = True
+
+        if not has_investment_data and savings_col is not None:
+            investment_doc = await savings_col.aggregate([
+                {
+                    "$match": {
+                        "$or": [{"userId": user_id}, {"user_id": user_id}],
+                        "type": "INVESTMENT",
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": None,
+                        "totalCurrentValue": {"$sum": {"$toDouble": {"$ifNull": ["$currentAmount", "$current_amount"]}}},
+                        "totalInvested": {"$sum": {"$toDouble": {"$ifNull": ["$targetAmount", "$target_amount"]}}},
                     }
                 },
             ]).to_list(length=1)
