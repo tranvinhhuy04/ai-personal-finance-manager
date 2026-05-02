@@ -53,7 +53,6 @@ export const Auth = () => {
   }
 
   const setLogin = useAuthStore((state) => state.setLogin);
-  const setMockLogin = useAuthStore((state) => state.setMockLogin);
 
   async function handleRealLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -108,22 +107,6 @@ export const Auth = () => {
       setError('Đăng ký thành công. Vui lòng đăng nhập.');
     } catch (err: any) {
       setError(err?.message || 'Đăng ký thất bại');
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  function handleMockLogin() {
-    setError('');
-    setIsLoading(true);
-    try {
-      persistAuth('mock-token', {
-        id: 'mock-id',
-        email: 'demo@example.com',
-        fullName: 'Demo User',
-      });
-      setMockLogin();
-      navigate('/dashboard');
     } finally {
       setIsLoading(false);
     }
@@ -231,16 +214,7 @@ export const Auth = () => {
                   {!isLoading && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
                 </button>
 
-                {isLogin && (
-                  <button
-                    type="button"
-                    onClick={handleMockLogin}
-                    disabled={isLoading}
-                    className="w-full py-3 px-4 rounded-xl font-semibold text-emerald-300 border border-emerald-500/40 bg-transparent hover:bg-emerald-500/10 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {isLoading ? 'Đang xử lý...' : 'Đăng nhập trải nghiệm (Không cần tài khoản)'}
-                  </button>
-                )}
+
               </form>
 
               <div className="mt-6 text-center">

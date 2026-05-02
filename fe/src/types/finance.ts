@@ -316,6 +316,7 @@ export interface AIOcrResponse {
 
 export interface AIChatRequest {
   question: string;
+  sessionId?: string;
   context?: Record<string, unknown>;
   useLlm?: boolean;
   month?: string;

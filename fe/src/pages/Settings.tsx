@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion } from 'motion/react';
-import { Bell, Bot, Globe, KeyRound, Moon, Shield, Smartphone, SunMedium } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Bell, Bot, ChevronDown, ChevronUp, Globe, KeyRound, Moon, Pencil, Shield, Smartphone, SunMedium } from 'lucide-react';
 import { useTheme } from '@/contexts/theme-context';
 import { cn } from '@/lib/utils';
 import { axiosClient } from '@/utils/axiosClient';
@@ -37,6 +37,7 @@ type AIUsageLog = {
   model: string;
   tokens_used: number;
   estimated_cost: number;
+  api_key?: string;
 };
 
 type SettingsApiResponse = {
@@ -77,6 +78,9 @@ export const Settings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [usagePage, setUsagePage] = useState(0);
+  const USAGE_PAGE_SIZE = 5;
+  const [isEditingAiConfig, setIsEditingAiConfig] = useState(false);
 
   const sortedUsageLogs = useMemo(() => {
     return [...aiUsageLogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -159,6 +163,7 @@ export const Settings = () => {
       setAiUsageLogs(Array.isArray(response.data?.ai_usage_logs) ? response.data.ai_usage_logs : []);
       setApiKeyInput('');
       setSuccessMessage('Đã lưu cấu hình AI thành công.');
+      setIsEditingAiConfig(false);
       await fetchProviderStatus();
     } catch (error: any) {
       setErrorMessage(error?.message || 'Lưu API Key thất bại.');
@@ -236,60 +241,100 @@ export const Settings = () => {
             />
 
             <div className="p-5">
-              <div className="mb-4 flex items-center gap-3">
+              <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                   <KeyRound className="h-5 w-5" />
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-gray-900 dark:text-white">Cấu hình AI</h3>
-                  <p className="text-sm text-gray-500 dark:text-slate-400">Cập nhật Gemini API Key để kích hoạt các tính năng AI cá nhân hóa.</p>
+                  {isEditingAiConfig ? (
+                    <p className="text-sm text-gray-500 dark:text-slate-400">Cập nhật Gemini API Key và model để kích hoạt AI cá nhân hóa.</p>
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-slate-400 truncate">
+                      {apiKeyMasked
+                        ? <>Key: <span className="font-semibold text-gray-700 dark:text-slate-200">{apiKeyMasked}</span> · Model: <span className="font-semibold text-gray-700 dark:text-slate-200">{selectedModel}</span></>
+                        : 'Chưa cấu hình API Key'}
+                    </p>
+                  )}
                 </div>
-              </div>
-
-              <div className="space-y-3">
-                <input
-                  type="password"
-                  value={apiKeyInput}
-                  onChange={(event) => setApiKeyInput(event.target.value)}
-                  placeholder="Nhập Gemini API Key mới"
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-500 dark:focus:ring-emerald-900/40"
-                />
-
-                {apiKeyMasked && (
-                  <p className="text-xs text-gray-500 dark:text-slate-400">
-                    API Key hiện tại: <span className="font-semibold text-gray-700 dark:text-slate-200">{apiKeyMasked}</span>
-                  </p>
-                )}
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-slate-400">
-                    Model Gemini khả dụng
-                  </label>
-                  <select
-                    value={selectedModel}
-                    onChange={(event) => setSelectedModel(event.target.value)}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-500 dark:focus:ring-emerald-900/40"
-                  >
-                    {availableModels.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 <button
                   type="button"
-                  onClick={handleSaveGeminiKey}
-                  disabled={isSaving}
-                  className="inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => { setIsEditingAiConfig((v) => !v); setErrorMessage(null); setSuccessMessage(null); }}
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                 >
-                  {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                  {isEditingAiConfig ? (
+                    <><ChevronUp className="h-4 w-4" /> Ẩn</>
+                  ) : (
+                    <><Pencil className="h-4 w-4" /> Cập nhật</>
+                  )}
                 </button>
-
-                {successMessage && <p className="text-sm text-emerald-600 dark:text-emerald-400">{successMessage}</p>}
-                {errorMessage && <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>}
               </div>
+
+              <AnimatePresence initial={false}>
+                {isEditingAiConfig && (
+                  <motion.div
+                    key="ai-config-form"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-4 space-y-3 border-t border-gray-100 pt-4 dark:border-slate-800">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                          Gemini API Key mới
+                        </label>
+                        <input
+                          type="password"
+                          value={apiKeyInput}
+                          onChange={(event) => setApiKeyInput(event.target.value)}
+                          placeholder="Để trống nếu không thay đổi key"
+                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-500 dark:focus:ring-emerald-900/40"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                          Model Gemini
+                        </label>
+                        <select
+                          value={selectedModel}
+                          onChange={(event) => setSelectedModel(event.target.value)}
+                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-500 dark:focus:ring-emerald-900/40"
+                        >
+                          {availableModels.map((model) => (
+                            <option key={model} value={model}>
+                              {model}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={handleSaveGeminiKey}
+                          disabled={isSaving}
+                          className="inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setIsEditingAiConfig(false); setApiKeyInput(''); setErrorMessage(null); setSuccessMessage(null); }}
+                          className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                        >
+                          Huỷ
+                        </button>
+                      </div>
+
+                      {successMessage && <p className="text-sm text-emerald-600 dark:text-emerald-400">{successMessage}</p>}
+                      {errorMessage && <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>
@@ -317,9 +362,19 @@ export const Settings = () => {
               <p className="mb-3 text-xs text-gray-500 dark:text-slate-400 line-clamp-3">{providerStatus.message}</p>
             ) : null}
 
-            <p className="text-xs text-gray-500 dark:text-slate-400">
-              Trạng thái phía trên phản ánh kiểm tra runtime thật của key/model đang sử dụng để gọi AI.
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-500 dark:text-slate-400">
+                Trạng thái phía trên phản ánh kiểm tra runtime thật của key/model đang sử dụng để gọi AI.
+              </p>
+              <button
+                type="button"
+                onClick={() => void fetchProviderStatus()}
+                disabled={providerLoading}
+                className="ml-3 shrink-0 inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                {providerLoading ? 'Đang kiểm tra...' : 'Thử lại'}
+              </button>
+            </div>
           </div>
 
           <div className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -337,31 +392,62 @@ export const Settings = () => {
             ) : sortedUsageLogs.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-slate-400">Chưa có lượt gọi AI nào cho API Key hiện tại.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500 dark:border-slate-800 dark:text-slate-400">
-                      <th className="px-2 py-2">Thời gian</th>
-                      <th className="px-2 py-2">Loại tác vụ</th>
-                      <th className="px-2 py-2">Số lượng Token</th>
-                      <th className="px-2 py-2">Chi phí ước tính</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedUsageLogs.map((log, index) => (
-                      <tr key={`${log.date}-${index}`} className="border-b border-gray-50 text-gray-700 dark:border-slate-800 dark:text-slate-200">
-                        <td className="px-2 py-2">{new Date(log.date).toLocaleString('vi-VN')}</td>
-                        <td className="px-2 py-2">
-                          <div className="font-medium">{inferTaskType(log.model)}</div>
-                          <div className="text-xs text-gray-500 dark:text-slate-400">{log.model}</div>
-                        </td>
-                        <td className="px-2 py-2">{Number(log.tokens_used).toLocaleString('vi-VN')}</td>
-                        <td className="px-2 py-2">${Number(log.estimated_cost).toFixed(4)}</td>
+              <>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500 dark:border-slate-800 dark:text-slate-400">
+                        <th className="px-2 py-2">Thời gian</th>
+                        <th className="px-2 py-2">API KEY</th>
+                        <th className="px-2 py-2">Loại tác vụ</th>
+                        <th className="px-2 py-2">Số lượng Token</th>
+                        <th className="px-2 py-2">Chi phí ước tính</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {sortedUsageLogs.slice(usagePage * USAGE_PAGE_SIZE, (usagePage + 1) * USAGE_PAGE_SIZE).map((log, index) => (
+                        <tr key={`${log.date}-${index}`} className="border-b border-gray-50 text-gray-700 dark:border-slate-800 dark:text-slate-200">
+                          <td className="px-2 py-2">{new Date(log.date).toLocaleString('vi-VN')}</td>
+                          <td className="px-2 py-2 font-mono text-xs text-gray-500 dark:text-slate-400">
+                            {log.api_key ?? apiKeyMasked ?? '—'}
+                          </td>
+                          <td className="px-2 py-2">
+                            <div className="font-medium">{inferTaskType(log.model)}</div>
+                            <div className="text-xs text-gray-500 dark:text-slate-400">{log.model}</div>
+                          </td>
+                          <td className="px-2 py-2">{Number(log.tokens_used).toLocaleString('vi-VN')}</td>
+                          <td className="px-2 py-2">${Number(log.estimated_cost).toFixed(4)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {sortedUsageLogs.length > USAGE_PAGE_SIZE && (
+                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500 dark:text-slate-400">
+                    <span>
+                      {usagePage * USAGE_PAGE_SIZE + 1}–{Math.min((usagePage + 1) * USAGE_PAGE_SIZE, sortedUsageLogs.length)} / {sortedUsageLogs.length} bản ghi
+                    </span>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        disabled={usagePage === 0}
+                        onClick={() => setUsagePage((p) => p - 1)}
+                        className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+                      >
+                        ‹ Trước
+                      </button>
+                      <button
+                        type="button"
+                        disabled={(usagePage + 1) * USAGE_PAGE_SIZE >= sortedUsageLogs.length}
+                        onClick={() => setUsagePage((p) => p + 1)}
+                        className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+                      >
+                        Sau ›
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

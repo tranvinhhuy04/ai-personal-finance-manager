@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, FileText, Loader2, Search, Sparkles, Wallet2 } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
+import { getOrCreateChatSessionId } from '@/lib/chatSession';
 import { formatVND } from '@/lib/utils';
 import { CurrencyInput } from '@/components/common/CurrencyInput';
 import type {
@@ -44,9 +45,17 @@ function normalizeType(type: string | undefined): 'expense' | 'income' {
 
 function stripMarkdownCodeFence(input: string): string {
   const trimmed = input.trim();
-  const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  if (fencedMatch?.[1]) {
-    return fencedMatch[1].trim();
+  const lines = trimmed.split('\n');
+  // Find first opening fence line (``` or ```json)
+  const openIdx = lines.findIndex((l) => /^```(?:json)?\s*$/i.test(l.trim()));
+  if (openIdx !== -1) {
+    // Find the first closing fence after the opener
+    const closeIdx = lines.findIndex((l, i) => i > openIdx && l.trim() === '```');
+    if (closeIdx !== -1) {
+      return lines.slice(openIdx + 1, closeIdx).join('\n').trim();
+    }
+    // No closing fence found — return everything after the opener
+    return lines.slice(openIdx + 1).join('\n').trim();
   }
   return trimmed;
 }
@@ -101,6 +110,7 @@ function guessCategoryId(
 }
 
 export const SmartAIPage = () => {
+  const [chatSessionId] = useState(() => getOrCreateChatSessionId('ai-assistant'));
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<Category[]>([]);
   const [incomeCategories, setIncomeCategories] = useState<Category[]>([]);
@@ -121,11 +131,6 @@ export const SmartAIPage = () => {
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatResult, setChatResult] = useState<AIChatResponse | null>(null);
-
-  const [analysisInput, setAnalysisInput] = useState('');
-  const [analysisLoading, setAnalysisLoading] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<AIChatResponse | null>(null);
 
   const defaultWalletId = useMemo(() => wallets[0]?.id ?? '', [wallets]);
 
@@ -177,37 +182,21 @@ export const SmartAIPage = () => {
     setChatError(null);
 
     try {
-      const result = await apiClient.askAI({ question: resolvedQuestion, useLlm: true });
+      const result = await apiClient.askAI({
+        question: resolvedQuestion,
+        sessionId: chatSessionId,
+        useLlm: true,
+        context: {
+          uiSource: 'ai-assistant-page',
+          chatSurface: 'ai-assistant',
+        },
+      });
       setChatResult(result);
     } catch (error) {
       setChatError(getErrorMessage(error));
       setChatResult(null);
     } finally {
       setChatLoading(false);
-    }
-  };
-
-  const handleAnalyzeText = async () => {
-    const trimmed = analysisInput.trim();
-    if (!trimmed) return;
-
-    setAnalysisLoading(true);
-    setAnalysisError(null);
-
-    try {
-      const result = await apiClient.askAI({
-        question: `Hãy đưa ra lời khuyên tài chính dựa trên nội dung sau: ${trimmed}`,
-        context: {
-          pastedText: trimmed.slice(0, 2000),
-        },
-        useLlm: true,
-      });
-      setAnalysisResult(result);
-    } catch (error) {
-      setAnalysisError(getErrorMessage(error));
-      setAnalysisResult(null);
-    } finally {
-      setAnalysisLoading(false);
     }
   };
 
@@ -561,56 +550,6 @@ export const SmartAIPage = () => {
               <div className="flex h-full items-center justify-center text-center">
                 <p className="text-sm text-gray-500">Kết quả AI sẽ hiển thị ở đây theo cách ngắn gọn, dễ hiểu.</p>
               </div>
-            ) : null}
-          </div>
-        </motion.div>
-
-        <motion.div
-          whileHover={{ y: -4 }}
-          className="lg:col-span-2 flex flex-col gap-6 rounded-3xl border border-gray-100 bg-white p-6 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.03)] sm:flex-row"
-        >
-          <div className="flex-1">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                <FileText className="h-5 w-5" />
-              </div>
-              <h2 className="text-lg font-bold text-gray-900">Phân tích Báo cáo & Hợp đồng</h2>
-            </div>
-            <p className="mb-4 text-sm text-gray-500">Dán nội dung dài để AI sinh nhận định và lời khuyên tài chính sơ bộ.</p>
-            <textarea
-              rows={5}
-              value={analysisInput}
-              onChange={(event) => setAnalysisInput(event.target.value)}
-              placeholder="Nhập hoặc dán nội dung văn bản vào đây..."
-              className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm transition-all focus:border-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-600/20"
-            ></textarea>
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                disabled={analysisLoading || !analysisInput.trim()}
-                onClick={() => void handleAnalyzeText()}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-700 px-6 py-2.5 text-sm font-medium text-white shadow-lg shadow-purple-900/20 transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {analysisLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                Phân tích ngay
-              </button>
-            </div>
-          </div>
-          <div className="flex min-h-[220px] w-full flex-col justify-center rounded-2xl border border-gray-100 bg-gray-50 p-4 text-center sm:w-1/3">
-            {analysisError ? <p className="text-sm text-rose-600">{analysisError}</p> : null}
-            {analysisResult ? (
-              <div className="space-y-3 text-left text-sm text-gray-700">
-                <div className="flex flex-wrap gap-2">
-                  <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-700">Intent: {analysisResult.intent}</span>
-                  <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">LLM: {analysisResult.llmUsed ? 'On' : 'Off'}</span>
-                </div>
-                <p className="whitespace-pre-wrap">{analysisResult.answer}</p>
-              </div>
-            ) : !analysisLoading ? (
-              <>
-                <Sparkles className="mb-3 h-8 w-8 self-center text-gray-300" />
-                <p className="text-sm text-gray-500">Kết quả phân tích sẽ hiển thị tại đây.</p>
-              </>
             ) : null}
           </div>
         </motion.div>

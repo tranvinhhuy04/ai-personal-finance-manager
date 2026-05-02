@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -17,6 +18,8 @@ class RetrievalLayer:
         self.mongo_db = os.getenv("MONGODB_DB", "finance").strip()
         self.vector_index_name = os.getenv("ATLAS_VECTOR_INDEX", "knowledge_embedding_index").strip()
         self.exchangerate_api = os.getenv("EXCHANGE_RATE_API", "https://open.er-api.com/v6/latest/USD").strip()
+        self.gold_price_api = os.getenv("GOLD_PRICE_API", "https://api.gold-api.com/price/XAU/USD").strip()
+        self.domestic_gold_price_url = os.getenv("DOMESTIC_GOLD_PRICE_URL", "https://www.24h.com.vn/gia-vang-hom-nay-c425.html").strip()
 
         self.mongo_client: AsyncIOMotorClient | None = None
         if self.mongo_uri:
@@ -233,12 +236,76 @@ class RetrievalLayer:
                 response.raise_for_status()
                 return response.json()
 
+        async def fetch_text(url: str) -> str:
+            if not url:
+                return ""
+            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=2.0), follow_redirects=True) as client:
+                response = await client.get(
+                    url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+                    },
+                )
+                response.raise_for_status()
+                return response.text
+
+        def parse_domestic_sjc(html: str, fetched_at: str) -> dict[str, Any]:
+            if not html:
+                return {}
+
+            row_match = re.search(
+                r'<tr[^>]*data-seach="sjc"[^>]*>.*?<span class="fixW">([\d,\.]+)</span>.*?<span class="fixW">([\d,\.]+)</span>',
+                html,
+                re.IGNORECASE | re.DOTALL,
+            )
+            date_match = re.search(r'Hôm nay \((\d{2}/\d{2}/\d{4})\)', html, re.IGNORECASE)
+            if not row_match:
+                return {}
+
+            def parse_thousand_vnd(raw: str) -> float | None:
+                digits = re.sub(r'[^\d]', '', raw)
+                if not digits:
+                    return None
+                return float(digits) * 1000
+
+            buy_price = parse_thousand_vnd(row_match.group(1))
+            sell_price = parse_thousand_vnd(row_match.group(2))
+            return {
+                "provider": "24h_domestic_gold",
+                "brand": "SJC",
+                "buy_vnd_per_luong": buy_price,
+                "sell_vnd_per_luong": sell_price,
+                "page_date": date_match.group(1) if date_match else None,
+                "updated_at": fetched_at,
+            }
+
+        fetched_at = datetime.now(timezone.utc).isoformat()
         try:
-            exchange_data = await fetch_json(self.exchangerate_api)
+            exchange_task = fetch_json(self.exchangerate_api)
+            gold_task = fetch_json(self.gold_price_api)
+            domestic_gold_task = fetch_text(self.domestic_gold_price_url)
+            exchange_data, gold_data, domestic_gold_html = await asyncio.gather(exchange_task, gold_task, domestic_gold_task)
         except Exception:
             exchange_data = {}
+            gold_data = {}
+            domestic_gold_html = ""
         return {
-            "exchange": exchange_data,
+            "exchange": {
+                "provider": "open_er_api",
+                "base_code": exchange_data.get("base_code") or exchange_data.get("base") or "USD",
+                "updated_at": exchange_data.get("time_last_update_utc") or exchange_data.get("time_last_update_unix"),
+                "rates": exchange_data.get("rates") if isinstance(exchange_data.get("rates"), dict) else {},
+            },
+            "gold": {
+                "provider": "gold_api",
+                "symbol": gold_data.get("symbol") or "XAU",
+                "currency": gold_data.get("currency") or "USD",
+                "price_usd_per_ounce": gold_data.get("price"),
+                "updated_at": gold_data.get("updatedAt"),
+                "updated_at_readable": gold_data.get("updatedAtReadable"),
+            },
+            "domestic_gold": parse_domestic_sjc(domestic_gold_html, fetched_at),
         }
 
     async def execute(

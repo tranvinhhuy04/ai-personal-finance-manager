@@ -4,8 +4,11 @@ import hashlib
 import json
 import os
 import re
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from functools import lru_cache
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from app.services.advisor.financial_math import (
     compute_roi,
@@ -190,6 +193,116 @@ class AdvisorOrchestrator:
         return ROUTE_OUT_OF_SCOPE
 
     @staticmethod
+    def _normalize_text(value: str) -> str:
+        return value.strip().lower()
+
+    @staticmethod
+    def _format_vi_number(value: float, digits: int = 0) -> str:
+        formatted = f"{value:,.{digits}f}"
+        return formatted.replace(",", "_").replace(".", ",").replace("_", ".")
+
+    @staticmethod
+    def _format_vnd(value: float) -> str:
+        return f"{AdvisorOrchestrator._format_vi_number(value, 0)} VND"
+
+    @staticmethod
+    def _format_usd(value: float) -> str:
+        return f"{AdvisorOrchestrator._format_vi_number(value, 2)} USD"
+
+    @staticmethod
+    def _format_rate(value: float, digits: int | None = None) -> str:
+        if digits is None:
+            digits = 0 if abs(value - round(value)) < 1e-9 else 2
+        return AdvisorOrchestrator._format_vi_number(value, digits)
+
+    @staticmethod
+    def _format_vi_datetime(value: Any) -> str | None:
+        if value in (None, ""):
+            return None
+
+        dt: datetime | None = None
+        if isinstance(value, (int, float)):
+            dt = datetime.fromtimestamp(float(value), tz=timezone.utc)
+        elif isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return None
+            try:
+                dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            except ValueError:
+                try:
+                    dt = parsedate_to_datetime(raw)
+                except Exception:
+                    return None
+
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        local_dt = dt.astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
+        return local_dt.strftime("lúc %H:%M ngày %d/%m/%Y")
+
+    @classmethod
+    def _extract_exchange_pair(cls, message: str) -> tuple[str, str]:
+        normalized = cls._normalize_text(message)
+        aliases = {
+            "usd": "USD",
+            "đô": "USD",
+            "dollar": "USD",
+            "eur": "EUR",
+            "euro": "EUR",
+            "jpy": "JPY",
+            "yen": "JPY",
+            "cny": "CNY",
+            "nhân dân tệ": "CNY",
+            "gbp": "GBP",
+            "bảng": "GBP",
+            "vnd": "VND",
+        }
+        detected: list[str] = []
+        for alias, code in aliases.items():
+            if alias in normalized and code not in detected:
+                detected.append(code)
+
+        if len(detected) >= 2:
+            return detected[0], detected[1]
+        if len(detected) == 1:
+            code = detected[0]
+            if code == "VND":
+                return "USD", "VND"
+            return code, "VND"
+        return "USD", "VND"
+
+    @classmethod
+    def _resolve_exchange_rate(cls, rates: dict[str, Any], base_code: str, source_code: str, target_code: str) -> float | None:
+        normalized_base = (base_code or "USD").upper()
+        source = source_code.upper()
+        target = target_code.upper()
+        if source == target:
+            return 1.0
+
+        def as_float(code: str) -> float | None:
+            value = rates.get(code)
+            try:
+                return float(value)
+            except Exception:
+                return None
+
+        if normalized_base == source:
+            return as_float(target)
+        if normalized_base == target:
+            base_to_source = as_float(source)
+            if base_to_source and base_to_source != 0:
+                return 1 / base_to_source
+            return None
+
+        base_to_source = as_float(source)
+        base_to_target = as_float(target)
+        if base_to_source and base_to_target and base_to_source != 0:
+            return base_to_target / base_to_source
+        return None
+
+    @staticmethod
     def _empty_tool_result() -> AdvisorToolResult:
         return AdvisorToolResult(
             structured_data={},
@@ -200,19 +313,85 @@ class AdvisorOrchestrator:
     @staticmethod
     def _build_fallback_response(route: str) -> str:
         if route == ROUTE_OUT_OF_SCOPE:
-            return "Minh la tro ly tai chinh Fin, minh chi co the giup ban cac van de ve quan ly tien bac va dau tu thoi nhe."
+            return "Mình là trợ lý tài chính Fin, mình chỉ có thể hỗ trợ các vấn đề về quản lý tiền bạc và đầu tư thôi nhé."
 
         return (
-            "Minh co the trao doi ve cac chu de tai chinh cong khai nhu gia vang, ty gia hoac chung khoan, "
-            "nhung hien tai minh khong co cong cu du lieu realtime de xac nhan muc gia hom nay."
+            "Mình chưa lấy được dữ liệu thị trường mới nhất ngay lúc này. Bạn thử lại sau ít phút nhé."
         )
 
-    @staticmethod
-    def _build_external_financial_response(external_data: dict[str, Any]) -> str:
-        return (
-            "Minh co the trao doi ve cac chu de tai chinh cong khai nhu gia vang, ty gia hoac chung khoan, "
-            "nhung hien tai minh chua truy van duoc Google Search Grounding de xac nhan so lieu moi nhat."
-        )
+    @classmethod
+    def _build_external_financial_response(cls, message: str, external_data: dict[str, Any]) -> str:
+        normalized = cls._normalize_text(message)
+        exchange_data = external_data.get("exchange") if isinstance(external_data, dict) else None
+        gold_data = external_data.get("gold") if isinstance(external_data, dict) else None
+        domestic_gold_data = external_data.get("domestic_gold") if isinstance(external_data, dict) else None
+
+        if "vàng" in normalized or "vang" in normalized or "xau" in normalized:
+            if isinstance(domestic_gold_data, dict) and domestic_gold_data:
+                buy_price = domestic_gold_data.get("buy_vnd_per_luong")
+                sell_price = domestic_gold_data.get("sell_vnd_per_luong")
+                updated_at = cls._format_vi_datetime(domestic_gold_data.get("updated_at"))
+                if isinstance(buy_price, (int, float)) and isinstance(sell_price, (int, float)):
+                    answer = (
+                        f"Giá vàng SJC hiện tại mua vào {cls._format_vnd(float(buy_price))}/lượng, "
+                        f"bán ra {cls._format_vnd(float(sell_price))}/lượng"
+                    )
+                    if updated_at:
+                        answer += f", cập nhật {updated_at}."
+                    else:
+                        answer += "."
+                    return answer
+
+            price_usd = None
+            updated_at = None
+            if isinstance(gold_data, dict):
+                try:
+                    price_usd = float(gold_data.get("price_usd_per_ounce"))
+                except Exception:
+                    price_usd = None
+                updated_at = cls._format_vi_datetime(gold_data.get("updated_at")) or gold_data.get("updated_at_readable")
+
+            if price_usd is not None and price_usd > 0:
+                answer = f"Giá vàng thế giới hiện khoảng {cls._format_usd(price_usd)}/ounce"
+
+                if isinstance(exchange_data, dict):
+                    rates = exchange_data.get("rates") if isinstance(exchange_data.get("rates"), dict) else {}
+                    usd_vnd = cls._resolve_exchange_rate(rates, str(exchange_data.get("base_code") or "USD"), "USD", "VND")
+                    if usd_vnd:
+                        vnd_per_luong = price_usd * usd_vnd * 37.5 / 31.1034768
+                        answer += f", tương đương khoảng {cls._format_vnd(vnd_per_luong)}/lượng theo giá thế giới quy đổi"
+
+                if updated_at:
+                    answer += f", cập nhật {updated_at}."
+                else:
+                    answer += "."
+                return answer
+
+        if "tỷ giá" in normalized or "ty gia" in normalized or re.search(r"\b(usd|eur|jpy|cny|gbp|vnd)\b", normalized):
+            if isinstance(exchange_data, dict) and exchange_data:
+                rates = exchange_data.get("rates") if isinstance(exchange_data.get("rates"), dict) else {}
+                if rates:
+                    source_code, target_code = cls._extract_exchange_pair(normalized)
+                    rate = cls._resolve_exchange_rate(rates, str(exchange_data.get("base_code") or "USD"), source_code, target_code)
+                    if rate is not None:
+                        updated_at = cls._format_vi_datetime(exchange_data.get("updated_at"))
+                        rate_digits = 0 if target_code == "VND" else None
+                        answer = f"Tỷ giá tham chiếu hiện tại: 1 {source_code} = {cls._format_rate(rate, rate_digits)} {target_code}"
+                        if updated_at:
+                            answer += f", cập nhật {updated_at}."
+                        else:
+                            answer += "."
+                        return answer
+
+        if isinstance(exchange_data, dict) and exchange_data:
+            available_codes = exchange_data.get("rates") if isinstance(exchange_data.get("rates"), dict) else {}
+            if available_codes:
+                return (
+                    "Mình lấy được một phần dữ liệu thị trường rồi, nhưng chưa đủ dữ liệu phù hợp để trả lời chính xác câu này. "
+                    "Bạn thử nói rõ mã ngoại tệ hoặc loại vàng cần xem nhé."
+                )
+
+        return "Mình chưa lấy được dữ liệu thị trường mới nhất ngay lúc này. Bạn thử lại sau ít phút nhé."
 
     @staticmethod
     def _empty_metrics() -> AdvisorMetrics:
@@ -284,6 +463,9 @@ class AdvisorOrchestrator:
 
         route = str(tool_context.get("route") or "unknown")
 
+        if route == ROUTE_EXTERNAL_FINANCIAL_DATA:
+            return self._build_external_financial_response(req.message, tool_context.get("external", {})), {}
+
         should_use_llm = req.use_llm or route == ROUTE_EXTERNAL_FINANCIAL_DATA
         if not should_use_llm:
             return (
@@ -299,7 +481,7 @@ class AdvisorOrchestrator:
 
         if not api_key:
             if route == ROUTE_EXTERNAL_FINANCIAL_DATA:
-                return self._build_external_financial_response(tool_context.get("external", {})), {}
+                return self._build_external_financial_response(req.message, tool_context.get("external", {})), {}
             return (
                 f"Ban dang co tong thu {calculations.total_income:,.0f} va tong chi {calculations.total_expense:,.0f}. "
                 f"Ty le tiet kiem la {calculations.savings_rate:.2f}% va ROI la {calculations.roi:.2f}%. "
@@ -329,10 +511,10 @@ class AdvisorOrchestrator:
                 }
                 return answer_text, llm_meta
             if route == ROUTE_EXTERNAL_FINANCIAL_DATA:
-                return self._build_external_financial_response(tool_context.get("external", {})), {}
+                return self._build_external_financial_response(req.message, tool_context.get("external", {})), {}
         except Exception:
             if route == ROUTE_EXTERNAL_FINANCIAL_DATA:
-                return self._build_external_financial_response(tool_context.get("external", {})), {}
+                return self._build_external_financial_response(req.message, tool_context.get("external", {})), {}
             return (
                 f"Ban dang co tong thu {calculations.total_income:,.0f} va tong chi {calculations.total_expense:,.0f}. "
                 f"Ty le tiet kiem la {calculations.savings_rate:.2f}% va ROI la {calculations.roi:.2f}%. "
@@ -349,7 +531,7 @@ class AdvisorOrchestrator:
 
     async def run(self, req: AdvisorChatRequest) -> AdvisorResponse:
         cache_key = self._cache_key(req)
-        cached = await self.memory.get_cached_answer(cache_key)
+        cached = None if EXTERNAL_FINANCIAL_PATTERN.search(req.message) else await self.memory.get_cached_answer(cache_key)
         if cached:
             return AdvisorResponse.model_validate(cached)
 
@@ -375,10 +557,7 @@ class AdvisorOrchestrator:
             tool_result = AdvisorToolResult(
                 structured_data={},
                 unstructured_context=[],
-                external_data={
-                    "provider": "gemini_google_search_grounding",
-                    "enabled": True,
-                },
+                external_data=await self.retrieval.fetch_external_data(),
             )
 
         long_term_prefs = await self.memory.get_user_preferences(req.user_id)
@@ -428,7 +607,7 @@ class AdvisorOrchestrator:
             },
         )
 
-        await self.memory.set_cached_answer(cache_key, response.model_dump())
+        await self.memory.set_cached_answer(cache_key, response.model_dump(), ttl_seconds=20 if route == ROUTE_EXTERNAL_FINANCIAL_DATA else 120)
         return response
 
 

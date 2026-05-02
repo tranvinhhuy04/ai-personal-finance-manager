@@ -599,6 +599,7 @@ class ApiClient {
     const response = await aiAxiosClient.post('/api/v1/ai/chat', {
       message: data.question,
       question: data.question,
+      sessionId: data.sessionId,
       context: data.context ?? {},
       use_llm: data.useLlm ?? false,
       month: data.month,

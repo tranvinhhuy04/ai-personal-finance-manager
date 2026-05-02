@@ -75,9 +75,13 @@ class GeminiService:
         intent: str,
         context: dict[str, Any],
         fallback_answer: str,
+        model_override: str | None = None,
+        api_key_override: str | None = None,
     ) -> str | None:
-        if not self.is_enabled():
+        credentials = self._effective_credentials(model_override=model_override, api_key_override=api_key_override)
+        if not credentials:
             return None
+        model, api_key = credentials
 
         prompt = (
             'Bạn là Senior AI Financial Assistant cho ứng dụng quản lý tài chính cá nhân. '
@@ -105,7 +109,7 @@ class GeminiService:
 
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(12.0, connect=4.0)) as client:
-                response = await client.post(self._url(), json=payload)
+                response = await client.post(self._build_url(model, api_key), json=payload)
                 response.raise_for_status()
                 data = response.json()
                 generated = self._extract_text(data)

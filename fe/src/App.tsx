@@ -11,7 +11,6 @@ import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
 import { Invoices } from './pages/Invoices';
 import { Recurring } from './pages/Recurring';
-import { Subscriptions } from './pages/Subscriptions';
 import { Settings } from './pages/Settings';
 import { Feedback } from './pages/Feedback';
 import { Help } from './pages/Help';
@@ -39,7 +38,6 @@ export default function App() {
                   <Route path="/transactions" element={<Transactions />} />
                   <Route path="/invoices" element={<Invoices />} />
                   <Route path="/recurring" element={<Recurring />} />
-                  <Route path="/subscriptions" element={<Subscriptions />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/ai-assistant" element={<SmartAIPage />} />
                   <Route path="/feedback" element={<Feedback />} />

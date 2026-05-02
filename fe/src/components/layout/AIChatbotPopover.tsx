@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bot, Loader2, Send, Sparkles, User2, X } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
+import { getOrCreateChatSessionId } from '@/lib/chatSession';
 
 const ASSISTANT_NAME = 'Fin';
 
@@ -479,6 +480,10 @@ const humanizeAssistantReply = (answer: string, intent: string) => {
     return `${normalized} Nếu bạn muốn, mình sẽ gợi ý luôn kế hoạch hành động theo tuần.`;
   }
 
+  if (intent === 'general_knowledge') {
+    return normalized;
+  }
+
   if (intent === 'unknown' || isGenericAssistantFallback(normalized)) {
     return `Mình hiểu ý bạn. ${normalized} Bạn có thể nói rõ thêm bối cảnh để mình tư vấn sát hơn nhé.`;
   }
@@ -501,6 +506,10 @@ const buildAssistantMeta = (intent: string, llmUsed: boolean) => {
     return `${ASSISTANT_NAME} • Mình cần thêm ngữ cảnh`;
   }
 
+  if (intent === 'general_knowledge') {
+    return llmUsed ? `${ASSISTANT_NAME} • Dữ liệu thị trường / tri thức công khai` : `${ASSISTANT_NAME} • Thông tin tham khảo`;
+  }
+
   return llmUsed ? `${ASSISTANT_NAME} • Phân tích chuyên sâu` : `${ASSISTANT_NAME} • Phản hồi nhanh`;
 };
 
@@ -512,6 +521,7 @@ type ChatMessage = {
 };
 
 export const AIChatbotPopover = () => {
+  const [chatSessionId] = useState(() => getOrCreateChatSessionId('popover'));
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -678,12 +688,14 @@ export const AIChatbotPopover = () => {
 
       const result = await apiClient.askAI({
         question,
+        sessionId: chatSessionId,
         useLlm: shouldUseGemini,
         context: {
           assistantName: ASSISTANT_NAME,
           conversationHistory,
           featureCatalog: FEATURE_ROUTE_CATALOG,
           uiSource: 'popover',
+          chatSurface: 'popover',
         },
       });
       const shouldForceFeatureReply =
@@ -696,11 +708,11 @@ export const AIChatbotPopover = () => {
         !!localFeatureReply
         && !shouldPreferDynamicDataReply
         && localFeatureReply.score >= FEATURE_DIRECT_REPLY_SCORE
-        && (result.intent === 'unknown' || result.confidence < 0.35 || isGenericAssistantFallback(result.answer));
+        && (result.intent === 'unknown' || result.confidence < 0.35 || (result.intent !== 'general_knowledge' && isGenericAssistantFallback(result.answer)));
       const shouldUseUnknownFallback =
         !localFeatureReply
         && !isFinancialDataQuestion(question)
-        && (result.intent === 'unknown' || result.confidence < 0.3 || isGenericAssistantFallback(result.answer));
+        && (result.intent === 'unknown' || result.confidence < 0.3 || (result.intent !== 'general_knowledge' && isGenericAssistantFallback(result.answer)));
       const humanizedAnswer = humanizeAssistantReply(result.answer, result.intent);
       const assistantMeta = buildAssistantMeta(result.intent, result.llmUsed);
       const unknownFallback = shouldPreferDynamicDataReply ? buildDataQuestionFallback() : buildUnknownQuestionFallback();

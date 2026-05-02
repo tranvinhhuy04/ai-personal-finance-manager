@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
 
-const ACCESS_TOKEN_TTL_SECONDS = Number(process.env.ACCESS_TOKEN_TTL_SECONDS) || 60 * 15; // 15m
+const ACCESS_TOKEN_TTL_SECONDS = Number(process.env.ACCESS_TOKEN_TTL_SECONDS) || 60 * 40; // 40m
 const REFRESH_TOKEN_TTL_SECONDS = Number(process.env.REFRESH_TOKEN_TTL_SECONDS) || 60 * 60 * 24 * 7; // 7d
 const TWO_FACTOR_PENDING_TTL_SECONDS =
   Number(process.env.TWO_FACTOR_PENDING_TTL_SECONDS) || 60 * 5; // 5m

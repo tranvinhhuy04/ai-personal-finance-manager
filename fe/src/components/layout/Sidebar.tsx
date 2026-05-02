@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import {
   LayoutDashboard, LineChart, ArrowRightLeft, FileText,
-  Layers, ShieldCheck, MessageSquare, Settings, HelpCircle, LogOut, Search, Sparkles, PiggyBank
+  Layers, MessageSquare, Settings, HelpCircle, LogOut, Search, Sparkles, PiggyBank
 } from 'lucide-react';
 import { Wallet as WalletIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -108,7 +108,6 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             <h3 className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Tính năng</h3>
             <div className="space-y-1">
               <NavItem icon={Layers} label="Định kỳ" to="/recurring" isActive={location.pathname === '/recurring'} onClick={onClose} />
-              <NavItem icon={ShieldCheck} label="Đăng ký" to="/subscriptions" isActive={location.pathname === '/subscriptions'} onClick={onClose} />
               <NavItem icon={MessageSquare} label="Phản hồi" to="/feedback" isActive={location.pathname === '/feedback'} onClick={onClose} />
             </div>
           </div>
