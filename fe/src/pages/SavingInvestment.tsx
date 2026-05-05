@@ -124,7 +124,7 @@ export function SavingInvestment() {
   );
 
   const summary = useMemo(() => {
-    const activeItems = savings.filter((item) => item.status === 'ACTIVE');
+    const activeItems = savings.filter((item) => item.status === 'ACTIVE' && item.type === tab);
     const totalCurrent = activeItems.reduce((sum, item) => sum + Number(item.currentAmount ?? 0), 0);
     const totalTarget = activeItems.reduce((sum, item) => sum + Number(item.targetAmount ?? 0), 0);
     const completion = totalTarget > 0 ? Math.min(100, Math.round((totalCurrent / totalTarget) * 100)) : 0;
@@ -135,7 +135,7 @@ export function SavingInvestment() {
       totalTarget,
       completion,
     };
-  }, [savings]);
+  }, [savings, tab]);
 
   const handleCreateSaving = async () => {
     if (!createForm.name?.trim()) {
