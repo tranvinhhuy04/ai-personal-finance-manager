@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
@@ -16,6 +16,12 @@ from app.services.ocr_service import process_invoice_image
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+class GeminiKeyEntry(BaseModel):
+    """Một entry trong pool API Keys — bao gồm plaintext key và index gốc."""
+    key: str
+    index: int
 
 
 class ChatRequest(BaseModel):
@@ -34,13 +40,15 @@ class ChatRequest(BaseModel):
         description="Nếu true và có GEMINI_API_KEY, service sẽ thử gọi Gemini để sinh câu trả lời tự nhiên hơn.",
     )
     model: str | None = Field(default=None, description="Model Gemini được user chọn từ settings")
-    gemini_api_key: str | None = Field(default=None, description="Gemini API key runtime của user")
+    gemini_api_key: str | None = Field(default=None, description="Gemini API key runtime của user (legacy)")
+    gemini_api_keys: Optional[List[GeminiKeyEntry]] = Field(default=None, description="Pool API Keys với auto-rotation")
 
 
 class ExtractTextRequest(BaseModel):
     input_text: str = Field(..., min_length=2, description="Natural language input or group chat text")
     model: str | None = Field(default=None, description="Model Gemini override từ settings")
-    gemini_api_key: str | None = Field(default=None, description="Gemini API key runtime từ settings")
+    gemini_api_key: str | None = Field(default=None, description="Gemini API key runtime từ settings (legacy)")
+    gemini_api_keys: Optional[List[GeminiKeyEntry]] = Field(default=None, description="Pool API Keys với auto-rotation")
 
 
 class ProviderStatusRequest(BaseModel):
@@ -132,13 +140,23 @@ async def chat(payload: ChatRequest) -> dict[str, Any]:
 
 @router.post("/extract-text")
 async def extract_text(payload: ExtractTextRequest) -> dict[str, Any]:
-    """Extract financial transactions from free text/group chat by prompting Gemini to output JSON array."""
+    """Extract financial transactions from free text/group chat.
+
+    Hỗ trợ auto-rotation: khi `gemini_api_keys` (pool) được cung cấp, service sẽ
+    tự động thử key tiếp theo nếu key hiện tại bị Quota/Rate-limit (429/403).
+    Response trả về thêm `exhausted_key_indices` để gateway persist trạng thái.
+    """
     raw_text = payload.input_text.strip()
     if len(raw_text) < 2:
         raise HTTPException(status_code=400, detail="input_text must contain at least 2 characters")
 
     gemini = get_gemini_service()
-    if not gemini.is_enabled():
+
+    # Xác định chế độ: pool rotation hay single key
+    pool = [entry.model_dump() for entry in payload.gemini_api_keys] if payload.gemini_api_keys else None
+
+    # Cần ít nhất 1 key (pool hoặc single) hoặc server env key
+    if not pool and not payload.gemini_api_key and not gemini.is_enabled():
         raise HTTPException(status_code=503, detail="Gemini is not configured. Missing GEMINI_API_KEY")
 
     try:
@@ -146,18 +164,24 @@ async def extract_text(payload: ExtractTextRequest) -> dict[str, Any]:
             input_text=raw_text,
             model_override=payload.model,
             api_key_override=payload.gemini_api_key,
+            api_keys_override=pool,
         )
         if not extraction:
             raise HTTPException(status_code=502, detail="Gemini returned empty extraction output")
+
+        resolved_model = str(extraction.get("model") or payload.model or gemini.model)
+        exhausted_indices: list[int] = extraction.get("exhausted_key_indices") or []
 
         return {
             "success": True,
             "input": raw_text,
             "raw_output": str(extraction.get("text") or ""),
-            "model": str(extraction.get("model") or payload.model or gemini.model),
+            "model": resolved_model,
+            # Trả về danh sách index bị exhausted để gateway persist về identity service
+            "exhausted_key_indices": exhausted_indices,
             "llm": {
                 "provider": "gemini",
-                "model": str(extraction.get("model") or payload.model or gemini.model),
+                "model": resolved_model,
                 "usage": extraction.get("usage") or {
                     "prompt_tokens": 0,
                     "completion_tokens": 0,

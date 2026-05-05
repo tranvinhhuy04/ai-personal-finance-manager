@@ -123,6 +123,11 @@ router.all('/settings/usage/append', verifyToken, (_req, res) => {
   return res.status(403).json({ message: 'Forbidden' });
 });
 
+// /settings/api-keys/mark-exhausted is called internally by BFF — block direct public access
+router.all('/settings/api-keys/mark-exhausted', verifyToken, (_req, res) => {
+  return res.status(403).json({ message: 'Forbidden' });
+});
+
 // /api/v1/settings -> service-identity /settings (JWT required)
 router.use(
   '/settings',

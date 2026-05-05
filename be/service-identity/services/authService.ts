@@ -3,12 +3,16 @@ import crypto from 'crypto';
 import { Types } from 'mongoose';
 import { AppError } from '../src/errors/AppError';
 import {
+  addApiKeyToPool,
   appendAiUsageLog,
   createDefaultUserSettings,
   createUser,
   findUserByEmail,
   findUserById,
   findUserSettings,
+  markApiKeysExhaustedByIndices,
+  migrateLegacyApiKey,
+  removeApiKeyByIndex,
   upsertUserSettings,
 } from '../src/repositories/authRepository';
 import {
@@ -61,6 +65,9 @@ type AppendUsagePayload = {
   estimated_cost: number;
   date?: string | Date;
 };
+
+/** Dạng thô của một entry trong gemini_api_keys array từ MongoDB lean doc. */
+type RawKeyEntry = { key?: unknown; status?: unknown; added_at?: unknown };
 
 function getModelId(modelName: string) {
   return modelName.replace(/^models\//, '').trim();
@@ -450,41 +457,83 @@ export async function get2FAStatus(userId: string) {
   return { twoFactorEnabled: Boolean(settings?.twoFactorEnabled) };
 }
 
+// ---------------------------------------------------------------------------
+// Helpers for key pool
+// ---------------------------------------------------------------------------
+
+/** Đọc settings và tự động migrate legacy `gemini_api_key` string → array. */
+async function getSettingsWithMigration(userId: string) {
+  let settings = await findUserSettings(userId);
+  if (!settings) {
+    await upsertUserSettings(userId, {});
+    settings = await findUserSettings(userId);
+  }
+
+  const raw = settings as any;
+  const hasLegacy = typeof raw?.gemini_api_key === 'string' && raw.gemini_api_key.length > 0;
+  const hasNewKeys = Array.isArray(raw?.gemini_api_keys) && raw.gemini_api_keys.length > 0;
+
+  if (hasLegacy && !hasNewKeys) {
+    await migrateLegacyApiKey(userId, raw.gemini_api_key as string);
+    settings = await findUserSettings(userId);
+  }
+
+  return settings;
+}
+
+/** Giải mã một entry trong pool. Trả về null nếu lỗi. */
+function decryptKeyEntry(entry: RawKeyEntry): string | null {
+  if (typeof entry?.key !== 'string' || !entry.key) return null;
+  try {
+    return decryptSettingValue(entry.key);
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+
 export async function getSettings(userId: string) {
   requireString(userId, 'userId');
   if (!Types.ObjectId.isValid(userId)) {
     throw new AppError('User not found', 401);
   }
 
-  const settings = await findUserSettings(userId);
-  if (!settings) {
-    await upsertUserSettings(userId, {});
-  }
+  const settings = await getSettingsWithMigration(userId);
+  const raw = settings as any;
 
-  const settingsAfterUpsert = settings ?? (await findUserSettings(userId));
-  const encryptedApiKey = (settingsAfterUpsert as any)?.gemini_api_key as string | null | undefined;
+  const apiKeysRaw: RawKeyEntry[] = Array.isArray(raw?.gemini_api_keys) ? raw.gemini_api_keys : [];
 
-  let decryptedApiKey: string | null = null;
-  if (encryptedApiKey) {
-    try {
-      decryptedApiKey = decryptSettingValue(encryptedApiKey);
-    } catch {
-      decryptedApiKey = null;
+  // Build masked list for the UI
+  const geminiApiKeys = apiKeysRaw.map((entry) => ({
+    key_masked: maskApiKey(decryptKeyEntry(entry)),
+    status: (entry?.status as string) ?? 'active',
+    added_at: entry?.added_at ?? null,
+  }));
+
+  // First active key → probe available models
+  let firstActivePlain: string | null = null;
+  for (const entry of apiKeysRaw) {
+    if (entry?.status === 'active') {
+      firstActivePlain = decryptKeyEntry(entry);
+      if (firstActivePlain) break;
     }
   }
 
-  const aiUsageLogs = normalizeAiUsageLogs((settingsAfterUpsert as any)?.ai_usage_logs ?? []);
-  const selectedModelRaw = String((settingsAfterUpsert as any)?.selected_ai_model ?? DEFAULT_AI_MODEL).trim();
+  const selectedModelRaw = String(raw?.selected_ai_model ?? DEFAULT_AI_MODEL).trim();
   const selectedModel = selectedModelRaw.length > 0 ? selectedModelRaw : DEFAULT_AI_MODEL;
-  const availableModelsFromApiKey = decryptedApiKey ? await listGeminiModelsByApiKey(decryptedApiKey) : [];
-  const availableModels = Array.from(new Set([selectedModel, DEFAULT_AI_MODEL, ...availableModelsFromApiKey])).filter(Boolean);
+  const availableModelsFromKey = firstActivePlain ? await listGeminiModelsByApiKey(firstActivePlain) : [];
+  const availableModels = Array.from(new Set([selectedModel, DEFAULT_AI_MODEL, ...availableModelsFromKey])).filter(Boolean);
 
   return {
-    gemini_api_key_masked: maskApiKey(decryptedApiKey),
-    has_gemini_api_key: Boolean(decryptedApiKey),
+    // New pool format
+    gemini_api_keys: geminiApiKeys,
+    has_gemini_api_key: geminiApiKeys.some((k) => k.status === 'active'),
+    // Legacy compat (masked first active key)
+    gemini_api_key_masked: geminiApiKeys.find((k) => k.status === 'active')?.key_masked ?? null,
     selected_ai_model: selectedModel,
     available_models: availableModels,
-    ai_usage_logs: aiUsageLogs,
+    ai_usage_logs: normalizeAiUsageLogs(raw?.ai_usage_logs ?? []),
   };
 }
 
@@ -503,9 +552,9 @@ export async function updateSettings(
 
   const updatePayload: Record<string, unknown> = {};
 
-  if (typeof payload.gemini_api_key === 'string') {
-    const trimmedApiKey = payload.gemini_api_key.trim();
-    updatePayload.gemini_api_key = trimmedApiKey.length > 0 ? encryptSettingValue(trimmedApiKey) : null;
+  // If a new key is provided via legacy field, add it to the pool
+  if (typeof payload.gemini_api_key === 'string' && payload.gemini_api_key.trim().length > 0) {
+    await addApiKey(userId, payload.gemini_api_key.trim());
   }
 
   if (typeof payload.selected_ai_model === 'string') {
@@ -523,7 +572,10 @@ export async function updateSettings(
     updatePayload.ai_usage_logs = normalizedLogs;
   }
 
-  await upsertUserSettings(userId, updatePayload);
+  if (Object.keys(updatePayload).length > 0) {
+    await upsertUserSettings(userId, updatePayload);
+  }
+
   return getSettings(userId);
 }
 
@@ -533,28 +585,84 @@ export async function getRuntimeAiConfig(userId: string) {
     throw new AppError('User not found', 401);
   }
 
-  const settings = await findUserSettings(userId);
-  const encryptedApiKey = (settings as any)?.gemini_api_key as string | null | undefined;
-  const selectedModelRaw = String((settings as any)?.selected_ai_model ?? DEFAULT_AI_MODEL).trim();
+  const settings = await getSettingsWithMigration(userId);
+  const raw = settings as any;
+
+  const apiKeysRaw: RawKeyEntry[] = Array.isArray(raw?.gemini_api_keys) ? raw.gemini_api_keys : [];
+  const selectedModelRaw = String(raw?.selected_ai_model ?? DEFAULT_AI_MODEL).trim();
   const selectedModel = selectedModelRaw.length > 0 ? selectedModelRaw : DEFAULT_AI_MODEL;
 
-  let decryptedApiKey: string | null = null;
-  if (encryptedApiKey) {
-    try {
-      decryptedApiKey = decryptSettingValue(encryptedApiKey);
-    } catch {
-      decryptedApiKey = null;
-    }
-  }
+  // Decrypt all active keys, preserving original index for exhaustion tracking
+  const activeKeys = apiKeysRaw
+    .map((entry, idx) => {
+      if (entry?.status !== 'active') return null;
+      const plain = decryptKeyEntry(entry);
+      if (!plain) return null;
+      return { key: plain, index: idx };
+    })
+    .filter((item): item is { key: string; index: number } => item !== null);
 
-  const availableModels = decryptedApiKey ? await listGeminiModelsByApiKey(decryptedApiKey) : [];
+  const firstActiveKey = activeKeys[0]?.key ?? null;
+  const availableModels = firstActiveKey ? await listGeminiModelsByApiKey(firstActiveKey) : [];
 
   return {
-    has_gemini_api_key: Boolean(decryptedApiKey),
-    gemini_api_key: decryptedApiKey,
+    has_gemini_api_key: activeKeys.length > 0,
+    // Full pool with indices — AI service uses these for rotation
+    gemini_api_keys: activeKeys,
+    // Legacy single-key field (first active key) for backward-compat consumers
+    gemini_api_key: firstActiveKey,
     selected_ai_model: selectedModel,
     available_models: Array.from(new Set([selectedModel, DEFAULT_AI_MODEL, ...availableModels])).filter(Boolean),
   };
+}
+
+// ---------------------------------------------------------------------------
+// API Key Pool management
+// ---------------------------------------------------------------------------
+
+/** Thêm một API Key mới vào pool (tối đa 10). */
+export async function addApiKey(userId: string, plainKey: string) {
+  requireString(userId, 'userId');
+  requireString(plainKey, 'gemini_api_key');
+  if (!Types.ObjectId.isValid(userId)) throw new AppError('User not found', 401);
+
+  const trimmed = plainKey.trim();
+  if (trimmed.length < 10) throw new AppError('API Key quá ngắn (tối thiểu 10 ký tự)', 400);
+
+  // Kiểm tra số lượng hiện tại
+  const settings = await findUserSettings(userId);
+  const currentKeys: RawKeyEntry[] = Array.isArray((settings as any)?.gemini_api_keys)
+    ? (settings as any).gemini_api_keys
+    : [];
+  if (currentKeys.length >= 10) {
+    throw new AppError('Đã đạt giới hạn 10 API Keys. Vui lòng xóa key cũ trước.', 400);
+  }
+
+  const encrypted = encryptSettingValue(trimmed);
+  await addApiKeyToPool(userId, encrypted);
+  return getSettings(userId);
+}
+
+/** Xóa API Key tại vị trí `index` trong pool. */
+export async function removeApiKey(userId: string, index: number) {
+  requireString(userId, 'userId');
+  if (!Types.ObjectId.isValid(userId)) throw new AppError('User not found', 401);
+  if (!Number.isInteger(index) || index < 0) throw new AppError('Index không hợp lệ', 400);
+
+  await removeApiKeyByIndex(userId, index);
+  return getSettings(userId);
+}
+
+/** Đánh dấu các keys tại `indices` là exhausted (hết quota). */
+export async function markApiKeysExhausted(userId: string, indices: number[]) {
+  requireString(userId, 'userId');
+  if (!Types.ObjectId.isValid(userId)) throw new AppError('User not found', 401);
+  if (!Array.isArray(indices) || !indices.every(Number.isInteger)) {
+    throw new AppError('indices phải là mảng số nguyên', 400);
+  }
+
+  await markApiKeysExhaustedByIndices(userId, indices);
+  return { success: true };
 }
 
 export async function appendUsageLog(userId: string, payload: AppendUsagePayload) {

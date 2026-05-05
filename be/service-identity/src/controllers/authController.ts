@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import {
+  addApiKey,
   appendUsageLog,
   get2FAStatus,
   getRuntimeAiConfig,
@@ -8,8 +9,10 @@ import {
   login,
   loginWith2FA,
   logout,
+  markApiKeysExhausted,
   refreshTokens,
   register,
+  removeApiKey,
   setup2FA,
   updateSettings,
   verify2FA,
@@ -100,5 +103,30 @@ export const appendUsageLogHandler = catchAsync(async (req: Request, res: Respon
   const userId = (req as any).userId as string;
   const { model, tokens_used, estimated_cost, date } = req.body ?? {};
   const result = await appendUsageLog(userId, { model, tokens_used, estimated_cost, date });
+  return res.status(200).json(result);
+});
+
+// ---------------------------------------------------------------------------
+// API Key Pool handlers
+// ---------------------------------------------------------------------------
+
+export const addApiKeyHandler = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const { gemini_api_key } = req.body ?? {};
+  const result = await addApiKey(userId, gemini_api_key);
+  return res.status(200).json(result);
+});
+
+export const removeApiKeyHandler = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const index = Number(req.params.index);
+  const result = await removeApiKey(userId, index);
+  return res.status(200).json(result);
+});
+
+export const markApiKeysExhaustedHandler = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const { indices } = req.body ?? {};
+  const result = await markApiKeysExhausted(userId, Array.isArray(indices) ? indices.map(Number) : []);
   return res.status(200).json(result);
 });

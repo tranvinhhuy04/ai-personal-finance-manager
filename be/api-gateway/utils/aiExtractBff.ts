@@ -4,9 +4,12 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? 'http://ai-service:8000';
 const IDENTITY_SERVICE_URL = process.env.IDENTITY_SERVICE_URL ?? 'http://service-identity:3001';
 const AI_PROXY_TIMEOUT_MS = Number(process.env.AI_PROXY_TIMEOUT_MS ?? 60_000);
 
+type GeminiKeyEntry = { key: string; index: number };
+
 type RuntimeAiConfig = {
   has_gemini_api_key: boolean;
   gemini_api_key: string | null;
+  gemini_api_keys?: GeminiKeyEntry[];
   selected_ai_model: string;
   available_models: string[];
 };
@@ -71,6 +74,25 @@ async function appendUsageLog(req: Request, usage: { model: string; tokens_used:
   }
 }
 
+/** Đánh dấu exhausted các keys có index trong `indices` về identity service. */
+async function markKeysExhausted(req: Request, indices: number[]) {
+  if (!indices.length) return;
+  try {
+    await fetch(`${IDENTITY_SERVICE_URL}/settings/api-keys/mark-exhausted`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: String(req.headers.authorization ?? ''),
+      },
+      body: JSON.stringify({ indices }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch (error) {
+    console.warn('[api-gateway] failed to mark API keys exhausted:', error);
+  }
+}
+
 async function fetchRuntimeAiConfig(req: Request): Promise<RuntimeAiConfig | null> {
   try {
     const response = await fetch(`${IDENTITY_SERVICE_URL}/settings/runtime-ai`, {
@@ -121,7 +143,9 @@ export async function handleAiExtractText(req: Request, res: Response) {
   const payload = {
     input_text: inputText,
     model: runtimeAiConfig?.selected_ai_model,
-    gemini_api_key: runtimeAiConfig?.gemini_api_key,
+    // Pool rotation (preferred) — fallback to legacy single key
+    gemini_api_keys: runtimeAiConfig?.gemini_api_keys?.length ? runtimeAiConfig.gemini_api_keys : undefined,
+    gemini_api_key: !runtimeAiConfig?.gemini_api_keys?.length ? runtimeAiConfig?.gemini_api_key : undefined,
   };
 
   try {
@@ -144,6 +168,14 @@ export async function handleAiExtractText(req: Request, res: Response) {
         void appendUsageLog(req, failedUsage);
       }
       return res.status(response.status).json(data);
+    }
+
+    // Persist exhausted key indices back to identity service (fire & forget)
+    const exhaustedIndices = Array.isArray(data.exhausted_key_indices)
+      ? (data.exhausted_key_indices as number[])
+      : [];
+    if (exhaustedIndices.length > 0) {
+      void markKeysExhausted(req, exhaustedIndices);
     }
 
     const usage = parseUsageMeta(data);

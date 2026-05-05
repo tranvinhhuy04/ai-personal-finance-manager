@@ -10,6 +10,85 @@ import httpx
 GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
 
 
+# ---------------------------------------------------------------------------
+# Helper: kiểm tra xem HTTP status / body có phải lỗi quota/rate-limit không
+# ---------------------------------------------------------------------------
+
+def _is_quota_error(status_code: int, body: str) -> bool:
+    """Trả về True nếu lỗi là 429 hoặc 403 quota/rate-limit."""
+    if status_code == 429:
+        return True
+    if status_code == 403:
+        lowered = body.lower()
+        return 'quota' in lowered or 'rate limit' in lowered or 'rateLimitExceeded' in body
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Auto-Rotation: thử lần lượt từng key trong pool, bỏ qua key bị quota
+# ---------------------------------------------------------------------------
+
+async def call_gemini_with_rotation(
+    *,
+    api_keys: list[dict[str, Any]],  # [{key: str, index: int}, ...]
+    model: str,
+    payload: dict[str, Any],
+    timeout: float = 20.0,
+    connect_timeout: float = 5.0,
+) -> tuple[dict[str, Any], list[int]]:
+    """Gọi Gemini API với cơ chế auto-rotate qua pool keys.
+
+    Returns:
+        (response_data, exhausted_indices)  — response_data là JSON đã parse,
+        exhausted_indices là danh sách index của các keys bị quota.
+
+    Raises:
+        RuntimeError: khi tất cả keys đều bị quota hoặc không có key nào.
+    """
+    if not api_keys:
+        raise RuntimeError('Vui lòng cập nhật API Key để sử dụng tính năng này.')
+
+    exhausted_indices: list[int] = []
+    last_error = 'Không có key hợp lệ trong pool.'
+
+    for entry in api_keys:
+        key = str(entry.get('key') or '').strip()
+        key_index = int(entry.get('index', -1))
+
+        if not key:
+            continue
+
+        url = GeminiService._build_url(model, key)
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout, connect=connect_timeout)) as client:
+                response = await client.post(url, json=payload)
+
+                if _is_quota_error(response.status_code, response.text):
+                    exhausted_indices.append(key_index)
+                    last_error = f'Key index={key_index}: quota/rate-limit ({response.status_code})'
+                    continue  # thử key tiếp theo
+
+                response.raise_for_status()
+                return response.json(), exhausted_indices
+
+        except httpx.HTTPStatusError as exc:
+            body = exc.response.text[:500] if exc.response is not None else str(exc)
+            status = exc.response.status_code if exc.response is not None else 0
+            if _is_quota_error(status, body):
+                exhausted_indices.append(key_index)
+                last_error = f'Key index={key_index}: quota/rate-limit ({status})'
+                continue
+            # Lỗi thực sự (invalid key, server error…) — dừng ngay
+            raise RuntimeError(f'Gemini API HTTP error: {body}') from exc
+
+        except httpx.RequestError as exc:
+            raise RuntimeError(f'Unable to reach Gemini API: {exc}') from exc
+
+    raise RuntimeError(
+        f'Tất cả API Keys đã hết Quota. Vui lòng cập nhật API Key. Chi tiết: {last_error}'
+    )
+
+
 class GeminiService:
     """Gemini helper dùng để tăng chất lượng câu trả lời và hậu xử lý OCR khi có API key."""
 
@@ -125,11 +204,16 @@ class GeminiService:
         input_text: str,
         model_override: str | None = None,
         api_key_override: str | None = None,
+        api_keys_override: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any] | None:
-        credentials = self._effective_credentials(model_override=model_override, api_key_override=api_key_override)
-        if not credentials:
+        """Trích xuất giao dịch từ văn bản tự do.
+
+        Khi `api_keys_override` được cung cấp (pool nhiều keys), hàm sẽ sử dụng
+        cơ chế auto-rotation. Trả về dict bổ sung trường `exhausted_key_indices`.
+        """
+        model = (model_override or self.model or '').strip()
+        if not model:
             return None
-        model, api_key = credentials
 
         system_prompt = (
             'Bạn là trợ lý tài chính thông minh. Hãy đọc đoạn văn bản hoặc hội thoại sau. '
@@ -159,6 +243,31 @@ class GeminiService:
             },
         }
 
+        # --- Pool rotation path ---
+        if api_keys_override:
+            data, exhausted_indices = await call_gemini_with_rotation(
+                api_keys=api_keys_override,
+                model=model,
+                payload=payload,
+                timeout=20.0,
+                connect_timeout=5.0,
+            )
+            generated = self._extract_text(data)
+            if not generated:
+                raise RuntimeError('Gemini response does not contain generated text')
+            return {
+                'text': generated.strip(),
+                'model': model,
+                'usage': self._extract_usage(data),
+                'exhausted_key_indices': exhausted_indices,
+            }
+
+        # --- Single key path (legacy / fallback) ---
+        credentials = self._effective_credentials(model_override=model_override, api_key_override=api_key_override)
+        if not credentials:
+            return None
+        _, api_key = credentials
+
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=5.0)) as client:
                 response = await client.post(self._build_url(model, api_key), json=payload)
@@ -171,6 +280,7 @@ class GeminiService:
                     'text': generated.strip(),
                     'model': model,
                     'usage': self._extract_usage(data),
+                    'exhausted_key_indices': [],
                 }
         except httpx.HTTPStatusError as exc:
             detail = exc.response.text[:500] if exc.response is not None else str(exc)

@@ -41,6 +41,7 @@ type DashboardResponse = {
 type RuntimeAiConfig = {
   has_gemini_api_key: boolean;
   gemini_api_key: string | null;
+  gemini_api_keys?: Array<{ key: string; index: number }>;
   selected_ai_model: string;
   available_models: string[];
 };
@@ -583,6 +584,8 @@ async function tryRecordTransactions(
   message: string,
   runtimeAiConfig: RuntimeAiConfig | null,
 ): Promise<Record<string, unknown> | null> {
+  const keyPool = runtimeAiConfig?.gemini_api_keys?.length ? runtimeAiConfig.gemini_api_keys : undefined;
+
   const response = await fetch(`${AI_SERVICE_URL}/api/v1/ai/extract-text`, {
     method: 'POST',
     headers: {
@@ -592,13 +595,27 @@ async function tryRecordTransactions(
     body: JSON.stringify({
       input_text: message,
       model: runtimeAiConfig?.selected_ai_model,
-      gemini_api_key: runtimeAiConfig?.gemini_api_key,
+      // Pool rotation (preferred) — fallback to legacy single key
+      gemini_api_keys: keyPool,
+      gemini_api_key: !keyPool ? runtimeAiConfig?.gemini_api_key : undefined,
     }),
     signal: AbortSignal.timeout(AI_CHAT_UPSTREAM_TIMEOUT_MS),
   });
 
   const rawText = await response.text();
   const extractData = parseRawText(rawText);
+
+  if (!response.ok) {
+    throw new Error(String(extractData.detail ?? extractData.message ?? 'Không thể trích xuất giao dịch từ nội dung tự nhiên.'));
+  }
+
+  // Persist exhausted key indices (fire & forget)
+  const exhaustedIndices = Array.isArray(extractData.exhausted_key_indices)
+    ? (extractData.exhausted_key_indices as number[])
+    : [];
+  if (exhaustedIndices.length > 0) {
+    void markKeysExhausted(req, exhaustedIndices);
+  }
 
   if (!response.ok) {
     throw new Error(String(extractData.detail ?? extractData.message ?? 'Không thể trích xuất giao dịch từ nội dung tự nhiên.'));
@@ -908,6 +925,25 @@ async function appendUsageLog(req: Request, usage: { model: string; tokens_used:
     });
   } catch (error) {
     console.warn('[api-gateway] failed to append AI usage log:', error);
+  }
+}
+
+/** Đánh dấu exhausted các keys có index trong `indices` về identity service. */
+async function markKeysExhausted(req: Request, indices: number[]) {
+  if (!indices.length) return;
+  try {
+    await fetch(`${IDENTITY_SERVICE_URL}/settings/api-keys/mark-exhausted`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: String(req.headers.authorization ?? ''),
+      },
+      body: JSON.stringify({ indices }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch (error) {
+    console.warn('[api-gateway] failed to mark API keys exhausted:', error);
   }
 }
 

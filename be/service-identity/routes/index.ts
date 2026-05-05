@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import requireAuth from '../middlewares/requireAuth';
 import {
+  addApiKeyHandler,
   appendUsageLogHandler,
   get2FAStatusHandler,
   getRuntimeAiConfigHandler,
@@ -9,8 +10,10 @@ import {
   login2FAHandler,
   loginHandler,
   logoutHandler,
+  markApiKeysExhaustedHandler,
   refreshTokenHandler,
   registerHandler,
+  removeApiKeyHandler,
   setup2FAHandler,
   updateSettingsHandler,
   verify2FAHandler,
@@ -34,6 +37,11 @@ router.get('/settings', requireAuth('access'), getSettingsHandler);
 router.patch('/settings', requireAuth('access'), updateSettingsHandler);
 router.get('/settings/runtime-ai', requireAuth('access'), getRuntimeAiConfigHandler);
 router.post('/settings/usage/append', requireAuth('access'), appendUsageLogHandler);
+
+// API Key Pool management
+router.post('/settings/api-keys', requireAuth('access'), addApiKeyHandler);
+router.delete('/settings/api-keys/:index', requireAuth('access'), removeApiKeyHandler);
+router.patch('/settings/api-keys/mark-exhausted', requireAuth('access'), markApiKeysExhaustedHandler);
 
 export default router;
 
