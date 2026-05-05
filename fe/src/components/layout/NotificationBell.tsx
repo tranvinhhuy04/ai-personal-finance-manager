@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react';
-import { Bell, BellRing, CircleAlert, Info, Loader2 } from 'lucide-react';
+import { Bell, BellRing, CircleAlert, Info, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { cn } from '@/lib/utils';
@@ -126,7 +126,13 @@ export const NotificationBell = memo(function NotificationBell() {
                     >
                       <div className="flex items-start gap-3">
                         <div className={cn('mt-0.5 p-1.5 rounded-lg border', typeClass)}>
-                          <CircleAlert className="w-4 h-4" />
+                          {item.type === 'SUCCESS' ? (
+                            <CheckCircle2 className="w-4 h-4" />
+                          ) : item.type === 'WARNING' || item.type === 'ALERT' ? (
+                            <AlertTriangle className="w-4 h-4" />
+                          ) : (
+                            <Info className="w-4 h-4" />
+                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">

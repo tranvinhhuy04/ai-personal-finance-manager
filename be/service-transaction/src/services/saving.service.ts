@@ -123,10 +123,23 @@ class SavingService {
     if (!input.user_id) throw new AppError('user_id is required', 400);
     if (!input.source_wallet_id) throw new AppError('sourceWalletId is required', 400);
 
-    const amount = parsePositiveAmount(input.amount);
+    let amount = parsePositiveAmount(input.amount);
     const saving = await SavingModel.findOne({ _id: input.saving_id, user_id: input.user_id });
     if (!saving) throw new AppError('Saving package not found', 404);
     if (saving.status !== 'ACTIVE') throw new AppError('Saving package has already been settled', 400);
+
+    const currentAmount = Number(saving.current_amount?.toString?.() ?? 0);
+    const targetAmountVal = saving.target_amount ? Number(saving.target_amount.toString()) : null;
+
+    if (targetAmountVal !== null && targetAmountVal > 0) {
+      const remainingAmount = Math.max(0, targetAmountVal - currentAmount);
+      if (amount > remainingAmount) {
+        amount = remainingAmount;
+      }
+      if (amount <= 0) {
+        throw new AppError('Gói này đã đạt mục tiêu, không thể nạp thêm', 400);
+      }
+    }
 
     const wallet = await this.getWalletSnapshot(input.source_wallet_id, input.authorization);
     const walletBalance = Number(wallet.balance ?? '0');
@@ -138,7 +151,6 @@ class SavingService {
     session.startTransaction();
 
     try {
-      const currentAmount = Number(saving.current_amount?.toString?.() ?? 0);
       saving.current_amount = mongoose.Types.Decimal128.fromString(String(currentAmount + amount));
       await saving.save({ session });
 
@@ -171,6 +183,24 @@ class SavingService {
           transactionId: transaction.id,
         },
       });
+
+      const targetAmountVal = saving.target_amount ? Number(saving.target_amount.toString()) : null;
+      const isTargetReached = targetAmountVal !== null && targetAmountVal > 0 && currentAmount < targetAmountVal && (currentAmount + amount) >= targetAmountVal;
+
+      if (isTargetReached) {
+        await this.publishNotification({
+          userId: input.user_id,
+          title: `Hoàn thành mục tiêu ${saving.type === 'INVESTMENT' ? 'đầu tư' : 'tiết kiệm'}`,
+          message: `Chúc mừng bạn đã hoàn thành mục tiêu ${targetAmountVal.toLocaleString('vi-VN')}đ của gói ${saving.name}!`,
+          type: 'SUCCESS',
+          metadata: {
+            savingId: saving._id.toString(),
+            savingType: saving.type,
+            action: 'target_reached',
+            targetAmount: targetAmountVal,
+          },
+        });
+      }
 
       return {
         saving: this.toResponse(saving),

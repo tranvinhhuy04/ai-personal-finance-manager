@@ -174,7 +174,7 @@ export function SavingInvestment() {
       setDepositTarget(null);
       setDepositForm({ sourceWalletId: '', amount: '' });
       await refreshData();
-      setToast({ type: 'success', message: 'Nạp tiền thành công, thông báo realtime sẽ xuất hiện ngay.' });
+      setToast({ type: 'success', message: 'Nạp tiền thành công.' });
     } catch (error) {
       setToast({ type: 'error', message: error instanceof Error ? error.message : 'Nạp tiền thất bại.' });
     } finally {
@@ -366,35 +366,46 @@ export function SavingInvestment() {
                     </div>
 
                     <div className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
-                      <div className="mb-2 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
-                        <span>Tiến độ</span>
-                        <span>{item.targetAmount ? `${progress}%` : 'Linh hoạt'}</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
-                        <div
-                          className="h-2 rounded-full bg-slate-900 transition-all dark:bg-emerald-500"
-                          style={{ width: `${item.targetAmount ? progress : 20}%` }}
-                        />
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+                      {item.status === 'ACTIVE' && (
+                        <>
+                          <div className="mb-2 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
+                            <span>Tiến độ</span>
+                            <span>{item.targetAmount ? `${progress}%` : 'Linh hoạt'}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
+                            <div
+                              className="h-2 rounded-full bg-slate-900 transition-all dark:bg-emerald-500"
+                              style={{ width: `${item.targetAmount ? progress : 20}%` }}
+                            />
+                          </div>
+                        </>
+                      )}
+                      <div className={cn("flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400", item.status === 'ACTIVE' && "mt-3")}>
                         <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" /> Bắt đầu: {new Date(item.startDate).toLocaleDateString('vi-VN')}</span>
                         <span className="inline-flex items-center gap-1"><Target className="h-3.5 w-3.5" /> Kết thúc: {item.endDate ? new Date(item.endDate).toLocaleDateString('vi-VN') : 'Không giới hạn'}</span>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        disabled={item.status !== 'ACTIVE'}
-                        onClick={() => {
-                          setDepositTarget(item);
-                          setDepositForm({ sourceWalletId: wallets[0]?.id ?? '', amount: '' });
-                        }}
-                        className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:disabled:bg-slate-700"
-                      >
-                        <ArrowDownToLine className="h-4 w-4" />
-                        Nạp tiền
-                      </button>
+                      {item.targetAmount && item.currentAmount >= item.targetAmount ? (
+                        <div className="inline-flex items-center gap-2 rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Đã hoàn thành
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={item.status !== 'ACTIVE'}
+                          onClick={() => {
+                            setDepositTarget(item);
+                            setDepositForm({ sourceWalletId: wallets[0]?.id ?? '', amount: '' });
+                          }}
+                          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:disabled:bg-slate-700"
+                        >
+                          <ArrowDownToLine className="h-4 w-4" />
+                          Nạp tiền
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={item.status !== 'ACTIVE'}
