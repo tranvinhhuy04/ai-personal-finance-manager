@@ -236,15 +236,23 @@ class SavingService {
     }
 
     const currentAmount = Number(saving.current_amount?.toString?.() ?? 0);
-    const settleAmount = settleType === 'PARTIAL'
-      ? parsePositiveAmount(input.amount as string | number, 'amount')
-      : currentAmount;
+    let settleAmount: number;
+    let remainingAmount: number;
 
-    if (settleType === 'PARTIAL' && settleAmount > currentAmount) {
-      throw new AppError('Partial settlement amount cannot exceed package balance', 400);
+    if (settleType === 'PARTIAL') {
+      settleAmount = parsePositiveAmount(input.amount as string | number, 'amount');
+      if (settleAmount > currentAmount) {
+        throw new AppError('Partial settlement amount cannot exceed package balance', 400);
+      }
+      remainingAmount = Math.max(0, currentAmount - settleAmount);
+    } else {
+      if (input.amount !== undefined && input.amount !== null && input.amount !== '') {
+        settleAmount = parsePositiveAmount(input.amount as string | number, 'amount');
+      } else {
+        settleAmount = currentAmount;
+      }
+      remainingAmount = 0;
     }
-
-    const remainingAmount = Math.max(0, currentAmount - settleAmount);
     const session = await mongoose.startSession();
     session.startTransaction();
 

@@ -568,7 +568,7 @@ class ApiClient {
     const response = await axiosClient.post(`/api/v1/savings/${savingId}/settle`, {
       settleType,
       destinationWalletId: data?.destinationWalletId ?? null,
-      amount: settleType === 'PARTIAL' ? data?.amount ?? null : null,
+      amount: data?.amount ?? null,
     });
 
     return {

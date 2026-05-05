@@ -201,6 +201,18 @@ export function SavingInvestment() {
         setToast({ type: 'error', message: 'Số tiền tất toán bán phần không được vượt quá số dư trong gói.' });
         return;
       }
+    } else if (settleForm.settleType === 'FULL' && settleTarget.type === 'INVESTMENT') {
+      if (settleForm.destinationWalletId && !settleForm.amount) {
+        setToast({ type: 'error', message: 'Vui lòng nhập số tiền thực lãnh.' });
+        return;
+      }
+      if (settleForm.amount) {
+        const fullAmount = Number(settleForm.amount);
+        if (!Number.isFinite(fullAmount) || fullAmount < 0) {
+          setToast({ type: 'error', message: 'Vui lòng nhập số tiền thực lãnh hợp lệ.' });
+          return;
+        }
+      }
     }
 
     setSubmitting(true);
@@ -208,7 +220,7 @@ export function SavingInvestment() {
       await apiClient.settleSaving(settleTarget.id, {
         settleType: settleForm.settleType,
         destinationWalletId: settleForm.destinationWalletId || null,
-        amount: settleForm.settleType === 'PARTIAL' ? settleForm.amount : null,
+        amount: (settleForm.settleType === 'PARTIAL' || (settleForm.settleType === 'FULL' && settleTarget.type === 'INVESTMENT')) ? settleForm.amount : null,
       });
       setSettleTarget(null);
       setSettleForm(initialSettleForm);
@@ -572,7 +584,7 @@ export function SavingInvestment() {
                 ))}
               </select>
 
-              {settleForm.settleType === 'PARTIAL' && (
+              {settleForm.settleType === 'PARTIAL' ? (
                 <div className="space-y-2">
                   <CurrencyInput
                     value={settleForm.amount}
@@ -582,7 +594,17 @@ export function SavingInvestment() {
                   />
                   <p className="text-xs text-slate-500">Số dư hiện tại trong gói: {formatCurrency(Number(settleTarget.currentAmount ?? 0))}</p>
                 </div>
-              )}
+              ) : settleTarget.type === 'INVESTMENT' ? (
+                <div className="space-y-2">
+                  <CurrencyInput
+                    value={settleForm.amount}
+                    onValueChange={(value) => setSettleForm((prev) => ({ ...prev, amount: value }))}
+                    placeholder="Thực lãnh (VND)"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+                  />
+                  <p className="text-xs text-slate-500">Số tiền gốc đã đầu tư: {formatCurrency(Number(settleTarget.currentAmount ?? 0))}</p>
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
