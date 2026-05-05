@@ -16,7 +16,7 @@ import {
   listRecurringRules,
   updateRecurringRule,
 } from '../controllers/recurring-rule.controller';
-import { createSaving, depositSaving, listSavings, settleSaving } from '../controllers/saving.controller';
+import { createSaving, deleteSaving, depositSaving, listSavings, settleSaving } from '../controllers/saving.controller';
 import { uploadInvoiceImage } from '../middlewares/upload.middleware';
 
 const router = Router();
@@ -45,6 +45,7 @@ router.get('/savings', listSavings);
 router.post('/savings', createSaving);
 router.post('/savings/:id/deposit', depositSaving);
 router.post('/savings/:id/settle', settleSaving);
+router.delete('/savings/:id', deleteSaving);
 
 router.post('/invoices/extract', uploadInvoiceImage, extractInvoice);
 router.post('/invoices/upload',  uploadInvoiceImage, uploadInvoice);

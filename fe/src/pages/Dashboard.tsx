@@ -83,8 +83,12 @@ async function fetchOverview(walletsPromise?: Promise<Wallet[]>): Promise<Dashbo
   ]);
 
   const totalWalletBalance = wallets.reduce((sum, wallet) => sum + toNumber(wallet.balance), 0);
-  const totalSavings = savings.reduce((sum, item) => sum + toNumber(item.currentAmount), 0);
-  const totalInvestment = investments.reduce((sum, item) => sum + toNumber(item.currentAmount), 0);
+  const totalSavings = savings
+    .filter((item) => item.status === 'ACTIVE')
+    .reduce((sum, item) => sum + toNumber(item.currentAmount), 0);
+  const totalInvestment = investments
+    .filter((item) => item.status === 'ACTIVE')
+    .reduce((sum, item) => sum + toNumber(item.currentAmount), 0);
 
   return {
     balance: {

@@ -314,6 +314,21 @@ class SavingService {
     }
   }
 
+  async deleteSaving(savingId: string, userId: string) {
+    if (!mongoose.Types.ObjectId.isValid(savingId)) throw new AppError('saving_id is invalid', 400);
+
+    const saving = await SavingModel.findOne({ _id: savingId, user_id: userId });
+    if (!saving) throw new AppError('Saving package not found', 404);
+
+    const currentAmount = Number(saving.current_amount?.toString() ?? 0);
+    if (saving.status !== 'SETTLED' && currentAmount > 0) {
+      throw new AppError('Chỉ có thể xóa gói đã tất toán hoặc có số dư bằng 0', 400);
+    }
+
+    await SavingModel.deleteOne({ _id: savingId });
+    return { success: true };
+  }
+
   private async getWalletSnapshot(walletId: string, authorization?: string): Promise<WalletSnapshot> {
     if (!authorization) {
       throw new AppError('Authorization header is required to validate wallet ownership', 401);

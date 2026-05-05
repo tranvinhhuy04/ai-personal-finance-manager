@@ -66,3 +66,11 @@ export const settleSaving = catchAsync(async (req: Request, res: Response) => {
 
   return res.status(200).json(result);
 });
+
+export const deleteSaving = catchAsync(async (req: Request, res: Response) => {
+  const userId = String((req as any).userId ?? '');
+  const savingId = req.params.id;
+
+  const result = await savingService.deleteSaving(savingId, userId);
+  return res.status(200).json(result);
+});

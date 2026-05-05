@@ -577,6 +577,10 @@ class ApiClient {
     };
   }
 
+  async deleteSaving(savingId: string): Promise<void> {
+    await axiosClient.delete(`/api/v1/savings/${savingId}`);
+  }
+
   // ===== AI SERVICE ENDPOINTS =====
 
   async ocrInvoice(file: File): Promise<AIOcrResponse> {

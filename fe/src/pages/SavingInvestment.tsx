@@ -12,6 +12,7 @@ import {
   Target,
   TrendingUp,
   Wallet,
+  X,
 } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -236,6 +237,18 @@ export function SavingInvestment() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa gói này?')) return;
+
+    try {
+      await apiClient.deleteSaving(id);
+      await refreshData();
+      setToast({ type: 'success', message: 'Đã xóa gói thành công.' });
+    } catch (error) {
+      setToast({ type: 'error', message: error instanceof Error ? error.message : 'Xóa gói thất bại.' });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {toast && (
@@ -356,14 +369,26 @@ export function SavingInvestment() {
                         </div>
                       </div>
 
-                      <span className={cn(
-                        'rounded-full px-2.5 py-1 text-xs font-semibold',
-                        item.status === 'ACTIVE'
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                          : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
-                      )}>
-                        {item.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã tất toán'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          'rounded-full px-2.5 py-1 text-xs font-semibold',
+                          item.status === 'ACTIVE'
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+                        )}>
+                          {item.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã tất toán'}
+                        </span>
+                        {item.status === 'SETTLED' && (
+                          <button
+                            type="button"
+                            onClick={() => void handleDelete(item.id)}
+                            className="rounded-full p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                            title="Xóa gói"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
