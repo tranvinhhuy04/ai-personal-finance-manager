@@ -5,8 +5,7 @@
  *   Node.js nhận file từ FE → đọc buffer → gọi nội bộ Python ai-service (PaddleOCR)
  *   → trả về { merchantName, totalAmount, transactionDate } chuẩn hóa về FE.
  *
- * Google Cloud Vision + Gemini đã được loại bỏ khỏi luồng active.
- * Xem @deprecated block trong file cũ nếu cần rollback.
+ * Luồng OCR cloud cũ đã được loại bỏ khỏi runtime hiện tại.
  */
 
 import { readFile } from 'fs/promises';
