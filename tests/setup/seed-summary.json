@@ -1,0 +1,22 @@
+{
+  "account": {
+    "email": "test030526@gmail.com",
+    "password": "12345678"
+  },
+  "period": {
+    "from": "2024-05-03",
+    "to": "2026-05-03"
+  },
+  "counts": {
+    "transactions": 859,
+    "wallets": 3,
+    "categories": 7
+  },
+  "expected": {
+    "totalBalance": 300507877,
+    "totalIncome": 549007652,
+    "totalExpense": 267499775,
+    "totalExpense2025": 135926313,
+    "foodExpenseApr2026": 2493911
+  }
+}
