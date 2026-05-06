@@ -50,6 +50,10 @@ type DetailedTransaction = {
   occurredAt: Date;
   source: string;
 };
+type SavingsMetrics = {
+  savedAmount: number;
+  savingsRate: number;
+};
 
 function toMonthKey(date?: string | Date) {
   const occurredDate = date ? new Date(date) : new Date();
@@ -502,6 +506,35 @@ function buildBudgetProgress(currentBreakdown: BreakdownItem[], previousBreakdow
     };
   });
 }
+function buildSavingsMetrics(summary: SummaryResult, transactions: DetailedTransaction[]): SavingsMetrics {
+  const savingsDeposits = transactions.reduce((sum, transaction) => {
+    if (transaction.source !== 'SAVING' || transaction.transactionType !== 'EXPENSE') {
+      return sum;
+    }
+
+    return sum + transaction.amount;
+  }, 0);
+
+  const savingsWithdrawals = transactions.reduce((sum, transaction) => {
+    if (transaction.source !== 'SAVING' || transaction.transactionType !== 'INCOME') {
+      return sum;
+    }
+
+    return sum + transaction.amount;
+  }, 0);
+
+  const retainedCash = Math.max(0, summary.totalIncome - savingsWithdrawals - summary.totalExpense);
+  const netSavingsContribution = Math.max(0, savingsDeposits - savingsWithdrawals);
+  const savedAmount = roundMoney(retainedCash + netSavingsContribution);
+  const savingsRate = summary.totalIncome > 0
+    ? roundPercent((savedAmount / summary.totalIncome) * 100)
+    : 0;
+
+  return {
+    savedAmount,
+    savingsRate,
+  };
+}
 
 function buildInsights(input: {
   summary: SummaryResult;
@@ -509,6 +542,8 @@ function buildInsights(input: {
   budgetProgress: Array<{ category: string; percent: number }>;
   recurringSpend: number;
   transactionCount: number;
+  periodDays: number;
+  savingsMetrics: SavingsMetrics;
 }) {
   const spendingChangePercent = roundPercent(
     calculatePercentChange(input.summary.totalExpense, input.previousSummary.totalExpense)
@@ -516,13 +551,10 @@ function buildInsights(input: {
   const incomeChangePercent = roundPercent(
     calculatePercentChange(input.summary.totalIncome, input.previousSummary.totalIncome)
   );
-  const savingsRate = input.summary.totalIncome > 0
-    ? roundPercent(Math.max(0, (input.summary.net / input.summary.totalIncome) * 100))
-    : 0;
+  const savingsRate = input.savingsMetrics.savingsRate;
 
-  const totalDays = 30;
-  const dailyAverageExpense = roundMoney(input.summary.totalExpense / Math.max(1, totalDays));
-  const riskiestCategory = input.budgetProgress.sort((a, b) => b.percent - a.percent)[0]?.category ?? null;
+  const dailyAverageExpense = roundMoney(input.summary.totalExpense / Math.max(1, input.periodDays));
+  const riskiestCategory = [...input.budgetProgress].sort((a, b) => b.percent - a.percent)[0]?.category ?? null;
 
   let severity: 'good' | 'warning' | 'neutral' = 'neutral';
   let headline = 'Dòng tiền hiện tại đang được kiểm soát khá ổn định.';
@@ -1024,13 +1056,19 @@ class AnalyticsService {
     const budgetProgress = buildBudgetProgress(breakdown, previousBreakdown);
     const topTransactions = buildTopTransactions(detailedTransactions);
     const forecast = buildForecastData(detailedTransactions, currentWindow);
-    const recurringSpend = subscriptions.reduce((sum, item) => sum + item.amount, 0);
+    const recurringSpend = subscriptions
+      .filter((item) => item.status === 'ACTIVE')
+      .reduce((sum, item) => sum + item.amount, 0);
+    const periodDays = diffDaysInclusive(currentWindow.startDate, currentWindow.endDate);
+    const savingsMetrics = buildSavingsMetrics(summary, detailedTransactions);
     const insights = buildInsights({
       summary,
       previousSummary,
       budgetProgress,
       recurringSpend,
       transactionCount: detailedTransactions.length,
+      periodDays,
+      savingsMetrics,
     });
 
     return {
