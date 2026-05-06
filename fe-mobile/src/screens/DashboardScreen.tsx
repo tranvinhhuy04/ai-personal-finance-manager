@@ -1,20 +1,23 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { ArrowDownRight, ArrowUpRight, PiggyBank, TrendingUp, Wallet2 } from 'lucide-react-native';
 
 import { EmptyState } from '../components/EmptyState';
+import { PrimaryButton } from '../components/PrimaryButton';
 import { SkeletonLoading } from '../components/SkeletonLoading';
 import { WalletCard } from '../components/WalletCard';
+import { useAppPreferences } from '../hooks/useAppPreferences';
 import { useDashboardOverview } from '../hooks/useDashboardOverview';
 import { toWalletCardItem, useWallets } from '../hooks/useWallets';
 import type { TimeRange } from '../types/finance';
 import { formatCompactCurrency, formatCurrency } from '../utils/formatCurrency';
 
 const RANGE_OPTIONS: Array<{ key: TimeRange; label: string }> = [
-  { key: 'month', label: 'Tháng' },
-  { key: 'quarter', label: 'Quý' },
-  { key: 'year', label: 'Năm' },
+  { key: 'month', label: 'Tháng này' },
+  { key: 'quarter', label: 'Quý này' },
+  { key: 'year', label: 'Năm nay' },
 ];
 
 function FilterPill({
@@ -29,7 +32,7 @@ function FilterPill({
   return (
     <Pressable
       onPress={onPress}
-      className={`rounded-full px-3 py-1.5 ${selected ? 'bg-emerald-600' : 'bg-slate-100'}`}
+      className={`min-h-[44px] rounded-full px-3.5 py-2 ${selected ? 'bg-emerald-600' : 'bg-slate-100'} items-center justify-center`}
     >
       <Text className={`text-xs font-semibold ${selected ? 'text-white' : 'text-slate-600'}`}>{label}</Text>
     </Pressable>
@@ -58,11 +61,22 @@ function QuickStatCard({
 }
 
 export function DashboardScreen() {
+  const { preferences } = useAppPreferences();
   const [range, setRange] = useState<TimeRange>('month');
   const overview = useDashboardOverview(range);
   const wallets = useWallets();
+  const navigation = useNavigation<any>();
 
-  const featuredWallets = useMemo(() => wallets.rawWallets.slice(0, 6), [wallets.rawWallets]);
+  const parseBalance = (value: unknown) => {
+    const normalized = String(value ?? '0').replace(/,/g, '').replace(/\s/g, '');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const featuredWallets = useMemo(
+    () => [...wallets.rawWallets].sort((a, b) => parseBalance(b.balance) - parseBalance(a.balance)).slice(0, 6),
+    [wallets.rawWallets]
+  );
   const bars = overview.data.cashflowBars;
   const maxBarValue = Math.max(...bars.flatMap((item) => [item.income, item.expense]), 1);
 
@@ -71,10 +85,10 @@ export function DashboardScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
+    <SafeAreaView className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        className="flex-1 bg-slate-50"
+        className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}
         refreshControl={
           <RefreshControl
             refreshing={overview.isRefreshing || wallets.isRefreshing}
@@ -88,15 +102,15 @@ export function DashboardScreen() {
         <View className="px-5 pt-4 pb-10">
           <View className="mb-6">
             <Text className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Fintech Mobile</Text>
-            <Text className="mt-2 text-[28px] font-bold text-slate-900">Dashboard</Text>
-            <Text className="mt-1 text-sm leading-5 text-slate-500">
-              Tổng quan ví, dòng tiền và insight tài chính theo phong cách từ bản web.
+            <Text className="mt-2 text-[28px] font-bold text-slate-900">Tổng quan tài chính</Text>
+            <Text className="mt-2 text-sm leading-6 text-slate-500">
+              Báo cáo nhanh về tài sản khả dụng, biến động dòng tiền và các điểm cần theo dõi trong kỳ.
             </Text>
           </View>
 
           {overview.errorMessage || wallets.errorMessage ? (
             <View className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <Text className="text-sm font-medium text-amber-800">Chưa tải được đầy đủ dữ liệu từ backend.</Text>
+              <Text className="text-sm font-medium text-amber-800">Một phần dữ liệu chưa đồng bộ từ backend.</Text>
               <Text className="mt-1 text-xs text-amber-700">{overview.errorMessage ?? wallets.errorMessage}</Text>
             </View>
           ) : null}
@@ -104,7 +118,7 @@ export function DashboardScreen() {
           <View className="rounded-[24px] bg-emerald-600 p-6 shadow-lg">
             <View className="flex-row items-start justify-between gap-4">
               <View className="flex-1">
-                <Text className="mb-1 text-sm font-medium text-emerald-100">Tổng số dư của tôi</Text>
+                <Text className="mb-1 text-sm font-medium text-emerald-100">Tổng tài sản khả dụng</Text>
                 <Text className="text-4xl font-bold tracking-tight text-white">{formatCurrency(overview.data.totalBalance)}</Text>
               </View>
               <View className="rounded-full bg-white/15 p-3">
@@ -124,71 +138,70 @@ export function DashboardScreen() {
               icon={<PiggyBank size={18} color="#059669" />}
               title="Tiết kiệm"
               value={formatCompactCurrency(overview.data.totalSavings)}
-              hint="Quỹ dự phòng"
+              hint="Quỹ dự phòng hiện có"
             />
             <QuickStatCard
               icon={<TrendingUp size={18} color="#059669" />}
               title="Đầu tư"
               value={formatCompactCurrency(overview.data.totalInvestments)}
-              hint="Tăng trưởng"
+              hint="Giá trị tăng trưởng"
             />
           </View>
 
-          <View className="mt-8">
-            <View className="mb-4 flex-row items-center justify-between gap-3">
-              <View className="flex-1">
-                <Text className="text-lg font-bold text-slate-800">Ví nổi bật</Text>
-                <Text className="mt-1 text-sm text-slate-500">Các ví được đồng bộ từ backend và hiển thị theo dạng card.</Text>
-              </View>
-              <View className="flex-row gap-2">
-                {RANGE_OPTIONS.map((item) => (
-                  <FilterPill
-                    key={item.key}
-                    label={item.label}
-                    selected={range === item.key}
-                    onPress={() => setRange(item.key)}
-                  />
-                ))}
-              </View>
+          <View className="mt-7">
+            <View className="mb-4">
+              <Text className="text-lg font-bold text-slate-800">Ví nổi bật</Text>
+              <Text className="mt-1 text-sm leading-6 text-slate-500">Các ví có số dư đại diện, đồng bộ trực tiếp từ hệ thống backend.</Text>
             </View>
 
-            <View className="rounded-[24px] bg-white py-4 shadow-sm">
-              {featuredWallets.length === 0 ? (
-                <View className="px-4">
-                  <EmptyState
-                    title="Chưa có ví nào"
-                    description="Khi API ví sẵn sàng, danh sách ví nổi bật sẽ xuất hiện tại đây."
-                  />
-                </View>
-              ) : (
-                <FlatList
-                  data={featuredWallets}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  keyExtractor={(item) => item.id}
-                  contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingRight: 28 }}
-                  renderItem={({ item }) => <WalletCard wallet={toWalletCardItem(item)} variant="compact" />}
+            {wallets.isLoading ? (
+              <View className="h-44 rounded-[24px] bg-white items-center justify-center shadow-sm">
+                <Text className="text-sm text-slate-400">Đang tải ví…</Text>
+              </View>
+            ) : featuredWallets.length === 0 ? (
+              <View className="rounded-[24px] bg-white px-4 py-6 shadow-sm">
+                <EmptyState
+                  title="Chưa có ví nào"
+                  description="Tạo ví đầu tiên trong tab Ví để thấy danh sách ví nổi bật tại đây."
+                  action={
+                    <PrimaryButton
+                      label="Tải lại"
+                      variant="secondary"
+                      onPress={() => {
+                        void overview.refetch();
+                        void wallets.refetch();
+                      }}
+                    />
+                  }
                 />
-              )}
-            </View>
+              </View>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 4, gap: 12, paddingRight: 8 }}
+              >
+                {featuredWallets.map((item) => (
+                  <WalletCard key={item.id} wallet={toWalletCardItem(item)} variant="compact" />
+                ))}
+              </ScrollView>
+            )}
           </View>
 
-          <View className="mt-8">
-            <View className="mb-4 flex-row items-center justify-between gap-3">
-              <View className="flex-1">
-                <Text className="text-lg font-bold text-slate-800">Dòng tiền</Text>
-                <Text className="mt-1 text-sm text-slate-500">{overview.data.periodLabel}</Text>
-              </View>
-              <View className="flex-row gap-2">
-                {RANGE_OPTIONS.map((item) => (
-                  <FilterPill
-                    key={`cashflow-${item.key}`}
-                    label={item.label}
-                    selected={range === item.key}
-                    onPress={() => setRange(item.key)}
-                  />
-                ))}
-              </View>
+          <View className="mt-7">
+            <View className="mb-3">
+              <Text className="text-lg font-bold text-slate-800">Phân tích dòng tiền</Text>
+              <Text className="mt-1 text-sm text-slate-500">{overview.data.periodLabel}</Text>
+            </View>
+            <View className="mb-4 flex-row gap-2">
+              {RANGE_OPTIONS.map((item) => (
+                <FilterPill
+                  key={`cashflow-${item.key}`}
+                  label={item.label}
+                  selected={range === item.key}
+                  onPress={() => setRange(item.key)}
+                />
+              ))}
             </View>
 
             <View className="rounded-[24px] bg-white p-4 shadow-sm">
@@ -196,6 +209,7 @@ export function DashboardScreen() {
                 <EmptyState
                   title="Chưa có dữ liệu dòng tiền"
                   description="Biểu đồ thu và chi sẽ hiển thị tại đây ngay khi analytics service trả dữ liệu."
+                  action={<PrimaryButton label="Tải lại dữ liệu" variant="secondary" onPress={() => void overview.refetch()} />}
                 />
               ) : (
                 <>
@@ -239,11 +253,19 @@ export function DashboardScreen() {
             </View>
           </View>
 
-          <View className="mt-8">
-            <View className="mb-4 flex-row items-center justify-between gap-3">
+          <View className="mt-7">
+            <View className="mb-4 gap-2">
               <View className="flex-1">
-                <Text className="text-lg font-bold text-slate-800">Insight nhanh</Text>
-                <Text className="mt-1 text-sm text-slate-500">Những điểm nổi bật được chuẩn bị sẵn để gắn AI/backend.</Text>
+                <Text className="text-lg font-bold text-slate-800">Nhận định nhanh</Text>
+                <Text className="mt-1 text-sm leading-6 text-slate-500">Điểm nhấn tài chính được tổng hợp để hỗ trợ đánh giá nhanh theo kỳ.</Text>
+              </View>
+              <View className="flex-row justify-end">
+                <Pressable
+                  onPress={() => navigation.navigate('Analytics')}
+                  className="min-h-[44px] rounded-full bg-emerald-50 px-4 py-2 items-center justify-center"
+                >
+                  <Text className="text-xs font-semibold text-emerald-700" numberOfLines={1}>Phân tích nhanh</Text>
+                </Pressable>
               </View>
             </View>
 
@@ -267,10 +289,11 @@ export function DashboardScreen() {
                   <EmptyState
                     title="Chưa có giao dịch nổi bật"
                     description="Danh sách giao dịch gần nhất sẽ hiển thị tại đây khi analytics backend trả dữ liệu."
+                    action={<PrimaryButton label="Làm mới" variant="secondary" onPress={() => void overview.refetch()} />}
                   />
                 ) : (
                   overview.data.latestTransactions.map((item) => (
-                    <View key={item.id} className="rounded-[18px] bg-slate-50 p-3">
+                    <View key={item.id} className="rounded-[18px] bg-slate-50 p-3.5">
                       <View className="flex-row items-center justify-between gap-3">
                         <View className="flex-1">
                           <Text className="text-sm font-semibold text-slate-800">{item.merchant}</Text>

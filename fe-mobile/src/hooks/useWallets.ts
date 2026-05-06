@@ -3,7 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { financeApi } from '../api/finance';
 import type { CreateWalletInput, Wallet } from '../types/finance';
-import { DEMO_WALLETS } from '../utils/demoData';
+
+function parseBalance(value: unknown): number {
+  const normalized = String(value ?? '0').replace(/,/g, '').replace(/\s/g, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 export function useWallets() {
   const queryClient = useQueryClient();
@@ -31,7 +36,7 @@ export function useWallets() {
     },
   });
 
-  const sourceWallets = query.data ?? (query.isError ? DEMO_WALLETS : []);
+  const sourceWallets = query.data ?? [];
   const wallets = useMemo(() => {
     if (filter === 'active') return sourceWallets.filter((wallet) => wallet.status === 1);
     if (filter === 'locked') return sourceWallets.filter((wallet) => wallet.status !== 1);
@@ -39,7 +44,7 @@ export function useWallets() {
   }, [filter, sourceWallets]);
 
   const summary = useMemo(() => {
-    const totalBalance = sourceWallets.reduce((sum, wallet) => sum + Number(wallet.balance || 0), 0);
+    const totalBalance = sourceWallets.reduce((sum, wallet) => sum + parseBalance(wallet.balance), 0);
     const activeCount = sourceWallets.filter((wallet) => wallet.status === 1).length;
 
     return {
@@ -58,7 +63,7 @@ export function useWallets() {
     setFilter,
     isLoading: query.isLoading,
     isRefreshing: query.isRefetching,
-    isDemoMode: query.isError,
+    isDemoMode: false,
     errorMessage: query.error instanceof Error ? query.error.message : null,
     refetch: query.refetch,
     createWallet: createMutation.mutateAsync,

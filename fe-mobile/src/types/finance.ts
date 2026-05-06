@@ -96,6 +96,15 @@ export interface AnalyticsDashboardResponse {
     date: string;
     amount: number;
     transactionType: 'INCOME' | 'EXPENSE';
+    source?: string;
+  }>;
+  subscriptions?: Array<{
+    id: string;
+    name: string;
+    date: string;
+    amount: number;
+    frequency: 'WEEKLY' | 'MONTHLY';
+    status: 'ACTIVE' | 'PAUSED';
   }>;
 }
 
@@ -126,4 +135,35 @@ export interface CreateWalletInput {
   walletType: WalletType;
   walletName: string;
   balance?: number;
+}
+
+export type TransactionType = 'INCOME' | 'EXPENSE';
+
+export interface Transaction {
+  id: string;
+  userId: string;
+  walletId: string;
+  categoryId?: string | null;
+  categoryName?: string | null;
+  amount: number;
+  transactionType: TransactionType;
+  currency: string;
+  description: string;
+  occurredAt: string;
+  createdAt: string;
+}
+
+export interface CreateTransactionInput {
+  walletId: string;
+  categoryId?: string;
+  amount: number;
+  transactionType: TransactionType;
+  description: string;
+  occurredAt?: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  type: TransactionType;
 }

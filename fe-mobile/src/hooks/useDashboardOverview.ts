@@ -3,14 +3,19 @@ import { useQuery } from '@tanstack/react-query';
 
 import { financeApi } from '../api/finance';
 import type { AnalyticsDashboardResponse, SavingPackage, TimeRange, Wallet } from '../types/finance';
-import { DEMO_WALLETS, getDemoAnalytics } from '../utils/demoData';
+
+function parseBalance(value: unknown): number {
+  const normalized = String(value ?? '0').replace(/,/g, '').replace(/\s/g, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 function sumSavingAmount(items: SavingPackage[]) {
   return items.reduce((sum, item) => sum + Number(item.currentAmount || 0), 0);
 }
 
 function sumWalletAmount(items: Wallet[]) {
-  return items.reduce((sum, item) => sum + Number(item.balance || 0), 0);
+  return items.reduce((sum, item) => sum + parseBalance(item.balance), 0);
 }
 
 export function useDashboardOverview(range: TimeRange = 'month') {
@@ -35,10 +40,9 @@ export function useDashboardOverview(range: TimeRange = 'month') {
     retry: 1,
   });
 
-  const wallets = walletsQuery.data ?? (walletsQuery.isError ? DEMO_WALLETS : []);
+  const wallets = walletsQuery.data ?? [];
   const [savings = [], investments = []] = savingsQuery.data ?? [[], []];
-  const analytics: AnalyticsDashboardResponse | undefined =
-    analyticsQuery.data ?? (analyticsQuery.isError ? getDemoAnalytics(range) : undefined);
+  const analytics: AnalyticsDashboardResponse | undefined = analyticsQuery.data;
 
   const data = useMemo(() => {
     const totalBalance = sumWalletAmount(wallets);
@@ -66,7 +70,7 @@ export function useDashboardOverview(range: TimeRange = 'month') {
 
   const isLoading = walletsQuery.isLoading || savingsQuery.isLoading || analyticsQuery.isLoading;
   const isRefreshing = walletsQuery.isRefetching || savingsQuery.isRefetching || analyticsQuery.isRefetching;
-  const isDemoMode = walletsQuery.isError || savingsQuery.isError || analyticsQuery.isError;
+  const isDemoMode = false;
 
   const refetchAll = async () => {
     await Promise.all([walletsQuery.refetch(), savingsQuery.refetch(), analyticsQuery.refetch()]);

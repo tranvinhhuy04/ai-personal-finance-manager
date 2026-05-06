@@ -3,8 +3,11 @@ import type {
   AIChatRequest,
   AIChatResponse,
   AnalyticsDashboardResponse,
+  Category,
+  CreateTransactionInput,
   CreateWalletInput,
   SavingPackage,
+  Transaction,
   Wallet,
 } from '../types/finance';
 
@@ -131,6 +134,17 @@ class FinanceApiClient {
             date: String(item.date ?? ''),
             amount: toNumber(item.amount),
             transactionType: (item.transactionType ?? 'EXPENSE') as 'INCOME' | 'EXPENSE',
+            source: item.source ? String(item.source) : undefined,
+          }))
+        : [],
+      subscriptions: Array.isArray(raw.subscriptions)
+        ? raw.subscriptions.map((item: Record<string, any>) => ({
+            id: String(item.id ?? ''),
+            name: String(item.name ?? 'Khoản định kỳ'),
+            date: String(item.date ?? ''),
+            amount: toNumber(item.amount),
+            frequency: (item.frequency ?? 'MONTHLY') as 'WEEKLY' | 'MONTHLY',
+            status: (item.status ?? 'ACTIVE') as 'ACTIVE' | 'PAUSED',
           }))
         : [],
     };
@@ -213,6 +227,94 @@ class FinanceApiClient {
     });
 
     return this.normalizeAIResponse(response.data ?? {});
+  }
+
+  async getTransactions(opts?: { walletId?: string; limit?: number; skip?: number }): Promise<Transaction[]> {
+    const params: Record<string, string | number> = {};
+    if (opts?.walletId) params.wallet_id = opts.walletId;
+    if (opts?.limit != null) params.limit = opts.limit;
+    if (opts?.skip != null) params.skip = opts.skip;
+
+    const response = await axiosClient.get('/api/v1/transactions', { params });
+    const raw = response.data ?? [];
+    const list = Array.isArray(raw) ? raw : (raw.data ?? []);
+
+    return list.map((item: Record<string, any>) => ({
+      id: String(item.id ?? item._id ?? ''),
+      userId: String(item.userId ?? item.user_id ?? ''),
+      walletId: String(item.walletId ?? item.wallet_id ?? ''),
+      categoryId: item.categoryId ?? item.category_id ?? null,
+      categoryName: item.categoryName ?? item.category_name ?? null,
+      amount: toNumber(item.amount),
+      transactionType: (item.transactionType ?? item.transaction_type ?? 'EXPENSE') as Transaction['transactionType'],
+      currency: String(item.currency ?? 'VND'),
+      description: String(item.description ?? item.merchant ?? 'Giao dịch'),
+      occurredAt: String(item.occurredAt ?? item.occurred_at ?? item.createdAt ?? new Date().toISOString()),
+      createdAt: String(item.createdAt ?? item.created_at ?? new Date().toISOString()),
+    }));
+  }
+
+  async createTransaction(data: CreateTransactionInput): Promise<Transaction> {
+    const response = await axiosClient.post('/api/v1/transactions', {
+      wallet_id: data.walletId,
+      category_id: data.categoryId ?? null,
+      amount: data.amount,
+      transaction_type: data.transactionType,
+      currency: 'VND',
+      description: data.description,
+      occurred_at: data.occurredAt ?? new Date().toISOString(),
+    });
+
+    const item = response.data ?? {};
+    return {
+      id: String(item.id ?? item._id ?? ''),
+      userId: String(item.userId ?? item.user_id ?? ''),
+      walletId: String(item.walletId ?? item.wallet_id ?? ''),
+      categoryId: item.categoryId ?? item.category_id ?? null,
+      categoryName: item.categoryName ?? item.category_name ?? null,
+      amount: toNumber(item.amount),
+      transactionType: (item.transactionType ?? item.transaction_type ?? 'EXPENSE') as Transaction['transactionType'],
+      currency: String(item.currency ?? 'VND'),
+      description: String(item.description ?? ''),
+      occurredAt: String(item.occurredAt ?? item.occurred_at ?? new Date().toISOString()),
+      createdAt: String(item.createdAt ?? item.created_at ?? new Date().toISOString()),
+    };
+  }
+
+  async getCategories(): Promise<Category[]> {
+    const response = await axiosClient.get('/api/v1/transactions/categories');
+    const list = Array.isArray(response.data) ? response.data : (response.data?.data ?? []);
+    return list.map((item: Record<string, any>) => ({
+      id: String(item.id ?? item._id ?? ''),
+      name: String(item.name ?? 'Khác'),
+      type: (item.type ?? 'EXPENSE') as Category['type'],
+    }));
+  }
+
+  /**
+   * OCR a receipt/invoice image and return extracted fields.
+   * Sends multipart/form-data with the image to POST /api/v1/invoices/extract
+   */
+  async extractInvoice(imageUri: string, mimeType = 'image/jpeg'): Promise<{
+    merchantName: string;
+    totalAmount: number | null;
+    transactionDate: string | null;
+  }> {
+    const formData = new FormData();
+    const fileName = imageUri.split('/').pop() ?? 'invoice.jpg';
+    formData.append('file', { uri: imageUri, name: fileName, type: mimeType } as any);
+
+    const response = await axiosClient.post('/api/v1/invoices/extract', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 90_000, // OCR cold start can take ~30s
+    });
+
+    const data = (response.data?.data ?? response.data ?? {}) as Record<string, any>;
+    return {
+      merchantName: String(data.merchantName ?? data.merchant_name ?? 'Không rõ'),
+      totalAmount: data.totalAmount != null ? toNumber(data.totalAmount) : null,
+      transactionDate: data.transactionDate ?? data.transaction_date ?? null,
+    };
   }
 }
 

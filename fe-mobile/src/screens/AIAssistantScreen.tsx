@@ -1,12 +1,29 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Bot, Send, Sparkles, UserRound } from 'lucide-react-native';
 
 import { financeApi } from '../api/finance';
-import { PrimaryButton } from '../components/PrimaryButton';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { SectionCard } from '../components/SectionCard';
+import { useAppPreferences } from '../hooks/useAppPreferences';
+import { useCashflow } from '../hooks/useCashflow';
 import { AI_SUGGESTED_QUESTIONS } from '../utils/demoData';
+
+function isGenericAiFallback(answer: string) {
+  const normalized = answer.trim().toLowerCase();
+
+  return normalized.includes('mình là trợ lý tài chính fin')
+    && normalized.includes('quản lý tiền bạc và đầu tư');
+}
+
+function isPlaceholderAiInsight(answer: string) {
+  const normalized = answer.trim().toLowerCase();
+
+  return normalized.includes('backend gửi thêm')
+    || normalized.includes('analytics-service')
+    || normalized.includes('dữ liệu tài chính đã tổng hợp');
+}
 
 interface ChatMessage {
   id: string;
@@ -15,7 +32,9 @@ interface ChatMessage {
 }
 
 export function AIAssistantScreen() {
+  const { preferences } = useAppPreferences();
   const [question, setQuestion] = useState('');
+  const analytics = useCashflow('month');
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -37,13 +56,33 @@ export function AIAssistantScreen() {
     setIsSending(true);
 
     try {
-      const result = await financeApi.askAI({ question: resolvedQuestion, useLlm: true });
+      const result = await financeApi.askAI({
+        question: resolvedQuestion,
+        useLlm: true,
+        range: 'month',
+        context: analytics.data
+          ? {
+              period: analytics.data.period,
+              summary: analytics.data.summary,
+              kpis: analytics.data.kpis,
+              breakdown: analytics.data.breakdown?.slice(0, 6),
+              comparison: analytics.data.comparison?.slice(0, 6),
+              budgetProgress: analytics.data.budgetProgress?.slice(0, 5),
+              topTransactions: analytics.data.topTransactions?.slice(0, 5),
+              subscriptions: analytics.data.subscriptions?.slice(0, 5),
+            }
+          : {},
+      });
+      const answer = result.answer?.trim();
+      const safeAnswer = answer && !isGenericAiFallback(answer) && !isPlaceholderAiInsight(answer)
+        ? answer
+        : 'Mình đã nhận được câu hỏi của bạn nhưng hiện chưa đủ ngữ cảnh để tạo tư vấn sâu ngay trong khung chat này. Bạn có thể xem màn Analytics để lấy insight chi tiết theo kỳ, hoặc hỏi cụ thể hơn về tổng chi, tổng thu hay danh mục đang phát sinh nhiều nhất.';
       setMessages((current) => [
         ...current,
         {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
-          text: result.answer || 'AI chưa có phản hồi chi tiết cho câu hỏi này.',
+          text: safeAnswer,
         },
       ]);
     } catch (error) {
@@ -61,7 +100,7 @@ export function AIAssistantScreen() {
   };
 
   return (
-    <View className="flex-1 bg-slate-50">
+    <View className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
       <ScreenHeader
         eyebrow="Smart AI"
         title="AI Assistant"
@@ -71,7 +110,7 @@ export function AIAssistantScreen() {
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          className="flex-1 bg-slate-50"
+          className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
         >
           <View className="rounded-[24px] bg-slate-900 p-6 shadow-lg">
@@ -89,17 +128,17 @@ export function AIAssistantScreen() {
 
           <View className="mt-8">
             <SectionCard title="Prompt gợi ý" subtitle="Chạm một lần để gửi nhanh các câu hỏi thường gặp." className="mb-0">
-              <View className="flex-row flex-wrap gap-2">
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                 {AI_SUGGESTED_QUESTIONS.map((item) => (
                   <Pressable
                     key={item}
                     onPress={() => void handleAsk(item)}
-                    className="rounded-full bg-emerald-50 px-4 py-2"
+                    className="min-h-[44px] flex-row items-center justify-center rounded-full bg-emerald-50 px-4 py-2"
                   >
-                    <Text className="text-sm font-medium text-emerald-700">{item}</Text>
+                    <Text className="flex-shrink text-center text-sm font-medium text-emerald-700" numberOfLines={1}>{item}</Text>
                   </Pressable>
                 ))}
-              </View>
+              </ScrollView>
             </SectionCard>
           </View>
 
@@ -117,8 +156,8 @@ export function AIAssistantScreen() {
                         </View>
                       ) : null}
 
-                      <View className={`max-w-[84%] rounded-[20px] px-4 py-3 ${isAssistant ? 'bg-slate-50' : 'bg-slate-900'}`}>
-                        <Text className={`text-sm leading-6 ${isAssistant ? 'text-slate-800' : 'text-white'}`}>{message.text}</Text>
+                      <View className={`max-w-[84%] rounded-[20px] px-4 py-3 ${isAssistant ? (preferences.darkMode ? 'bg-slate-800' : 'bg-slate-50') : 'bg-slate-900'}`}>
+                        <Text className={`text-sm leading-6 ${isAssistant ? (preferences.darkMode ? 'text-slate-200' : 'text-slate-800') : 'text-white'}`}>{message.text}</Text>
                       </View>
 
                       {!isAssistant ? (
@@ -149,24 +188,36 @@ export function AIAssistantScreen() {
                   multiline
                   numberOfLines={4}
                   placeholder="Ví dụ: Hãy phân tích 3 khoản chi lớn nhất tháng này và cho tôi lời khuyên tiết kiệm."
+                  placeholderTextColor={preferences.darkMode ? '#94a3b8' : '#64748b'}
                   textAlignVertical="top"
-                  className="min-h-[120px] rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900"
+                  className={`min-h-[120px] rounded-[20px] px-4 py-3 ${preferences.darkMode ? 'border border-slate-700 bg-slate-900 text-slate-100' : 'border border-slate-200 bg-slate-50 text-slate-900'}`}
                 />
 
-                <PrimaryButton
-                  label="Gửi câu hỏi cho AI"
-                  loading={isSending}
-                  icon={<Send size={16} color="#ffffff" />}
+                <Pressable
                   onPress={() => void handleAsk()}
-                />
+                  disabled={isSending}
+                  className={`overflow-hidden rounded-2xl ${isSending ? 'opacity-60' : ''}`}
+                >
+                  <LinearGradient
+                    colors={['#059669', '#047857', '#065f46']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    className="flex-row items-center justify-center gap-2 px-4 py-4"
+                  >
+                    {isSending ? <ActivityIndicator size="small" color="#ffffff" /> : <Send size={16} color="#ffffff" />}
+                    <Text className="flex-shrink text-center text-[15px] font-bold text-white" numberOfLines={1}>
+                      {isSending ? 'Đang gửi câu hỏi...' : 'Gửi câu hỏi cho AI'}
+                    </Text>
+                  </LinearGradient>
+                </Pressable>
               </View>
             </SectionCard>
           </View>
 
-          <View className="mt-8 rounded-[24px] border border-emerald-100 bg-emerald-50 p-4">
+          <View className={`mt-8 rounded-[24px] border p-4 ${preferences.darkMode ? 'border-emerald-900 bg-emerald-950/30' : 'border-emerald-100 bg-emerald-50'}`}>
             <View className="mb-2 flex-row items-center gap-2">
               <Sparkles size={16} color="#059669" />
-              <Text className="font-semibold text-emerald-900">AI capabilities</Text>
+              <Text className="font-semibold text-emerald-900">Khả năng AI hiện tại</Text>
             </View>
             {[
               'Phân tích tổng chi tiêu, danh mục nổi bật và xu hướng dòng tiền.',
