@@ -128,13 +128,18 @@ function shouldUseAnalyticsChat(message: string): boolean {
     return true;
   }
 
-  // Be tolerant to mojibake/encoding issues (e.g. "th�ng" -> "th ng") coming from some terminals/clients.
-  const coarse = normalized.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-  const hasMetricCue = /(\bthu\b|\bchi\b|\btong\b|\bso du\b|\bgiao dich\b|\bincome\b|\bexpense\b)/.test(coarse);
-  const hasTimeCue = /(\bthang\b|\bth\b|\bnay\b|\btruoc\b|\bquy\b|\bnam\b|\bmonth\b|\brecent\b)/.test(coarse);
+  // Savings amount queries ('tiet kiem duoc bao nhieu') need analytics context
+  const hasSavingsAmountQuery = /tiet kiem/.test(normalized) && /(bao nhieu|so tien|duoc|con lai|de danh)/.test(normalized);
+  if (hasSavingsAmountQuery) {
+    return true;
+  }
+
+  // Be tolerant to mojibake/encoding issues coming from some terminals/clients.
+  const coarse = normalized.replace(/[^a-z0-9\\s]/g, ' ').replace(/\\s+/g, ' ').trim();
+  const hasMetricCue = /(\\bthu\\b|\\bchi\\b|\\btong\\b|\\bso du\\b|\\bgiao dich\\b|\\bincome\\b|\\bexpense\\b)/.test(coarse);
+  const hasTimeCue = /(\\bthang\\b|\\bth\\b|\\bnay\\b|\\btruoc\\b|\\bquy\\b|\\bnam\\b|\\bmonth\\b|\\brecent\\b)/.test(coarse);
   return hasMetricCue && hasTimeCue;
 }
-
 function shouldUseMarketAdvisor(message: string): boolean {
   const normalized = normalizeText(message);
   return /(gia vang|ty gia|usd|chung khoan|co phieu|crypto|bitcoin|eth|lai suat|lai suat ngan hang)/.test(normalized);
@@ -201,7 +206,7 @@ function shouldUseLlm(message: string, explicit: unknown): boolean {
     return explicit;
   }
 
-  return /lời khuyên|goi y|gợi ý|tiet kiem|tiết kiệm|toi uu|tối ưu|phân tích|phan tich|kế hoạch|ke hoach|nên/i.test(
+  return /lời khuyên|goi y|gợi ý|tiet kiem|tiết kiệm|toi uu|tối ưu|phân tích|phan tich|kế hoạch|ke hoach|nên|giá vàng|gia vang|tỷ giá|ty gia|lãi suất|lai suat|chứng khoán|chung khoan|bitcoin|crypto/i.test(
     message
   );
 }

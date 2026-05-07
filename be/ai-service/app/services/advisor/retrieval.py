@@ -281,15 +281,19 @@ class RetrievalLayer:
             }
 
         fetched_at = datetime.now(timezone.utc).isoformat()
+        exchange_data: dict[str, Any] = {}
+        gold_data: dict[str, Any] = {}
+        domestic_gold_html = ""
         try:
             exchange_task = fetch_json(self.exchangerate_api)
             gold_task = fetch_json(self.gold_price_api)
             domestic_gold_task = fetch_text(self.domestic_gold_price_url)
-            exchange_data, gold_data, domestic_gold_html = await asyncio.gather(exchange_task, gold_task, domestic_gold_task)
+            results = await asyncio.gather(exchange_task, gold_task, domestic_gold_task, return_exceptions=True)
+            exchange_data = results[0] if isinstance(results[0], dict) else {}
+            gold_data = results[1] if isinstance(results[1], dict) else {}
+            domestic_gold_html = results[2] if isinstance(results[2], str) else ""
         except Exception:
-            exchange_data = {}
-            gold_data = {}
-            domestic_gold_html = ""
+            pass
         return {
             "exchange": {
                 "provider": "open_er_api",

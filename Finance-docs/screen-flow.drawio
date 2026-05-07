@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-05-07T00:00:00.000Z" version="21.0.0" type="device">
+  <diagram name="Screen Flow" id="screen-flow">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ==================== BACKGROUND: DashboardLayout Authenticated Area ==================== -->
+        <mxCell id="layout_bg" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;strokeWidth=2;fontColor=#333333;opacity=30;" vertex="1" parent="1">
+          <mxGeometry x="30" y="178" width="1830" height="980" as="geometry" />
+        </mxCell>
+        <mxCell id="layout_label" value="DashboardLayout — Khu vực đã xác thực (không có Route Guard)" style="text;html=1;align=left;verticalAlign=top;fontStyle=1;fontSize=12;strokeColor=none;fillColor=none;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="42" y="180" width="560" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== ENTRY POINT ==================== -->
+        <mxCell id="start" value="Start" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="32" y="68" width="90" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== AUTH SCREEN ==================== -->
+        <mxCell id="auth" value="&lt;b&gt;/auth&lt;/b&gt;&lt;br/&gt;Auth Page&lt;br/&gt;Login &amp;amp; Register" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="168" y="48" width="190" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- Auth Bug Note -->
+        <mxCell id="auth_bug" value="⚠️ Bug: navigate('/dashboard') sau login&lt;br/&gt;Route /dashboard không tồn tại → catch-all → /" style="text;html=1;align=left;verticalAlign=top;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=9;spacingLeft=4;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="378" y="12" width="300" height="42" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== HEADER ==================== -->
+        <mxCell id="header" value="Header  |  🔔 Notifications (dropdown, no nav)  |  HelpCircle → /help  |  Mail → /contact [dead route]  |  User Avatar → UserMenuDropdown" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="250" y="190" width="1565" height="42" as="geometry" />
+        </mxCell>
+
+        <!-- UserMenuDropdown -->
+        <mxCell id="user_menu" value="&lt;b&gt;UserMenuDropdown&lt;/b&gt;&lt;br/&gt;Hồ sơ cá nhân | Cài đặt | Logout" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1698" y="184" width="152" height="56" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== SIDEBAR ==================== -->
+        <mxCell id="sidebar" value="&lt;b&gt;Sidebar&lt;/b&gt;&lt;br/&gt;Navigation Hub&lt;br/&gt;─────────────&lt;br/&gt;/ &amp;nbsp;Bảng điều khiển&lt;br/&gt;/wallets&lt;br/&gt;/savings&lt;br/&gt;/analytics&lt;br/&gt;/transactions&lt;br/&gt;/invoices&lt;br/&gt;/recurring&lt;br/&gt;/ai-assistant&lt;br/&gt;/feedback&lt;br/&gt;/settings&lt;br/&gt;/help&lt;br/&gt;─────────────&lt;br/&gt;[Logout] → /auth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="42" y="248" width="182" height="890" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== PAGE SCREENS — ROW 1 (y=268) ==================== -->
+        <mxCell id="p_dashboard" value="&lt;b&gt;/&lt;/b&gt;&lt;br/&gt;Dashboard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="250" y="268" width="168" height="68" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_wallets" value="&lt;b&gt;/wallets&lt;/b&gt;&lt;br/&gt;Wallets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="448" y="268" width="168" height="68" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_savings" value="&lt;b&gt;/savings&lt;/b&gt;&lt;br/&gt;Savings &amp;amp; Investment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="646" y="268" width="168" height="68" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_analytics" value="&lt;b&gt;/analytics&lt;/b&gt;&lt;br/&gt;Analytics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="844" y="268" width="168" height="68" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_transactions" value="&lt;b&gt;/transactions&lt;/b&gt;&lt;br/&gt;Transactions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1042" y="268" width="168" height="68" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_invoices" value="&lt;b&gt;/invoices&lt;/b&gt;&lt;br/&gt;Invoices" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="268" width="168" height="68" as="geometry" />
+        </mxCell>
+
+        <!-- Dead Route Note -->
+        <mxCell id="dead_note" value="⚠️ Dead Route&lt;br/&gt;Header Mail icon → navigate('/contact')&lt;br/&gt;Không có route → redirect về /" style="rounded=1;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;align=left;spacingLeft=4;" vertex="1" parent="1">
+          <mxGeometry x="1438" y="268" width="230" height="68" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== PAGE SCREENS — ROW 2 (y=408) ==================== -->
+        <mxCell id="p_recurring" value="&lt;b&gt;/recurring&lt;/b&gt;&lt;br/&gt;Recurring" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="250" y="408" width="168" height="68" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_ai" value="&lt;b&gt;/ai-assistant&lt;/b&gt;&lt;br/&gt;AI Assistant" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="448" y="408" width="168" height="68" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_profile" value="&lt;b&gt;/profile&lt;/b&gt;&lt;br/&gt;Profile" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="646" y="408" width="168" height="68" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_settings" value="&lt;b&gt;/settings&lt;/b&gt;&lt;br/&gt;Settings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="844" y="408" width="168" height="68" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_help" value="&lt;b&gt;/help&lt;/b&gt;&lt;br/&gt;Help" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1042" y="408" width="168" height="68" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_feedback" value="&lt;b&gt;/feedback&lt;/b&gt;&lt;br/&gt;Feedback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="408" width="168" height="68" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== AI CHATBOT POPOVER (Floating) ==================== -->
+        <mxCell id="ai_popover" value="&lt;b&gt;AIChatbotPopover&lt;/b&gt; (floating widget)&lt;br/&gt;Đề xuất routes trong AI chat response (không programmatic)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="560" width="300" height="52" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== NAVIGATION EDGES ==================== -->
+
+        <!-- Start → Auth -->
+        <mxCell id="e0" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;" edge="1" source="start" target="auth" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Auth Login → Dashboard (navigate('/dashboard') → catch-all → /) -->
+        <mxCell id="e_login" value="Login thành công" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;strokeWidth=2;fontStyle=1;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="auth" target="p_dashboard" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="420" y="86" />
+              <mxPoint x="334" y="86" />
+              <mxPoint x="334" y="268" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Auth Register → self loop -->
+        <mxCell id="e_register" value="Register → switch to Login" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;fontSize=9;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" edge="1" source="auth" target="auth" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="263" y="165" />
+              <mxPoint x="148" y="165" />
+              <mxPoint x="148" y="123" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== SIDEBAR → PAGES (green, thin) ==================== -->
+        <mxCell id="e_sb_d" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;exitX=1;exitY=0.08;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sidebar" target="p_dashboard" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sb_w" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;exitX=1;exitY=0.16;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sidebar" target="p_wallets" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sb_s" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;exitX=1;exitY=0.24;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sidebar" target="p_savings" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sb_a" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;exitX=1;exitY=0.32;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sidebar" target="p_analytics" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sb_t" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;exitX=1;exitY=0.40;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sidebar" target="p_transactions" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sb_i" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;exitX=1;exitY=0.48;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sidebar" target="p_invoices" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sb_r" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;exitX=1;exitY=0.56;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sidebar" target="p_recurring" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sb_ai" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;exitX=1;exitY=0.64;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sidebar" target="p_ai" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sb_fb" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;exitX=1;exitY=0.72;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sidebar" target="p_feedback" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sb_st" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;exitX=1;exitY=0.80;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sidebar" target="p_settings" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sb_h" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;exitX=1;exitY=0.88;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sidebar" target="p_help" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Sidebar Logout → Auth -->
+        <mxCell id="e_sb_logout" value="Logout" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;strokeWidth=2;dashed=1;fontStyle=1;fontSize=9;exitX=0;exitY=0.97;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" edge="1" source="sidebar" target="auth" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="20" y="1163" />
+              <mxPoint x="20" y="138" />
+              <mxPoint x="168" y="138" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== HEADER → HELP ==================== -->
+        <mxCell id="e_hdr_help" value="HelpCircle icon" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontSize=9;exitX=0.62;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="header" target="p_help" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== USER MENU DROPDOWN ==================== -->
+        <!-- UserMenu → Profile -->
+        <mxCell id="e_um_prof" value="Hồ sơ" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontSize=9;" edge="1" source="user_menu" target="p_profile" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- UserMenu → Settings -->
+        <mxCell id="e_um_set" value="Cài đặt" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontSize=9;" edge="1" source="user_menu" target="p_settings" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- UserMenu → Auth (Logout) -->
+        <mxCell id="e_um_logout" value="Logout" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;strokeWidth=2;dashed=1;fontStyle=1;fontSize=9;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="user_menu" target="auth" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1774" y="155" />
+              <mxPoint x="420" y="155" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== DASHBOARD STATCARD NAVIGATIONS ==================== -->
+        <!-- Dashboard → Wallets (StatCard) -->
+        <mxCell id="e_dc_w" value="StatCard (Ví)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;fontSize=8;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="p_dashboard" target="p_wallets" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="334" y="248" />
+              <mxPoint x="532" y="248" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- Dashboard → Transactions (StatCard) -->
+        <mxCell id="e_dc_t" value="StatCard (Giao dịch)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;fontSize=8;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="p_dashboard" target="p_transactions" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="334" y="238" />
+              <mxPoint x="1126" y="238" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- Dashboard → Savings (StatCard) -->
+        <mxCell id="e_dc_s" value="StatCard (Tiết kiệm)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;fontSize=8;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="p_dashboard" target="p_savings" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="334" y="228" />
+              <mxPoint x="730" y="228" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- Dashboard → Settings (StatCard dropdown menu) -->
+        <mxCell id="e_dc_st" value="StatCard dropdown → Cài đặt" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;fontSize=8;" edge="1" source="p_dashboard" target="p_settings" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="334" y="390" />
+              <mxPoint x="928" y="390" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== HELP PAGE NAVIGATIONS ==================== -->
+        <!-- Help → AI Assistant -->
+        <mxCell id="e_hlp_ai" value="Thử AI ngay" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;fontSize=9;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p_help" target="p_ai" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Help → Feedback -->
+        <mxCell id="e_hlp_fb" value="Gửi phản hồi" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p_help" target="p_feedback" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1250" y="442" />
+              <mxPoint x="1250" y="490" />
+              <mxPoint x="1450" y="490" />
+              <mxPoint x="1450" y="442" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- Help → Wallets (quick nav card) -->
+        <mxCell id="e_hlp_w" value="Quick nav" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;fontSize=8;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="p_help" target="p_wallets" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1126" y="530" />
+              <mxPoint x="532" y="530" />
+              <mxPoint x="532" y="336" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- Help → Transactions (quick nav card) -->
+        <mxCell id="e_hlp_t" value="Quick nav" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;fontSize=8;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="p_help" target="p_transactions" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1126" y="540" />
+              <mxPoint x="1126" y="336" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- Help → Savings (quick nav card) -->
+        <mxCell id="e_hlp_s" value="Quick nav" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;fontSize=8;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="p_help" target="p_savings" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1126" y="550" />
+              <mxPoint x="730" y="550" />
+              <mxPoint x="730" y="336" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- Help → Recurring (quick nav card) -->
+        <mxCell id="e_hlp_r" value="Quick nav" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;fontSize=8;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p_help" target="p_recurring" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1000" y="442" />
+              <mxPoint x="1000" y="560" />
+              <mxPoint x="370" y="560" />
+              <mxPoint x="370" y="442" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- Help → Analytics (quick nav card) -->
+        <mxCell id="e_hlp_a" value="Quick nav" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;fontSize=8;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="p_help" target="p_analytics" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1126" y="520" />
+              <mxPoint x="928" y="520" />
+              <mxPoint x="928" y="336" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== LEGEND ==================== -->
+        <mxCell id="leg_bg" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="42" y="1182" width="820" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="leg_title" value="Legend" style="text;html=1;fontStyle=1;fontSize=12;align=left;verticalAlign=top;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="52" y="1185" width="100" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg1" value="Screen / Page" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="52" y="1210" width="130" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="Layout Component" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="198" y="1210" width="140" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="Auth Screen" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="354" y="1210" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="Floating / Popup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="490" y="1210" width="130" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" value="⚠️ Dead/Bug Route" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="636" y="1210" width="140" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg_arr1" value="Sidebar NavLink" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;endArrow=open;endFill=0;fontSize=9;" edge="1" parent="1">
+          <mxGeometry x="52" y="1258" width="130" height="30" relative="0" as="geometry">
+            <mxPoint x="62" y="1258" as="sourcePoint" />
+            <mxPoint x="162" y="1258" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg_arr1_lbl" value="Sidebar NavLink" style="text;html=1;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="172" y="1248" width="110" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg_arr2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;strokeWidth=2;dashed=1;endArrow=open;endFill=0;fontSize=9;" edge="1" parent="1">
+          <mxGeometry relative="0" as="geometry">
+            <mxPoint x="330" y="1258" as="sourcePoint" />
+            <mxPoint x="430" y="1258" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg_arr2_lbl" value="Logout flow" style="text;html=1;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="440" y="1248" width="100" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg_arr3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;endArrow=open;endFill=0;fontSize=9;" edge="1" parent="1">
+          <mxGeometry relative="0" as="geometry">
+            <mxPoint x="590" y="1258" as="sourcePoint" />
+            <mxPoint x="690" y="1258" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg_arr3_lbl" value="Help quick nav" style="text;html=1;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="700" y="1248" width="120" height="20" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

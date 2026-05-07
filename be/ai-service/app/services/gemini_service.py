@@ -162,18 +162,31 @@ class GeminiService:
             return None
         model, api_key = credentials
 
+        # Hướng dẫn thêm dựa vào sub_type được gửi kèm
+        sub_type = context.get('_sub_type', '') if isinstance(context, dict) else ''
+        sub_type_instruction = ''
+        if sub_type == 'category_breakdown':
+            sub_type_instruction = (
+                'Người dùng hỏi về DANH MỤC nào chi nhiều nhất. '
+                'Bắt buộc nêu tên danh mục cao nhất và số tiền cụ thể từ topExpenses. '
+                'Không được bắt đầu bằng tổng chi tiêu. '
+            )
+        elif sub_type == 'total_amount':
+            sub_type_instruction = (
+                'Người dùng hỏi về TỔNG chi tiêu. '
+                'Chỉ nêu tổng số và nhận xét ngắn gọn. '
+            )
+
         prompt = (
             'Bạn là Senior AI Financial Assistant cho ứng dụng quản lý tài chính cá nhân. '
             'Trả lời bằng tiếng Việt tự nhiên, súc tích và hữu ích trong 2-4 câu ngắn. '
-            'Ưu tiên format phù hợp cho dashboard insight: câu đầu là nhận định chính, câu sau nêu nguyên nhân hoặc hành động cụ thể. '
-            'Tuyệt đối không bịa số liệu: chỉ dùng số từ financialContext/context; nếu thiếu thì nói rõ là chưa có dữ liệu. '
-            'Nếu đang đưa lời khuyên, hãy nêu ngắn gọn: tình hình hiện tại, nguyên nhân lớn nhất và 1-2 hành động cụ thể. '
-            f'Intent đã nhận diện: {intent}.\n'
+            'Tuyệt đối không bịa số liệu: chỉ dùng số từ financialContext/context. '
+            + sub_type_instruction
+            + f'Intent đã nhận diện: {intent}.\n'
             f'Câu hỏi người dùng: {question}.\n'
             f'Context dữ liệu đáng tin cậy từ backend: {json.dumps(context, ensure_ascii=False)}.\n'
             f'Nếu context không đủ, dùng câu fallback sau làm nền: {fallback_answer}'
         )
-
         payload = {
             'contents': [{'parts': [{'text': prompt}]}],
             'generationConfig': {

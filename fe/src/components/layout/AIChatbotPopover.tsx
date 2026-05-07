@@ -316,14 +316,17 @@ const isFinancialDataQuestion = (question: string) => {
     normalizedQuestion
   );
 
+  // Savings amount queries ("tiết kiệm được bao nhiêu") are financial data questions
+  const savingsAmountQuery = /tiet kiem/.test(normalizedQuestion) && /(bao nhieu|so tien|duoc|con lai|de danh)/.test(normalizedQuestion);
+
   const quantitativeSignal = /(tong|bao nhieu|so tien|thang nay|quy nay|nam nay|thong ke|du lieu|bao cao)/.test(normalizedQuestion);
   const financialDomainSignal = /(chi|thu|giao dich|so du|vi|analytics|phan tich)/.test(normalizedQuestion);
 
-  if (hasFeatureIntentCue(normalizedQuestion) && !strongFinancialSignal) {
+  if (hasFeatureIntentCue(normalizedQuestion) && !strongFinancialSignal && !savingsAmountQuery) {
     return false;
   }
 
-  return strongFinancialSignal || (quantitativeSignal && financialDomainSignal);
+  return strongFinancialSignal || savingsAmountQuery || (quantitativeSignal && financialDomainSignal);
 };
 
 const isGenericAssistantFallback = (answer: string) => {
@@ -476,6 +479,14 @@ const humanizeAssistantReply = (answer: string, intent: string) => {
     return `Mình đã tổng hợp thu nhập cho bạn: ${normalized} Bạn muốn mình so sánh thêm với tháng trước không?`;
   }
 
+  if (intent === 'query_savings') {
+    return `Mình đã tính toán cho bạn: ${normalized} Nếu muốn, mình gợi ý luôn kế hoạch tăng mức tiết kiệm nhé.`;
+  }
+
+  if (intent === 'market_query') {
+    return normalized;
+  }
+
   if (intent === 'financial_advice') {
     return `${normalized} Nếu bạn muốn, mình sẽ gợi ý luôn kế hoạch hành động theo tuần.`;
   }
@@ -492,8 +503,12 @@ const humanizeAssistantReply = (answer: string, intent: string) => {
 };
 
 const buildAssistantMeta = (intent: string, llmUsed: boolean) => {
-  if (intent === 'query_spending' || intent === 'query_income') {
+  if (intent === 'query_spending' || intent === 'query_income' || intent === 'query_savings') {
     return `${ASSISTANT_NAME} • Dựa trên dữ liệu tài chính hiện tại`;
+  }
+
+  if (intent === 'market_query') {
+    return llmUsed ? `${ASSISTANT_NAME} • Dữ liệu thị trường thời gian thực` : `${ASSISTANT_NAME} • Thông tin thị trường`;
   }
 
   if (intent === 'financial_advice') {
@@ -543,7 +558,7 @@ export const AIChatbotPopover = () => {
     });
   }, [messages, isSending]);
 
-  const shouldUseLlm = (question: string) => /lời khuyên|goi y|gợi ý|tiết kiệm|tối ưu|phan tich|phân tích|nên|kế hoạch|hướng dẫn|tính năng|tất toán|định kỳ/i.test(question);
+  const shouldUseLlm = (question: string) => /lời khuyến|goi y|gợi ý|tiết kiệm|tối ưu|phan tich|phân tích|nên|kế hoạch|hướng dẫn|tính năng|tất toán|định kỳ|giá vàng|gia vang|tỷ giá|ty gia|lãi suất|lai suat|chứng khoán|chung khoan|bitcoin|crypto/i.test(question);
 
   const handleSend = async (prompt?: string) => {
     const question = (prompt ?? inputValue).trim();
