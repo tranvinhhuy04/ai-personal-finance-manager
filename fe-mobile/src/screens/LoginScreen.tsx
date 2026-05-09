@@ -105,15 +105,12 @@ export function LoginScreen() {
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <ScrollView
             className="flex-1 bg-slate-950"
-            contentContainerStyle={{ flexGrow: 1 }}
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingVertical: 32 }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <View className="flex-1 px-6 pb-8 pt-6">
-              <View className="absolute left-[-40px] top-10 h-40 w-40 rounded-full bg-emerald-500/20" />
-              <View className="absolute bottom-12 right-[-50px] h-48 w-48 rounded-full bg-cyan-500/10" />
-
-              <View className="mt-6 items-center">
+            <View className="px-6">
+              <View className="items-center mb-6">
                 <View className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2">
                   <Text className="text-[11px] font-semibold uppercase tracking-[0.28em] text-emerald-300">Fintech Mobile</Text>
                 </View>

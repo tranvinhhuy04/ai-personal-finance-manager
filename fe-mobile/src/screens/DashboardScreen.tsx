@@ -4,8 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowDownRight, ArrowUpRight, PiggyBank, TrendingUp, Wallet2 } from 'lucide-react-native';
 
+import { Chip } from '../components/Chip';
 import { EmptyState } from '../components/EmptyState';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { ScreenHeader } from '../components/ScreenHeader';
 import { SkeletonLoading } from '../components/SkeletonLoading';
 import { WalletCard } from '../components/WalletCard';
 import { useAppPreferences } from '../hooks/useAppPreferences';
@@ -19,25 +21,6 @@ const RANGE_OPTIONS: Array<{ key: TimeRange; label: string }> = [
   { key: 'quarter', label: 'Quý này' },
   { key: 'year', label: 'Năm nay' },
 ];
-
-function FilterPill({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className={`min-h-[44px] rounded-full px-3.5 py-2 ${selected ? 'bg-emerald-600' : 'bg-slate-100'} items-center justify-center`}
-    >
-      <Text className={`text-xs font-semibold ${selected ? 'text-white' : 'text-slate-600'}`}>{label}</Text>
-    </Pressable>
-  );
-}
 
 function QuickStatCard({
   icon,
@@ -85,7 +68,12 @@ export function DashboardScreen() {
   }
 
   return (
-    <SafeAreaView className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`} edges={['top']}>
+    <View className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
+      <ScreenHeader
+        eyebrow="Fintech Mobile"
+        title="Tổng quan tài chính"
+        subtitle="Báo cáo nhanh về tài sản khả dụng, biến động dòng tiền và các điểm cần theo dõi trong kỳ."
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}
@@ -100,13 +88,6 @@ export function DashboardScreen() {
         }
       >
         <View className="px-5 pt-4 pb-10">
-          <View className="mb-6">
-            <Text className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Fintech Mobile</Text>
-            <Text className="mt-2 text-[28px] font-bold text-slate-900">Tổng quan tài chính</Text>
-            <Text className="mt-2 text-sm leading-6 text-slate-500">
-              Báo cáo nhanh về tài sản khả dụng, biến động dòng tiền và các điểm cần theo dõi trong kỳ.
-            </Text>
-          </View>
 
           {overview.errorMessage || wallets.errorMessage ? (
             <View className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -195,7 +176,7 @@ export function DashboardScreen() {
             </View>
             <View className="mb-4 flex-row gap-2">
               {RANGE_OPTIONS.map((item) => (
-                <FilterPill
+                <Chip
                   key={`cashflow-${item.key}`}
                   label={item.label}
                   selected={range === item.key}
@@ -311,6 +292,6 @@ export function DashboardScreen() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

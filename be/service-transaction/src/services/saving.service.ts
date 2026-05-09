@@ -227,6 +227,10 @@ class SavingService {
       throw new AppError('settle_type must be FULL or PARTIAL', 400);
     }
 
+    if (!input.destination_wallet_id) {
+      throw new AppError('destinationWalletId is required', 400);
+    }
+
     if (settleType === 'PARTIAL' && !input.destination_wallet_id) {
       throw new AppError('destinationWalletId is required for partial settlement', 400);
     }

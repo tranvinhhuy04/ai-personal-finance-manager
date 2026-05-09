@@ -15,8 +15,11 @@ export type CreateTransactionInput = {
   occurred_at?: string | Date;
   idempotency_key?: string;
   source?: 'MANUAL' | 'INVOICE_CONFIRMATION' | 'RECURRING' | 'SAVING';
+  authorization?: string;
   session?: ClientSession;
 };
+
+const WALLET_SERVICE_URL = process.env.WALLET_SERVICE_URL ?? 'http://service-wallet:3002';
 
 function parsePositiveAmount(value: string | number) {
   const amount = Number(value);
@@ -36,9 +39,40 @@ function parseOccurredAt(value?: string | Date) {
 }
 
 class TransactionService {
+  private async walletBelongsToUser(walletId: string, authorization?: string) {
+    if (!authorization) {
+      return true;
+    }
+
+    const response = await fetch(`${WALLET_SERVICE_URL}/api/v1/wallets`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: authorization,
+      },
+      signal: AbortSignal.timeout(8_000),
+    });
+
+    if (!response.ok) {
+      throw new AppError('Unable to validate wallet ownership', 502);
+    }
+
+    const payload = await response.json();
+    if (!Array.isArray(payload)) {
+      return false;
+    }
+
+    return payload.some((wallet: any) => String(wallet?.id ?? '') === walletId);
+  }
+
   async createTransaction(input: CreateTransactionInput) {
     if (!input.wallet_id) throw new AppError('wallet_id is required', 400);
     if (!input.transaction_type) throw new AppError('transaction_type is required', 400);
+
+    const walletOwned = await this.walletBelongsToUser(input.wallet_id, input.authorization);
+    if (!walletOwned) {
+      throw new AppError('Wallet not found', 404);
+    }
 
     const amount = parsePositiveAmount(input.amount);
     const occurredAt = parseOccurredAt(input.occurred_at);
@@ -105,10 +139,14 @@ class TransactionService {
     await TransactionModel.findByIdAndUpdate(transactionId, { status: 'FAILED' });
   }
 
-  async listTransactions(limit = 50, skip = 0, walletId?: string, userId?: string) {
+  async listTransactions(limit = 50, skip = 0, walletId?: string, userId?: string, authorization?: string) {
     const filter: Record<string, unknown> = {};
 
     if (walletId) {
+      const walletOwned = await this.walletBelongsToUser(walletId, authorization);
+      if (!walletOwned) {
+        return [];
+      }
       filter.wallet_id = walletId;
     }
 

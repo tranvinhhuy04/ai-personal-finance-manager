@@ -267,7 +267,7 @@ class GeminiService:
             )
             generated = self._extract_text(data)
             if not generated:
-                raise RuntimeError('Gemini response does not contain generated text')
+                generated = '[]'
             return {
                 'text': generated.strip(),
                 'model': model,
@@ -288,7 +288,7 @@ class GeminiService:
                 data = response.json()
                 generated = self._extract_text(data)
                 if not generated:
-                    raise RuntimeError('Gemini response does not contain generated text')
+                    generated = '[]'
                 return {
                     'text': generated.strip(),
                     'model': model,

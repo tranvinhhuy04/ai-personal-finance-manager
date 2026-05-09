@@ -25,14 +25,37 @@ export const AUTH_STORAGE_KEYS = {
 
 const maybeHostUri =
   (Constants as any)?.expoConfig?.hostUri ||
+  (Constants as any)?.expoConfig?.debuggerHost ||
+  (Constants as any)?.expoGoConfig?.debuggerHost ||
   (Constants as any)?.manifest2?.extra?.expoClient?.hostUri ||
   (Constants as any)?.manifest?.debuggerHost ||
   '';
 
-const inferredExpoHost = String(maybeHostUri).split(':')[0];
-const inferredLanBaseUrl = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(inferredExpoHost)
-  ? `http://${inferredExpoHost}:3000`
-  : undefined;
+function extractHost(value?: string) {
+  const source = String(value || '').trim();
+  if (!source) {
+    return undefined;
+  }
+
+  const noScheme = source.replace(/^[a-zA-Z]+:\/\//, '');
+  const hostPart = noScheme.split('/')[0]?.trim() || '';
+  const host = hostPart.split(':')[0]?.trim() || '';
+  return host || undefined;
+}
+
+const webLocationHost =
+  typeof globalThis !== 'undefined' && (globalThis as any).location?.host
+    ? extractHost(String((globalThis as any).location.host))
+    : undefined;
+const inferredExpoHost =
+  extractHost(maybeHostUri) ||
+  webLocationHost ||
+  undefined;
+
+const inferredLanBaseUrl =
+  inferredExpoHost && /^(?:\d{1,3}\.){3}\d{1,3}$/.test(inferredExpoHost)
+    ? `http://${inferredExpoHost}:3000`
+    : undefined;
 
 function normalizeBaseUrl(value?: string) {
   const trimmed = value?.trim();
@@ -158,12 +181,16 @@ export const axiosClient = axios.create({
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': '1',
   },
 });
 
 export const aiAxiosClient = axios.create({
   baseURL: AI_SERVICE_BASE_URL,
   timeout: 120000,
+  headers: {
+    'ngrok-skip-browser-warning': '1',
+  },
 });
 
 axiosClient.interceptors.request.use(attachAuthToken);

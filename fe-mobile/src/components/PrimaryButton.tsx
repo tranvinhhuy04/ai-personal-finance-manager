@@ -34,14 +34,16 @@ export function PrimaryButton({
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
-      className={`min-h-[50px] overflow-hidden rounded-2xl ${isDisabled ? 'opacity-60' : ''}`}
+      android_ripple={{ color: variant === 'primary' ? '#047857' : '#e2e8f0', borderless: false }}
+      style={({ pressed }) => ({ opacity: pressed ? 0.78 : isDisabled ? 0.55 : 1 })}
+      className={`min-h-[52px] overflow-hidden rounded-[14px]`}
     >
       {variant === 'primary' ? (
         <LinearGradient
           colors={['#059669', '#0f766e', '#115e59']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          className={`min-h-[50px] flex-row items-center justify-center px-4 py-3 ${containerClass}`}
+          className={`min-h-[52px] flex-row items-center justify-center px-5 py-3 ${containerClass}`}
         >
           {loading ? (
             <ActivityIndicator color="#ffffff" />
@@ -60,7 +62,7 @@ export function PrimaryButton({
           )}
         </LinearGradient>
       ) : (
-        <View className={`min-h-[50px] flex-row items-center justify-center px-4 py-3 ${containerClass}`}>
+        <View className={`min-h-[52px] flex-row items-center justify-center px-5 py-3 ${containerClass}`}>
           {loading ? (
             <ActivityIndicator color="#0f172a" />
           ) : (

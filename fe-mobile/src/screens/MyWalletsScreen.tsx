@@ -12,6 +12,7 @@ import {
   Wallet2,
 } from 'lucide-react-native';
 
+import { Chip } from '../components/Chip';
 import { EmptyState } from '../components/EmptyState';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ScreenHeader } from '../components/ScreenHeader';
@@ -139,22 +140,6 @@ function TypeButton({
   );
 }
 
-function FilterChip({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} className={`min-h-[44px] rounded-full px-4 py-2 items-center justify-center ${selected ? 'bg-emerald-600' : 'bg-slate-100'}`}>
-      <Text className={`text-sm font-semibold ${selected ? 'text-white' : 'text-slate-700'}`}>{label}</Text>
-    </Pressable>
-  );
-}
-
 export function MyWalletsScreen() {
   const { preferences } = useAppPreferences();
   const {
@@ -265,9 +250,9 @@ export function MyWalletsScreen() {
 
         {/* Filter row */}
         <View className="mt-5 flex-row gap-2">
-          <FilterChip label="Tất cả" selected={filter === 'all'} onPress={() => setFilter('all')} />
-          <FilterChip label="Hoạt động" selected={filter === 'active'} onPress={() => setFilter('active')} />
-          <FilterChip label="Tạm khóa" selected={filter === 'locked'} onPress={() => setFilter('locked')} />
+          <Chip label="Tất cả" selected={filter === 'all'} onPress={() => setFilter('all')} />
+          <Chip label="Hoạt động" selected={filter === 'active'} onPress={() => setFilter('active')} />
+          <Chip label="Tạm khóa" selected={filter === 'locked'} onPress={() => setFilter('locked')} />
         </View>
 
         {/* Create wallet form */}

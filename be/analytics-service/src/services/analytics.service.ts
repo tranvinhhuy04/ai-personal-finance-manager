@@ -79,7 +79,17 @@ function normalizeMonthKey(input?: string): string | null {
 }
 
 function parseMonthKey(monthKey?: string) {
-  const normalized = normalizeMonthKey(monthKey) ?? toMonthKey();
+  let normalized: string;
+  if (monthKey !== undefined && monthKey !== null && String(monthKey).trim().length > 0) {
+    const parsed = normalizeMonthKey(monthKey);
+    if (!parsed) {
+      throw new AppError('month must be in YYYY-MM or MM/YYYY format', 400);
+    }
+    normalized = parsed;
+  } else {
+    normalized = toMonthKey();
+  }
+
   const [yearText, monthText] = normalized.split('-');
   const year = Number(yearText);
   const monthIndex = Number(monthText) - 1;
@@ -282,6 +292,10 @@ function normalizeRange(range?: string, legacyType?: string): AnalyticsRange {
 
 function getPeriodWindow(filters: DashboardFilters): PeriodWindow {
   const range = normalizeRange(filters.range, filters.type);
+
+  if (range === 'custom' && (!filters.from || !filters.to)) {
+    throw new AppError('from and to are required when range=custom', 400);
+  }
 
   if (range === 'custom' && filters.from && filters.to) {
     const startDate = safeDate(filters.from);

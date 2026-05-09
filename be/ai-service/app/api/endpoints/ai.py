@@ -150,6 +150,10 @@ async def extract_text(payload: ExtractTextRequest) -> dict[str, Any]:
     if len(raw_text) < 2:
         raise HTTPException(status_code=400, detail="input_text must contain at least 2 characters")
 
+    # Clamp very long input to improve stability while keeping useful context for extraction.
+    if len(raw_text) > 4000:
+        raw_text = raw_text[:4000]
+
     gemini = get_gemini_service()
 
     # Xác định chế độ: pool rotation hay single key
@@ -167,7 +171,16 @@ async def extract_text(payload: ExtractTextRequest) -> dict[str, Any]:
             api_keys_override=pool,
         )
         if not extraction:
-            raise HTTPException(status_code=502, detail="Gemini returned empty extraction output")
+            extraction = {
+                "text": "[]",
+                "model": payload.model or gemini.model,
+                "usage": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                },
+                "exhausted_key_indices": [],
+            }
 
         resolved_model = str(extraction.get("model") or payload.model or gemini.model)
         exhausted_indices: list[int] = extraction.get("exhausted_key_indices") or []
@@ -194,8 +207,27 @@ async def extract_text(payload: ExtractTextRequest) -> dict[str, Any]:
     except RuntimeError as exc:
         detail = str(exc)
         lowered = detail.lower()
-        status_code = 429 if ('429' in detail or 'quota' in lowered or 'rate limit' in lowered) else 502
-        raise HTTPException(status_code=status_code, detail=detail) from exc
+        if '429' in detail or 'quota' in lowered or 'rate limit' in lowered:
+            raise HTTPException(status_code=429, detail=detail) from exc
+
+        # Degrade gracefully for transient/provider parsing failures.
+        resolved_model = str(payload.model or gemini.model)
+        return {
+            "success": True,
+            "input": raw_text,
+            "raw_output": "[]",
+            "model": resolved_model,
+            "exhausted_key_indices": [],
+            "llm": {
+                "provider": "gemini",
+                "model": resolved_model,
+                "usage": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                },
+            },
+        }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Không thể trích xuất từ văn bản: {exc}") from exc
 

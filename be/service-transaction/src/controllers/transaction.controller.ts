@@ -27,6 +27,7 @@ export const createTransaction = catchAsync(async (req: Request, res: Response) 
     occurred_at,
     idempotency_key,
     source: 'MANUAL',
+    authorization: req.headers.authorization,
   });
 
   outboxPublisher.publishPending().catch((error) => {
@@ -42,11 +43,20 @@ export const listTransactions = catchAsync(async (req: Request, res: Response) =
   const walletId = req.query.wallet_id ? String(req.query.wallet_id) : undefined;
   const userId = String((req as any).userId ?? '');
 
+  if (!Number.isNaN(limit) && (limit < 1 || limit > 200)) {
+    return res.status(400).json({ message: 'limit must be between 1 and 200' });
+  }
+
+  if (!Number.isNaN(skip) && skip < 0) {
+    return res.status(400).json({ message: 'skip must be >= 0' });
+  }
+
   const data = await transactionService.listTransactions(
     Number.isNaN(limit) ? 50 : limit,
     Number.isNaN(skip) ? 0 : skip,
     walletId,
-    userId
+    userId,
+    req.headers.authorization
   );
 
   return res.status(200).json(data);

@@ -189,6 +189,14 @@ function requireString(value: unknown, fieldName: string) {
   }
 }
 
+function requireEmailFormat(email: string) {
+  const normalized = email.trim().toLowerCase();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(normalized)) {
+    throw new AppError('email is invalid', 400);
+  }
+}
+
 function requireMinLength(value: string, min: number, fieldName: string) {
   if (value.length < min) {
     throw new AppError(`${fieldName} must be at least ${min} characters`, 400);
@@ -232,6 +240,7 @@ function toSafeUser(row: any) {
 
 export async function register({ email, password, fullName, phone }: RegisterInput) {
   requireString(email, 'email');
+  requireEmailFormat(email);
   requireMinLength(password, 8, 'password');
   requireString(fullName, 'fullName');
   if (phone != null && typeof phone !== 'string') {
@@ -277,6 +286,7 @@ export async function register({ email, password, fullName, phone }: RegisterInp
 
 export async function login({ email, password, twoFactorCode }: LoginInput) {
   requireString(email, 'email');
+  requireEmailFormat(email);
   requireString(password, 'password');
 
   const emailNorm = email.trim().toLowerCase();
@@ -648,6 +658,15 @@ export async function removeApiKey(userId: string, index: number) {
   requireString(userId, 'userId');
   if (!Types.ObjectId.isValid(userId)) throw new AppError('User not found', 401);
   if (!Number.isInteger(index) || index < 0) throw new AppError('Index không hợp lệ', 400);
+
+  const settings = await findUserSettings(userId);
+  const currentKeys: RawKeyEntry[] = Array.isArray((settings as any)?.gemini_api_keys)
+    ? (settings as any).gemini_api_keys
+    : [];
+
+  if (index >= currentKeys.length) {
+    throw new AppError('API key index not found', 404);
+  }
 
   await removeApiKeyByIndex(userId, index);
   return getSettings(userId);

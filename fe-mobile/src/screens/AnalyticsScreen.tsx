@@ -3,6 +3,7 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useQuery } from '@tanstack/react-query';
 import { Bot, BrainCircuit, CalendarRange, ChartPie, Info, PiggyBank, Sparkles, TrendingDown, TrendingUp, Wallet2 } from 'lucide-react-native';
 
+import { Chip } from '../components/Chip';
 import { EmptyState } from '../components/EmptyState';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { SectionCard } from '../components/SectionCard';
@@ -19,6 +20,17 @@ const RANGES: Array<{ key: TimeRange; label: string }> = [
   { key: 'quarter', label: 'Quý này' },
   { key: 'year', label: 'Năm nay' },
 ];
+
+/** Strip HTML/script tags and truncate suspicious wallet names for safe display */
+function sanitizeWalletLabel(name: string): string {
+  const stripped = name
+    .replace(/<[^>]*>/g, '')
+    .replace(/&[a-z#0-9]+;/gi, '')
+    .replace(/["'`]/g, '')
+    .trim();
+  if (!stripped) return 'Ví không tên';
+  return stripped.length > 20 ? stripped.slice(0, 18) + '…' : stripped;
+}
 
 function buildAiQuestion(periodLabel: string, walletLabel: string) {
   return `Dựa trên dữ liệu tài chính cá nhân của tôi trong ${periodLabel} cho ${walletLabel}, hãy phân tích ngắn gọn sức khỏe tài chính hiện tại. Nêu 1 insight quan trọng nhất, 1 nguyên nhân chính dựa trên số liệu đang có và 1-2 hành động cụ thể trong 30 ngày tới. Chỉ trả lời trong phạm vi dữ liệu tài chính cá nhân của tôi.`;
@@ -37,22 +49,6 @@ function isPlaceholderAiInsight(answer: string) {
   return normalized.includes('backend gửi thêm')
     || normalized.includes('analytics-service')
     || normalized.includes('dữ liệu tài chính đã tổng hợp');
-}
-
-function FilterChip({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} className={`min-h-[44px] rounded-full px-4 py-2 items-center justify-center ${selected ? 'bg-emerald-600' : 'bg-slate-100'}`}>
-      <Text className={`text-sm font-semibold ${selected ? 'text-white' : 'text-slate-700'}`}>{label}</Text>
-    </Pressable>
-  );
 }
 
 function MetricCard({
@@ -238,15 +234,15 @@ export function AnalyticsScreen() {
           <View className="gap-3">
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
               {RANGES.map((item) => (
-                <FilterChip key={item.key} label={item.label} selected={range === item.key} onPress={() => setRange(item.key)} />
+                <Chip key={item.key} label={item.label} selected={range === item.key} onPress={() => setRange(item.key)} />
               ))}
             </ScrollView>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
               {walletOptions.slice(0, 6).map((wallet) => (
-                <FilterChip
+                <Chip
                   key={wallet.id}
-                  label={wallet.name}
+                  label={sanitizeWalletLabel(wallet.name)}
                   selected={(selectedWalletId ?? 'all') === wallet.id}
                   onPress={() => setSelectedWalletId(wallet.id === 'all' ? undefined : wallet.id)}
                 />

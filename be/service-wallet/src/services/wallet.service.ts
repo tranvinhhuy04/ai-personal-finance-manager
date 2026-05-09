@@ -38,6 +38,14 @@ function parseNonNegativeDecimal(amount: string, field: string) {
   return value;
 }
 
+function sanitizeWalletName(value: string) {
+  const stripped = value.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  if (!stripped) {
+    throw new AppError('wallet_name is required', 400);
+  }
+  return stripped;
+}
+
 export class WalletService {
   async createWallet(input: CreateWalletInput) {
     if (!input.user_id) throw new AppError('user_id is required', 400);
@@ -54,7 +62,7 @@ export class WalletService {
     const wallet = await walletRepository.create({
       user_id: input.user_id,
       wallet_type: input.wallet_type,
-      wallet_name: input.wallet_name.trim(),
+      wallet_name: sanitizeWalletName(input.wallet_name),
       balance: mongoose.Types.Decimal128.fromString(String(initialBalance)),
       version: 0,
       status: 1,
@@ -77,8 +85,7 @@ export class WalletService {
     if (!wallet) throw new AppError('Wallet not found', 404);
 
     if (payload.wallet_name !== undefined) {
-      const walletName = String(payload.wallet_name).trim();
-      if (!walletName) throw new AppError('wallet_name cannot be empty', 400);
+      const walletName = sanitizeWalletName(String(payload.wallet_name));
       wallet.wallet_name = walletName;
     }
 

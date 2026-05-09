@@ -1,5 +1,6 @@
 import { json, Router } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import rateLimit from 'express-rate-limit';
 import { ClientRequest, IncomingMessage, ServerResponse } from 'http';
 import verifyToken from '../middlewares/verifyToken';
 import { handleAiAdvisorChat } from '../utils/aiAdvisorBff';
@@ -20,6 +21,23 @@ const CLOUD_SERVICE_URL        = process.env.CLOUD_SERVICE_URL        ?? 'http:/
 const AI_PROXY_TIMEOUT_MS      = Number(process.env.AI_PROXY_TIMEOUT_MS ?? 60_000);
 const INVOICE_PROXY_TIMEOUT_MS = Number(process.env.INVOICE_PROXY_TIMEOUT_MS ?? 60_000);
 const NOTIFICATION_STREAM_TIMEOUT_MS = Number(process.env.NOTIFICATION_STREAM_TIMEOUT_MS ?? 600_000);
+const AUTH_LOGIN_RATE_LIMIT_WINDOW_MS = Number(process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_MS ?? 60_000);
+const AUTH_LOGIN_RATE_LIMIT_MAX = Number(process.env.AUTH_LOGIN_RATE_LIMIT_MAX ?? 10);
+
+const authLoginLimiter = rateLimit({
+  windowMs: AUTH_LOGIN_RATE_LIMIT_WINDOW_MS,
+  max: Math.max(1, AUTH_LOGIN_RATE_LIMIT_MAX),
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => {
+    const email = String((req.body as any)?.email ?? '').trim().toLowerCase();
+    return `${req.ip}:${email}`;
+  },
+  message: {
+    message: 'Too many failed login attempts, please try again later.',
+  },
+});
 
 /** Shared error handler — returns 504 when upstream is unreachable or times out */
 function onProxyError(err: Error, req: IncomingMessage, res: ServerResponse) {
@@ -40,8 +58,19 @@ function onProxyRes(proxyRes: IncomingMessage, req: IncomingMessage) {
   console.log(`[api-gateway] proxyRes ${req.method} ${req.url} -> ${statusCode}`);
 }
 
-function onProxyReq(_proxyReq: ClientRequest, req: IncomingMessage) {
+function onProxyReq(proxyReq: ClientRequest, req: IncomingMessage) {
   console.log(`[api-gateway] proxyReq ${req.method} ${req.url}`);
+
+  // When body-parser runs before proxy (e.g. /auth/login), we must re-stream the body.
+  const body = (req as any).body;
+  if (!body || typeof body !== 'object') {
+    return;
+  }
+
+  const bodyData = JSON.stringify(body);
+  proxyReq.setHeader('Content-Type', 'application/json');
+  proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+  proxyReq.write(bodyData);
 }
 
 function rewriteAuthPath(_path: string, req: IncomingMessage) {
@@ -99,6 +128,22 @@ function rewriteAiPath(_path: string, req: IncomingMessage) {
 }
 
 // /api/v1/auth/* -> service-identity (public, JWT not required)
+router.use(
+  '/auth/login',
+  json({ limit: '64kb' }),
+  authLoginLimiter,
+  createProxyMiddleware({
+    target: IDENTITY_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: rewriteAuthPath,
+    proxyTimeout: PROXY_TIMEOUT_MS,
+    timeout: PROXY_TIMEOUT_MS,
+    onProxyReq,
+    onProxyRes,
+    onError: onProxyError as any,
+  })
+);
+
 router.use(
   '/auth',
   createProxyMiddleware({

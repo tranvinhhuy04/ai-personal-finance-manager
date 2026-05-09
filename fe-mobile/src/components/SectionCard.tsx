@@ -14,7 +14,7 @@ export function SectionCard({ title, subtitle, rightSlot, children, className = 
   const { preferences } = useAppPreferencesContext();
 
   return (
-    <View className={`mb-5 rounded-[28px] px-5 py-5 shadow-sm ${preferences.darkMode ? 'border border-slate-800 bg-slate-900 shadow-black/30' : 'border border-slate-200/80 bg-white shadow-slate-200/40'} ${className}`}>
+    <View className={`mb-5 rounded-[20px] px-4 py-4 shadow-sm ${preferences.darkMode ? 'border border-slate-800/70 bg-slate-900 shadow-black/20' : 'border border-slate-200/60 bg-white shadow-slate-100/60'} ${className}`}>
       {title ? (
         <View className="mb-4 flex-row items-start justify-between gap-3">
           <View className="flex-1">
