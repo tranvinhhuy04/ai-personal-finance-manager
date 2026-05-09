@@ -1,5 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Banknote,
@@ -191,7 +192,7 @@ export function MyWalletsScreen() {
   }
 
   return (
-    <View className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
+    <SafeAreaView edges={['top', 'left', 'right']} className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
       <ScreenHeader
         eyebrow="Wallet Center"
         title="Ví của tôi"
@@ -363,6 +364,6 @@ export function MyWalletsScreen() {
           </Text>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

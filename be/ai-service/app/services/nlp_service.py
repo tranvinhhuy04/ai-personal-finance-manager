@@ -290,32 +290,42 @@ class NLPService:
         }
 
     def build_rule_based_answer(self, question: str, intent: str, context: dict[str, Any]) -> str:
-        summary = context.get("summary", {}) if isinstance(context, dict) else {}
-        financial_context = context.get("financialContext", {}) if isinstance(context, dict) else {}
+        safe_context = context if isinstance(context, dict) else {}
+        summary = safe_context.get("summary", {})
+        financial_context = safe_context.get("financialContext", {})
+
+        # Defensive normalization: avoid malformed client payloads causing `'str' object has no attribute get`.
+        if not isinstance(summary, dict):
+            summary = {}
+        if not isinstance(financial_context, dict):
+            financial_context = {}
+
         # topExpenses có thể nằm trực tiếp trong context hoặc lồng trong financialContext
         top_expenses = (
-            context.get("topExpenses")
+            safe_context.get("topExpenses")
             or financial_context.get("topExpenses")
             or []
         )
         if not isinstance(top_expenses, list):
             top_expenses = []
+        else:
+            top_expenses = [item for item in top_expenses if isinstance(item, dict)]
 
         total_expense = (
             summary.get("totalExpense")
             or summary.get("total_expense")
             or financial_context.get("totalExpense")
             or financial_context.get("total_expense")
-            or context.get("totalExpense")
-            or context.get("total_expense")
+            or safe_context.get("totalExpense")
+            or safe_context.get("total_expense")
         )
         total_income = (
             summary.get("totalIncome")
             or summary.get("total_income")
             or financial_context.get("totalIncome")
             or financial_context.get("total_income")
-            or context.get("totalIncome")
-            or context.get("total_income")
+            or safe_context.get("totalIncome")
+            or safe_context.get("total_income")
         )
 
         if intent == "market_query":

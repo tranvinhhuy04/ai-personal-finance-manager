@@ -109,6 +109,14 @@ async def chat(payload: ChatRequest) -> dict[str, Any]:
         merged_context = dict(payload.context or {})
         financial_context = dict(payload.financialContext or {})
 
+        # Guard against malformed client context (e.g. string payloads) to avoid runtime crashes.
+        if not isinstance(merged_context.get("summary"), dict):
+            merged_context["summary"] = {}
+        if not isinstance(merged_context.get("financialContext"), dict):
+            merged_context["financialContext"] = {}
+        if not isinstance(merged_context.get("topExpenses"), list):
+            merged_context["topExpenses"] = []
+
         if financial_context:
             merged_context["financialContext"] = financial_context
             merged_context["summary"] = {

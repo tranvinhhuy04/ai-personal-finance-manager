@@ -5,6 +5,11 @@
   "scripts": {
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
+    "test:benchmarks": "playwright test benchmarks/",
+    "test:benchmarks:headed": "playwright test benchmarks/ --headed",
+    "test:ocr": "playwright test benchmarks/ocr-accuracy.spec.ts",
+    "test:chatbot": "playwright test benchmarks/ai-chatbot-accuracy.spec.ts",
+    "test:nlp": "playwright test benchmarks/nlp-extraction.spec.ts",
     "seed:data": "tsx setup/seedData.ts"
   },
   "devDependencies": {

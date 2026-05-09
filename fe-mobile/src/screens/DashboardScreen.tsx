@@ -14,7 +14,7 @@ import { useAppPreferences } from '../hooks/useAppPreferences';
 import { useDashboardOverview } from '../hooks/useDashboardOverview';
 import { toWalletCardItem, useWallets } from '../hooks/useWallets';
 import type { TimeRange } from '../types/finance';
-import { formatCompactCurrency, formatCurrency } from '../utils/formatCurrency';
+import { formatCompactCurrency, formatCurrency, formatCurrencyShort } from '../utils/formatCurrency';
 
 const RANGE_OPTIONS: Array<{ key: TimeRange; label: string }> = [
   { key: 'month', label: 'Tháng này' },
@@ -68,7 +68,7 @@ export function DashboardScreen() {
   }
 
   return (
-    <View className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
+    <SafeAreaView className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`} edges={['top', 'left', 'right']}>
       <ScreenHeader
         eyebrow="Fintech Mobile"
         title="Tổng quan tài chính"
@@ -77,6 +77,7 @@ export function DashboardScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 120 }}
         refreshControl={
           <RefreshControl
             refreshing={overview.isRefreshing || wallets.isRefreshing}
@@ -87,7 +88,7 @@ export function DashboardScreen() {
           />
         }
       >
-        <View className="px-5 pt-4 pb-10">
+        <View>
 
           {overview.errorMessage || wallets.errorMessage ? (
             <View className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -100,7 +101,14 @@ export function DashboardScreen() {
             <View className="flex-row items-start justify-between gap-4">
               <View className="flex-1">
                 <Text className="mb-1 text-sm font-medium text-emerald-100">Tổng tài sản khả dụng</Text>
-                <Text className="text-4xl font-bold tracking-tight text-white">{formatCurrency(overview.data.totalBalance)}</Text>
+                <Text 
+                  className="text-4xl font-bold tracking-tight text-white" 
+                  numberOfLines={1} 
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  {formatCurrencyShort(overview.data.totalBalance)}
+                </Text>
               </View>
               <View className="rounded-full bg-white/15 p-3">
                 <Wallet2 size={22} color="#ffffff" />
@@ -292,6 +300,6 @@ export function DashboardScreen() {
           </View>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

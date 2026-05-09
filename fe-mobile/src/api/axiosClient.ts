@@ -10,6 +10,9 @@ const expoExtra = (Constants.expoConfig?.extra ?? {}) as {
   apiBaseUrl?: string;
   aiServiceUrl?: string;
   devAccessToken?: string;
+  apiTimeoutMs?: string | number;
+  authTimeoutMs?: string | number;
+  aiTimeoutMs?: string | number;
 };
 
 const TEMP_ACCESS_TOKEN = '';
@@ -62,24 +65,56 @@ function normalizeBaseUrl(value?: string) {
   return trimmed ? trimmed.replace(/\/+$/, '') : undefined;
 }
 
+function readTimeoutMs(...values: Array<unknown>) {
+  for (const value of values) {
+    if (value == null) {
+      continue;
+    }
+
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 1000) {
+      return Math.floor(parsed);
+    }
+  }
+
+  return undefined;
+}
+
 const fallbackBaseUrl = Platform.select({
   android: 'http://10.0.2.2:3000',
   ios: 'http://127.0.0.1:3000',
   default: 'http://127.0.0.1:3000',
 });
 
-export const API_BASE_URL =
-  normalizeBaseUrl(expoEnv.EXPO_PUBLIC_API_BASE_URL) ||
-  normalizeBaseUrl(inferredLanBaseUrl) ||
-  normalizeBaseUrl(expoExtra.apiBaseUrl) ||
-  normalizeBaseUrl(fallbackBaseUrl) ||
-  'http://127.0.0.1:3000';
+const apiBaseCandidatesRaw = [
+  normalizeBaseUrl(expoEnv.EXPO_PUBLIC_API_BASE_URL),
+  normalizeBaseUrl(inferredLanBaseUrl),
+  normalizeBaseUrl(expoExtra.apiBaseUrl),
+  normalizeBaseUrl(fallbackBaseUrl),
+  'http://127.0.0.1:3000',
+].filter((value): value is string => Boolean(value));
+
+export const API_BASE_URL_CANDIDATES = Array.from(new Set(apiBaseCandidatesRaw));
+
+export const API_BASE_URL = API_BASE_URL_CANDIDATES[0] || 'http://127.0.0.1:3000';
 
 export const AI_SERVICE_BASE_URL =
   normalizeBaseUrl(expoEnv.EXPO_PUBLIC_AI_SERVICE_URL) ||
   normalizeBaseUrl(inferredLanBaseUrl) ||
   normalizeBaseUrl(expoExtra.aiServiceUrl) ||
   API_BASE_URL;
+
+export const API_TIMEOUT_MS =
+  readTimeoutMs(expoEnv.EXPO_PUBLIC_API_TIMEOUT_MS, expoExtra.apiTimeoutMs) ||
+  30000;
+
+export const AUTH_TIMEOUT_MS =
+  readTimeoutMs(expoEnv.EXPO_PUBLIC_AUTH_TIMEOUT_MS, expoExtra.authTimeoutMs) ||
+  45000;
+
+export const AI_TIMEOUT_MS =
+  readTimeoutMs(expoEnv.EXPO_PUBLIC_AI_TIMEOUT_MS, expoExtra.aiTimeoutMs) ||
+  120000;
 
 function normalizeToken(value: unknown) {
   if (typeof value !== 'string') {
@@ -178,7 +213,16 @@ function normalizeApiError(error: any) {
 
 export const axiosClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: API_TIMEOUT_MS,
+  headers: {
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': '1',
+  },
+});
+
+export const authAxiosClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: AUTH_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': '1',
@@ -187,16 +231,18 @@ export const axiosClient = axios.create({
 
 export const aiAxiosClient = axios.create({
   baseURL: AI_SERVICE_BASE_URL,
-  timeout: 120000,
+  timeout: AI_TIMEOUT_MS,
   headers: {
     'ngrok-skip-browser-warning': '1',
   },
 });
 
 axiosClient.interceptors.request.use(attachAuthToken);
+authAxiosClient.interceptors.request.use(attachAuthToken);
 aiAxiosClient.interceptors.request.use(attachAuthToken);
 
 axiosClient.interceptors.response.use((response: any) => response, normalizeApiError);
+authAxiosClient.interceptors.response.use((response: any) => response, normalizeApiError);
 aiAxiosClient.interceptors.response.use((response: any) => response, normalizeApiError);
 
 export const authStorage = {

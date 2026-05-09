@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Bot, BrainCircuit, CalendarRange, ChartPie, Info, PiggyBank, Sparkles, TrendingDown, TrendingUp, Wallet2 } from 'lucide-react-native';
 
@@ -205,7 +206,7 @@ export function AnalyticsScreen() {
   }
 
   return (
-    <View className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
+    <SafeAreaView edges={['top', 'left', 'right']} className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
       <ScreenHeader
         eyebrow="Live Analytics"
         title="Phân tích chuyên sâu"
@@ -501,6 +502,6 @@ export function AnalyticsScreen() {
           </SectionCard>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

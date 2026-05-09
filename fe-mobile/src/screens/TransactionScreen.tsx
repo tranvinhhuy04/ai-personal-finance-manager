@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -32,7 +35,7 @@ import { useTransactions } from '../hooks/useTransactions';
 import { useWallets } from '../hooks/useWallets';
 import { financeApi } from '../api/finance';
 import type { TransactionType } from '../types/finance';
-import { formatCompactCurrency } from '../utils/formatCurrency';
+import { formatCompactCurrency, formatCurrencyShort } from '../utils/formatCurrency';
 
 function TypeToggle({
   value,
@@ -218,19 +221,21 @@ export function TransactionScreen() {
   };
 
   return (
-    <View className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
-      <ScreenHeader
-        eyebrow="Finance Tracker"
-        title="Giao dịch"
-        subtitle="Ghi nhận thu chi tức thì hoặc quét hóa đơn bằng OCR để tự động điền thông tin."
-      />
+    <SafeAreaView className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`} edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScreenHeader
+          eyebrow="Finance Tracker"
+          title="Giao dịch"
+          subtitle="Ghi nhận thu chi tức thì hoặc quét hóa đơn bằng OCR để tự động điền thông tin."
+        />
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void refetch()} />}
-      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 120 }}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void refetch()} />}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Summary strip */}
         <View className="mb-5 flex-row gap-3">
           <View className="flex-1 rounded-2xl bg-emerald-50 p-4">
@@ -510,6 +515,7 @@ export function TransactionScreen() {
           )}
         </View>
       </ScrollView>
-    </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

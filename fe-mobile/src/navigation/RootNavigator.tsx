@@ -32,10 +32,11 @@ function MainTabs() {
           fontWeight: '600',
           marginTop: 2,
         },
+        // iOS: Properly handle safe area with Home Indicator 
         tabBarStyle: {
           height: 68,
           paddingTop: 8,
-          paddingBottom: 10,
+          paddingBottom: 20, // Increased for iOS Home Indicator
           backgroundColor: preferences.darkMode ? '#0f172a' : '#ffffff',
           borderTopColor: preferences.darkMode ? '#1e293b' : '#f1f5f9',
           borderTopWidth: 1,

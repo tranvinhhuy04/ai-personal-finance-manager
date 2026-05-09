@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { AUTH_STORAGE_KEYS, authStorage, axiosClient } from './axiosClient';
+import {
+  AUTH_STORAGE_KEYS,
+  API_BASE_URL_CANDIDATES,
+  authAxiosClient,
+  authStorage,
+  axiosClient,
+} from './axiosClient';
 
 export interface AuthUser {
   id: string;
@@ -64,35 +70,109 @@ function normalizeLoginResult(data: Record<string, any>): LoginResult {
   };
 }
 
+function shouldRetryAuthRequest(error: any) {
+  const code = String(error?.code || '').toUpperCase();
+  const status = Number(error?.status || error?.response?.status || 0);
+  const message = String(error?.message || '').toLowerCase();
+
+  if (code === 'ECONNABORTED') {
+    return true;
+  }
+
+  if (message.includes('timeout') || message.includes('network error')) {
+    return true;
+  }
+
+  return status === 502 || status === 503 || status === 504;
+}
+
+async function withAuthRetry<T>(run: () => Promise<T>) {
+  try {
+    return await run();
+  } catch (error) {
+    if (!shouldRetryAuthRequest(error)) {
+      throw error;
+    }
+
+    return run();
+  }
+}
+
+async function postAuthWithFailover(path: string, payload: Record<string, unknown>) {
+  let lastError: unknown;
+
+  for (const baseURL of API_BASE_URL_CANDIDATES) {
+    try {
+      const response = await withAuthRetry(() => authAxiosClient.post(path, payload, { baseURL }));
+      return response;
+    } catch (error) {
+      lastError = error;
+
+      if (!shouldRetryAuthRequest(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw (lastError || new Error('Không thể kết nối đến máy chủ xác thực.'));
+}
+
+function mapAuthError(error: any): never {
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(error?.message || '').toLowerCase();
+
+  if (code === 'ECONNABORTED' || message.includes('timeout')) {
+    throw new Error('Kết nối máy chủ đăng nhập quá chậm. Vui lòng thử lại trong ít giây.');
+  }
+
+  if (message.includes('network error')) {
+    throw new Error('Không kết nối được tới máy chủ. Hãy kiểm tra API URL hoặc mạng hiện tại.');
+  }
+
+  throw error;
+}
+
 export const authApi = {
   async login(payload: LoginInput): Promise<LoginResult> {
-    const response = await axiosClient.post('/api/v1/auth/login', {
-      email: payload.email.trim(),
-      password: payload.password,
-      twoFactorCode: payload.twoFactorCode,
-    });
+    try {
+      const response = await postAuthWithFailover('/api/v1/auth/login', {
+        email: payload.email.trim(),
+        password: payload.password,
+        twoFactorCode: payload.twoFactorCode,
+      });
 
-    return normalizeLoginResult(response.data ?? {});
+      return normalizeLoginResult(response.data ?? {});
+    } catch (error) {
+      mapAuthError(error);
+    }
   },
 
   async register(payload: RegisterInput): Promise<LoginResult> {
-    const response = await axiosClient.post('/api/v1/auth/register', {
-      email: payload.email.trim(),
-      password: payload.password,
-      fullName: payload.fullName.trim(),
-      phone: payload.phone?.trim() || undefined,
-    });
+    try {
+      const response = await postAuthWithFailover('/api/v1/auth/register', {
+        email: payload.email.trim(),
+        password: payload.password,
+        fullName: payload.fullName.trim(),
+        phone: payload.phone?.trim() || undefined,
+      });
 
-    return normalizeLoginResult(response.data ?? {});
+      return normalizeLoginResult(response.data ?? {});
+    } catch (error) {
+      mapAuthError(error);
+    }
   },
 
   async loginWithTwoFactor(payload: TwoFactorLoginInput): Promise<LoginResult> {
-    const response = await axiosClient.post('/api/v1/auth/login/2fa', {
-      twoFactorToken: payload.twoFactorToken,
-      code: payload.code,
-    });
+    try {
+      const response = await postAuthWithFailover('/api/v1/auth/login/2fa', {
+        twoFactorToken: payload.twoFactorToken,
+        code: payload.code,
+      });
 
-    return normalizeLoginResult(response.data ?? {});
+      return normalizeLoginResult(response.data ?? {});
+    } catch (error) {
+      mapAuthError(error);
+    }
   },
 
   async getMe(): Promise<AuthUser | null> {

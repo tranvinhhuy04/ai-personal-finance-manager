@@ -1,5 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, ScrollView, Switch, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, LogOut, Moon, Shield, Smartphone, User2 } from 'lucide-react-native';
 
 import { API_BASE_URL } from '../api/axiosClient';
@@ -41,7 +42,7 @@ export function SettingsScreen() {
   const { user, signOut } = useAuth();
 
   return (
-    <View className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
+    <SafeAreaView className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`} edges={['top', 'left', 'right']}>
       <ScreenHeader
         eyebrow="System"
         title="Cài đặt"
@@ -53,7 +54,7 @@ export function SettingsScreen() {
           <ActivityIndicator color="#059669" />
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 120 }}>
           <View className="rounded-[24px] bg-slate-900 p-6 shadow-lg">
             <View className="flex-row items-start justify-between gap-4">
               <View className="flex-1">
@@ -153,6 +154,6 @@ export function SettingsScreen() {
           </View>
         </ScrollView>
       )}
-    </View>
+    </SafeAreaView>
   );
 }

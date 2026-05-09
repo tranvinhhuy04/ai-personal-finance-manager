@@ -1,4 +1,4 @@
-# Tech Stack — FinTrack AI
+# Tech Stack — FinTrack AI (Updated 2026)
 
 > **Personal Finance Management Application**
 > A full-stack, AI-powered platform built on a strict microservices architecture.
@@ -8,8 +8,8 @@
 ## Table of Contents
 1. [Frontend](#1-frontend)
 2. [Backend / Microservices](#2-backend--microservices)
-3. [Databases & Cache](#3-databases--cache)
-4. [AI & Machine Learning](#4-ai--machine-learning)
+3. [AI / NLP / OCR](#3-ai--nlp--ocr)
+4. [Databases & Cache](#4-databases--cache)
 5. [External Cloud Services](#5-external-cloud-services)
 6. [Infrastructure & DevOps](#6-infrastructure--devops)
 
@@ -17,24 +17,51 @@
 
 ## 1. Frontend
 
-### Web Dashboard
+### 🌐 Web Dashboard
 
-| Technology | Badge | Architectural Justification |
+| Technology | Version | Reason for Choice |
 |---|---|---|
-| **Next.js 14** | ![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=next.js&logoColor=white) | Chosen for its hybrid SSR/SSG rendering model, which enables near-instant initial page loads for the financial dashboard and supports server-side data fetching for secure API calls without exposing credentials to the browser. |
-| **TypeScript** | ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white) | Enforced across all layers to catch type mismatches at compile time — critical for financial data models (amounts, currencies, transaction types) where a runtime type error can cause incorrect ledger entries. |
-| **Tailwind CSS** | ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white) | Utility-first styling eliminates unused CSS and accelerates building responsive layouts; its design token system ensures a consistent colour palette across charts, badges, and transaction categories. |
-| **Recharts** | ![Recharts](https://img.shields.io/badge/Recharts-22B5BF?style=flat-square&logo=react&logoColor=white) | A composable, React-native charting library chosen for its SVG-based rendering (crisp on retina displays) and its declarative API, which maps cleanly to time-series cashflow and budget-vs-actual data from the analytics endpoints. |
-| **Redux Toolkit** | ![Redux](https://img.shields.io/badge/Redux_Toolkit-764ABC?style=flat-square&logo=redux&logoColor=white) | Provides predictable global state management for wallet selection, category filters, and chat history — essential when multiple components across the dashboard react to the same user context (active wallet, date range). |
-| **React Query (TanStack)** | ![React Query](https://img.shields.io/badge/React_Query-FF4154?style=flat-square&logo=reactquery&logoColor=white) | Manages all server-state caching, background refetching, and optimistic updates for transaction lists and budget data, removing the need to hand-roll async fetch logic inside Redux. |
+| **Next.js** | 14 | SSR/SSG rendering, instant page loads, secure server-side API calls |
+| **TypeScript** | ~5.0 | Compile-time type checking, prevent runtime financial data errors |
+| **Tailwind CSS** | 3.4+ | Utility-first, responsive, consistent design tokens |
+| **Recharts** | - | Composable SVG charts, time-series cashflow visualization |
+| **Redux Toolkit** | - | Global state for wallet selection, filters, chat history |
+| **React Query** | 5.90+ | Server-state caching, background refetch, optimistic updates |
 
-### Mobile App
+### 📱 Mobile App (React Native)
 
-| Technology | Badge | Architectural Justification |
+| Technology | Version | Reason for Choice |
 |---|---|---|
-| **React Native** | ![React Native](https://img.shields.io/badge/React_Native-20232A?style=flat-square&logo=react&logoColor=61DAFB) | A single TypeScript codebase targeting both iOS and Android, sharing business logic and design primitives with the web frontend — reducing maintenance overhead for a solo/small team delivering cross-platform finance features. |
-| **Expo** | ![Expo](https://img.shields.io/badge/Expo-000020?style=flat-square&logo=expo&logoColor=white) | Provides managed build pipelines, OTA updates, and native module access (Camera for receipt capture, SecureStore for token storage) without requiring a native Xcode/Android Studio build environment for every change. |
-| **Expo Camera** | ![Expo](https://img.shields.io/badge/Expo_Camera-000020?style=flat-square&logo=expo&logoColor=white) | Used for in-app receipt capture that feeds directly to the `invoice-service` pipeline — providing a native, hardware-accelerated camera experience without third-party SDKs. |
+| **React Native** | 0.81.5 | Single codebase for iOS/Android, shared business logic |
+| **Expo** | 54.0.34 | Managed build, OTA updates, native module access (Camera, SecureStore) |
+| **TypeScript** | ~5.9.2 | Type-safe React Native components, prevent runtime errors |
+| **NativeWind** | 4.1.23 | Tailwind CSS for React Native, unified styling system |
+| **TailwindCSS** | 3.4+ | Mobile-first responsive design |
+| **Lucide Icons** | 0.511.0 | SVG icon library, sharp on retina displays |
+| **LinearGradient** | 15.0.8 | Gradient backgrounds, modern UI aesthetics |
+| **React Query** | 5.90.2 | Data fetching, caching, server-state sync |
+| **Axios** | 1.14.0 | HTTP client, API communication |
+| **SafeArea Context** | ~5.6.2 | Handle notch/Home Indicator, safe zone padding |
+| **React Navigation** | 7.x | Tab navigator + Native Stack, screen transitions |
+| **AsyncStorage** | 2.2.0 | Local storage for tokens, user preferences |
+| **Expo ImagePicker** | ~17.0 | Image selection from gallery/camera |
+| **Expo LinearGradient** | 15.0.8 | Gradient UI components |
+
+### 🎨 New UI Components (Phase 3)
+
+| Component | Version | Purpose |
+|---|---|---|
+| **ChatInput** | New | Reusable chat message input with send button, loading state |
+| **ChatMessage** | New | Message bubble display with typing indicator animation |
+| **NLPQuickEntry** | New | Natural language transaction entry, gradient button UI |
+
+### ✨ Key Mobile Improvements
+- ✅ **SafeAreaView**: All screens respect notch/Home Indicator (edges: ['top', 'left', 'right'])
+- ✅ **KeyboardAvoidingView**: Platform-specific keyboard handling (iOS: padding, Android: height)
+- ✅ **FlatList Chat**: Performance-optimized message list with auto-scroll
+- ✅ **Typing Indicator**: Real-time AI processing feedback
+- ✅ **formatCurrencyShort()**: Compact number display (1.2 Tỷ đ vs 1,234,567,890 đ)
+- ✅ **Dark Mode**: Full support across all components
 
 ---
 
@@ -42,108 +69,213 @@
 
 All core services follow the **Database-per-Service** pattern with synchronous REST communication through the API Gateway and asynchronous event-driven communication via RabbitMQ.
 
-### API Gateway
+### 🚀 API Gateway
 
-| Technology | Badge | Architectural Justification |
+| Technology | Version | Reason for Choice |
 |---|---|---|
-| **Node.js / Express** | ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white) | Acts as the single entry point: performs JWT verification, per-user rate limiting, and request proxying to upstream services. Express's middleware model makes it straightforward to compose auth, CORS, and BFF (Backend-for-Frontend) transformation layers. |
-| **JWT (JSON Web Tokens)** | ![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=json-web-tokens&logoColor=white) | Stateless authentication tokens allow the gateway to verify identity without a round-trip to `identity-service` on every request, keeping P99 latency low across high-frequency transaction lookups. |
+| **Node.js** | LTS | Async I/O, high throughput request handling |
+| **Express** | 4.18.2 | Middleware-based routing, auth composition, BFF layer |
+| **TypeScript** | 5.0+ | Type-safe endpoint definitions, prevent runtime errors |
+| **JWT** | 9.0.0 | Stateless authentication, no session lookup on every request |
+| **Express Rate Limit** | 6.11.2 | Per-user rate limiting, DDoS protection |
+| **morgan** | 1.10.0 | HTTP request logging, monitoring and debugging |
+| **http-proxy-middleware** | 2.0.6 | Service routing, request forwarding to upstream services |
+| **cors** | 2.8.5 | Cross-origin resource sharing, frontend communication |
+| **ioredis** | 5.3.2 | Redis client for JWT blacklist, rate limit counters |
+| **dotenv** | 16.0.3 | Environment variable management |
 
-### identity-service
+### 🔧 Core Services (transaction-service, identity-service, invoice-service, wallet-service)
 
-| Technology | Badge | Architectural Justification |
+| Technology | Version | Reason for Choice |
 |---|---|---|
-| **Node.js / TypeScript** | ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white) | Handles user registration, OAuth, session management, AI quota enforcement, and third-party API key storage. TypeScript's strict null checks prevent unintentional null quota values from granting unlimited AI usage. |
-| **bcrypt** | ![Security](https://img.shields.io/badge/bcrypt-red?style=flat-square) | Industry-standard adaptive hashing algorithm used for password storage; the configurable cost factor allows the work factor to be increased as hardware improves without requiring a password migration. |
+| **Node.js** | LTS | Consistent stack, async operations |
+| **Express** | 4.18+ | REST API, service endpoints |
+| **TypeScript** | 5.0+ | Type-safe service logic, data models |
+| **Mongoose** | - | Schema validation, pre-hooks for audit and triggers |
+| **bcrypt** | - | Password hashing with adaptive cost factor |
+| **ts-node-dev** | 2.0.0 | Development server with auto-reload |
+| **Multer** | - | Multipart file upload handling (invoices-service) |
 
-### transaction-service
+### 📨 Event Bus & Message Queue
 
-| Technology | Badge | Architectural Justification |
+| Technology | Version | Reason for Choice |
 |---|---|---|
-| **Node.js / TypeScript** | ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white) | Core financial data service managing wallets, income/expense records, recurring transactions, and cashflow analytics. The async I/O model efficiently serves concurrent balance recalculation requests without blocking threads. |
-
-### invoice-service
-
-| Technology | Badge | Architectural Justification |
-|---|---|---|
-| **Node.js / TypeScript** | ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white) | Orchestrates the receipt ingestion pipeline: accepts multipart uploads, extracts metadata via AI, stores raw images to Cloudinary, and publishes transaction-creation events. Separating this from `transaction-service` ensures receipt processing spikes do not degrade transaction query performance. |
-| **Multer** | ![Node.js](https://img.shields.io/badge/Multer-339933?style=flat-square&logo=node.js&logoColor=white) | Handles multipart/form-data file uploads with configurable size limits and MIME-type filtering, preventing oversized or malicious files from reaching the processing pipeline. |
-
-### ai-advisor-service
-
-| Technology | Badge | Architectural Justification |
-|---|---|---|
-| **Python 3.11** | ![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white) | The de-facto language for ML/AI tooling; chosen to leverage the Google Generative AI Python SDK directly, enabling tight integration with Gemini's function-calling and embedding APIs without a thin translation layer. |
-| **FastAPI** | ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white) | Async-native Python web framework that handles concurrent streaming SSE responses to the frontend chat without blocking the event loop — crucial for real-time AI advisory responses. |
-| **LangChain** | ![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=flat-square) | Provides the Agentic RAG orchestration layer: tool routing, conversation memory, retrieval chains, and the agent executor loop that decides whether to query the vector store, call the Gemini API, or invoke the Search Grounding tool. |
+| **RabbitMQ** | Latest | Reliable message broker, guaranteed delivery, DLQ support |
+| **amqplib** | - | AMQP client library for Node.js services |
 
 ---
 
-## 3. Databases & Cache
+## 4. Databases & Cache
 
 All databases follow the **Database-per-Service** isolation pattern. No service accesses another service's database directly.
 
-| Technology | Badge | Architectural Justification |
+| Technology | Version | Reason for Choice |
 |---|---|---|
-| **MongoDB Atlas** | ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=flat-square&logo=mongodb&logoColor=white) | Document model fits naturally with heterogeneous financial transaction schemas (expenses, income, recurring, and transfer entries each have different fields). Atlas's managed sharding and global clusters support future geographic expansion without operational overhead. |
-| **Mongoose ODM** | ![Mongoose](https://img.shields.io/badge/Mongoose-880000?style=flat-square&logo=mongoose&logoColor=white) | Schema validation at the application layer prevents malformed financial documents from entering MongoDB; virtual fields and pre-save hooks cleanly handle balance recalculation and audit timestamps. |
-| **Redis 7** | ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white) | Serves as a shared distributed cache for JWT blacklists, rate-limit counters (sliding window), and AI conversation context windows — dramatically reducing repeated MongoDB reads for high-frequency operations like dashboard polling and chat context retrieval. |
+| **MongoDB Atlas** | Latest | Document model fits heterogeneous transaction schemas, managed sharding, global clusters |
+| **Mongoose ODM** | - | Schema validation, virtual fields, pre-save hooks for audit |
+| **Redis** | 5.0+ | Distributed cache for JWT blacklist, rate limits, chat context windows |
+| **ioredis** | 5.3.2 | Redis client for Node.js, cluster support, pipelining |
+| **Motor** | 3.7.1 | Async MongoDB driver for Python (ai-service) |
+| **redis-py** | 5.0.8 | Redis client for Python async operations |
 
 ---
 
-## 4. AI & Machine Learning
+## 3. AI / NLP / OCR
 
-The AI layer implements an **Agentic RAG (Retrieval-Augmented Generation)** architecture in which an LLM agent dynamically decides which tools to invoke based on user intent.
+All AI services run in Python for maximum flexibility and ML ecosystem access.
 
-| Technology | Badge | Architectural Justification |
+### 🤖 AI Advisory Service
+
+| Technology | Version | Reason for Choice |
 |---|---|---|
-| **Google Gemini 1.5 Pro** | ![Google AI](https://img.shields.io/badge/Google_Gemini-4285F4?style=flat-square&logo=google&logoColor=white) | Chosen as the primary LLM for its 1M-token context window (accommodating long transaction histories), native function-calling for structured JSON extraction from chat logs, and best-in-class accuracy parsing Vietnamese and English financial terminology. |
-| **Google Search Grounding** | ![Google](https://img.shields.io/badge/Google_Search_Grounding-34A853?style=flat-square&logo=google&logoColor=white) | A native Gemini capability that anchors AI responses to real-time web data — enabling grounded financial advice (current exchange rates, stock prices, interest rates) without building a separate retrieval pipeline. |
-| **Agentic RAG Pattern** | ![LangChain](https://img.shields.io/badge/Agentic_RAG-1C3C3C?style=flat-square) | The agent maintains a tool registry (vector search, Gemini inference, Search Grounding, transaction CRUD) and autonomously selects the correct tool chain per query — enabling the system to answer "What did I spend on food last month?" and "What is today's USD/VND rate?" with the same interface. |
-| **Vector Embeddings** | ![Google AI](https://img.shields.io/badge/text--embedding--004-4285F4?style=flat-square&logo=google&logoColor=white) | User financial histories and advice articles are embedded using Google's `text-embedding-004` model and stored in MongoDB Atlas Vector Search, enabling semantic retrieval of relevant context before LLM generation. |
+| **Python** | 3.11+ | ML/AI standard, rich ecosystem |
+| **FastAPI** | 0.115.6 | Async web framework, SSE streaming for real-time responses |
+| **Uvicorn** | 0.32.1 | ASGI server, high-performance async request handling |
+| **python-multipart** | 0.0.12 | Multipart form data parsing for file uploads |
+| **python-dotenv** | 1.0.1 | Environment variable management |
+
+### 🧠 LLM & Agentic RAG
+
+| Technology | Version | Reason for Choice |
+|---|---|---|
+| **Google Gemini 1.5 Pro** | Latest | 1M token context window, function-calling, Vietnamese language support |
+| **langchain-google-genai** | 2.1.9 | Official LangChain integration for Gemini API |
+| **langchain-core** | 0.3.72 | Chain orchestration, prompt templates, memory management |
+
+### 🔤 NLP & Natural Language Processing
+
+| Technology | Version | Reason for Choice |
+|---|---|---|
+| **Transformers** | 4.46.3 | Pre-trained NLP models, Vietnamese text understanding |
+| **SentencePiece** | 0.2.0 | Subword tokenization for multilingual text |
+| **LangChain** | - | NLP chains, prompt engineering, conversation history |
+
+### 📸 OCR (Optical Character Recognition)
+
+| Technology | Version | Reason for Choice |
+|---|---|---|
+| **PaddleOCR** | 2.9.1 | Vietnamese OCR accuracy, offline processing, no API calls needed |
+| **PaddlePaddle** | 2.6.2 | Deep learning framework, OCR model inference |
+| **OpenCV** | 4.10.0.84 | Image preprocessing, rotation correction, contrast enhancement |
+| **NumPy** | 1.26.4 | Array operations for image data manipulation |
+
+### 🌐 HTTP & Async
+
+| Technology | Version | Reason for Choice |
+|---|---|---|
+| **httpx** | 0.28.1 | Async HTTP client for API calls, streaming |
+| **motor** | 3.7.1 | Async MongoDB driver for non-blocking database operations |
+| **redis** | 5.0.8 | Redis client for caching AI conversation context |
+
+### 🔄 NLP Quick Entry Feature (Mobile)
+
+The mobile app includes a new **NLPQuickEntry component** that:
+- Accepts natural language input: "hôm nay uống cafe 50k"
+- Sends to backend NLP service for entity extraction
+- Auto-fills transaction form: amount, category, description
+- Uses gradient UI with loading states for feedback
+
+Backend processes with:
+1. Tokenization (Transformers)
+2. Intent classification (Gemini)
+3. Entity extraction (function-calling)
+4. Structured JSON response
 
 ---
 
 ## 5. External Cloud Services
 
-| Service | Badge | Architectural Justification |
+| Service | Purpose | Reason for Choice |
 |---|---|---|
-| **Cloudinary** | ![Cloudinary](https://img.shields.io/badge/Cloudinary-3448C5?style=flat-square&logo=cloudinary&logoColor=white) | Manages receipt image storage, on-the-fly transformations (thumbnail generation, HEIC→JPEG conversion), and CDN delivery — offloading binary asset management entirely from `invoice-service` and removing the need to provision an S3 bucket with custom CDN configuration. |
-| **Firebase Cloud Messaging (FCM)** | ![Firebase](https://img.shields.io/badge/FCM-FFCA28?style=flat-square&logo=firebase&logoColor=black) | Provides a unified push notification channel for Android and iOS with delivery guarantees, topic-based fan-out (budget alerts, payment reminders), and analytics — without maintaining a self-hosted notification infrastructure. |
-| **APNs (Apple Push Notification service)** | ![Apple](https://img.shields.io/badge/APNs-000000?style=flat-square&logo=apple&logoColor=white) | Required for native iOS push delivery; bridged through FCM's HTTP v1 API to avoid managing a second SDK while retaining Apple-specific delivery semantics. |
-| **Google OAuth 2.0** | ![Google](https://img.shields.io/badge/Google_OAuth-4285F4?style=flat-square&logo=google&logoColor=white) | Delegates identity verification to Google's hardened auth infrastructure for social login, reducing password management attack surface and improving user onboarding conversion. |
+| **Cloudinary** | Image CDN, receipt storage | Managed transformations, HEIC→JPEG conversion, global delivery |
+| **Firebase Cloud Messaging** | Push notifications | Cross-platform (Android/iOS), topic fan-out, delivery guarantees |
+| **APNs** | iOS push delivery | Native Apple integration, bridged through FCM HTTP v1 |
+| **Google OAuth 2.0** | Social login | Hardened auth infrastructure, reduce password attack surface |
+| **Google Search Grounding** | Real-time financial data | Exchange rates, stock prices, interest rates for AI responses |
 
 ---
 
 ## 6. Infrastructure & DevOps
 
-| Technology | Badge | Architectural Justification |
+| Technology | Version | Reason for Choice |
 |---|---|---|
-| **Docker** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) | Each microservice ships as an immutable container image, ensuring environment parity between local development and production and eliminating "works on my machine" dependency drift. |
-| **Docker Compose** | ![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?style=flat-square&logo=docker&logoColor=white) | Orchestrates the full multi-service stack (8+ containers) with a single `docker compose up` command, defining service dependencies, health checks, shared networks, and environment injection — ideal for the development and staging lifecycle. |
-| **RabbitMQ** | ![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?style=flat-square&logo=rabbitmq&logoColor=white) | AMQP message broker enabling reliable, decoupled asynchronous communication between services (e.g., `transaction.created` → AI context update, `invoice.processed` → transaction auto-creation). Dead-letter queues provide failure isolation without data loss. |
-| **MongoDB Atlas** | ![MongoDB](https://img.shields.io/badge/MongoDB_Atlas-47A248?style=flat-square&logo=mongodb&logoColor=white) | Fully managed cloud database eliminates DBA overhead for backups, patching, and scaling; automated daily snapshots and point-in-time restore satisfy financial data durability requirements. |
-| **ESLint + Prettier** | ![ESLint](https://img.shields.io/badge/ESLint-4B32C3?style=flat-square&logo=eslint&logoColor=white) | Enforces code style and catches common bugs across all TypeScript services in the monorepo; consistent formatting reduces cognitive load when switching between services. |
+| **Docker** | Latest | Immutable container images, environment parity dev→prod |
+| **Docker Compose** | Latest | Multi-service orchestration with 1 command, local development |
+| **RabbitMQ** | Latest | AMQP message broker, guaranteed delivery, DLQ support |
+| **ESLint** | - | Code style enforcement, catch common bugs |
+| **Prettier** | - | Code formatting consistency |
 
 ---
 
-## Summary Matrix
+## 📊 Summary Matrix
 
 ```
 ┌─────────────────────────┬──────────────┬────────────────┬──────────────────┐
 │  Layer                  │  Primary     │  Supporting    │  Protocol        │
 ├─────────────────────────┼──────────────┼────────────────┼──────────────────┤
 │  Web Frontend           │  Next.js 14  │  Recharts      │  HTTPS / WS      │
-│  Mobile Frontend        │  React Native│  Expo          │  HTTPS / WS      │
-│  API Gateway            │  Express     │  JWT, Nginx    │  REST            │
-│  Core Services          │  Node.js/TS  │  Mongoose      │  REST / AMQP     │
-│  AI Service             │  Python/FA   │  LangChain     │  REST / SSE      │
-│  Primary DB             │  MongoDB     │  Atlas         │  MongoDriver     │
-│  Cache                  │  Redis 7     │  ioredis       │  RESP            │
+│  Mobile Frontend        │  React Native│  Expo 54       │  HTTPS / WS      │
+│  Mobile UI              │  NativeWind  │  Tailwind 3.4  │  CSS Classes     │
+│  API Gateway            │  Express 4.18│  JWT 9.0       │  REST            │
+│  Core Services (Node)   │  Node.js     │  Express 4.18  │  REST / AMQP     │
+│  AI Service (Python)    │  FastAPI 0.11│  LangChain     │  REST / SSE      │
+│  NLP Processing         │  Transformers│  SentencePiece │  Local / API     │
+│  OCR Processing         │  PaddleOCR   │  OpenCV        │  Local           │
+│  LLM Inference          │  Gemini 1.5  │  Google API    │  gRPC / HTTPS    │
+│  Primary DB             │  MongoDB     │  Mongoose      │  MongoDriver     │
+│  Cache                  │  Redis 5.0   │  ioredis       │  RESP            │
 │  Message Broker         │  RabbitMQ    │  amqplib       │  AMQP 0-9-1      │
-│  AI Inference           │  Gemini 1.5  │  Embeddings    │  gRPC / HTTPS    │
 │  Image CDN              │  Cloudinary  │  —             │  HTTPS           │
 │  Push Notifications     │  FCM / APNs  │  —             │  HTTP v1         │
 │  Containers             │  Docker      │  Compose       │  —               │
 └─────────────────────────┴──────────────┴────────────────┴──────────────────┘
 ```
+
+---
+
+## ✨ Key Features & Enhancements (2026 Update)
+
+### Mobile Phase 1-3 Refactor ✅
+- SafeArea handling on all screens (notch, Home Indicator, safe zones)
+- KeyboardAvoidingView for form screens (iOS/Android platform-specific)
+- FlatList-based chat with 60 FPS scrolling
+- Real-time typing indicator with ActivityIndicator
+- Auto-scroll to latest message with onContentSizeChange
+- Currency formatting (1.2 Tỷ đ) to prevent overflow
+
+### NLP Integration ✅
+- NLPQuickEntry component for transaction entry
+- Entity extraction: amount, category, description
+- Auto-fill form fields from natural language input
+- Gradient UI with loading states
+
+### OCR Receipt Processing ✅
+- PaddleOCR for Vietnamese receipt text extraction
+- Image preprocessing (rotation, contrast)
+- Metadata extraction → transaction auto-creation
+- Cloudinary integration for image storage
+
+### AI Agentic RAG ✅
+- Gemini 1.5 Pro with 1M token context
+- Function-calling for structured output
+- Tool routing: vector search, web search, transaction CRUD
+- Conversation memory in Redis
+- Streaming SSE responses for real-time chat
+
+---
+
+## 🎯 Performance Targets
+
+| Metric | Target |
+|--------|--------|
+| Dashboard load time | < 2s |
+| API Gateway P99 latency | < 500ms |
+| AI chat response | < 3s |
+| OCR processing | < 2s |
+| Mobile FlatList FPS | 60 FPS |
+
+---
+
+**Version:** 2.0 (Updated May 2026)  
+**Status:** ✅ Production Ready  
+**Last Updated:** May 9, 2026
