@@ -23,7 +23,9 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isAuthenticated: false,
+      // Đăng nhập thật: lưu user và JWT token vào store
       setLogin: (user, token) => set({ user, token, isAuthenticated: true }),
+      // Đăng nhập demo không cần backend – dùng để test UI nhanh
       setMockLogin: () => set({
         user: {
           id: 'mock-id',
@@ -34,6 +36,7 @@ export const useAuthStore = create<AuthState>()(
         token: 'mock-token',
         isAuthenticated: true,
       }),
+      // Logout: xóa hết localStorage và reset Zustand state về chưa đăng nhập
       logout: () => {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('accessToken');
@@ -46,6 +49,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
+      // Zustand persist: chỉ lưu 3 field này vào localStorage (key 'auth-storage')
       name: 'auth-storage',
       partialize: (state) => ({ user: state.user, token: state.token, isAuthenticated: state.isAuthenticated }),
     }

@@ -19,6 +19,8 @@ function sumWalletAmount(items: Wallet[]) {
 }
 
 export function useDashboardOverview(range: TimeRange = 'month') {
+  // 3 query song song: ví, tiết kiệm/đầu tư, analytics
+  // Mỗi query độc lập – lỗi 1 query không ảnh hưởng query còn lại
   const walletsQuery = useQuery({
     queryKey: ['mobile-dashboard-overview-wallets'],
     queryFn: () => financeApi.getWallets(),
@@ -28,6 +30,7 @@ export function useDashboardOverview(range: TimeRange = 'month') {
 
   const savingsQuery = useQuery({
     queryKey: ['mobile-dashboard-overview-savings'],
+    // Gọi cả SAVING và INVESTMENT trong 1 Promise.all – giảm số round-trip
     queryFn: () => Promise.all([financeApi.getSavings('SAVING'), financeApi.getSavings('INVESTMENT')]),
     staleTime: 60_000,
     retry: 1,

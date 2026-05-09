@@ -13,10 +13,11 @@ export function useCashflow(range: TimeRange = 'month', walletId?: string) {
   });
 
   return {
+    // Nếu API lỗi, tự động fallback về dữ liệu demo – biểu đồ vẫn hiển thị thay vì bị trắng
     data: query.data ?? (query.isError ? getDemoAnalytics(range) : undefined),
     isLoading: query.isLoading,
     isRefreshing: query.isRefetching,
-    isDemoMode: query.isError,
+    isDemoMode: query.isError, // true = đang hiển thị dữ liệu giả
     errorMessage: query.error instanceof Error ? query.error.message : null,
     refetch: query.refetch,
   };

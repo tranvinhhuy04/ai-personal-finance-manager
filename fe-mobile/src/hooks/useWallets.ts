@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../api/finance';
 import type { CreateWalletInput, Wallet } from '../types/finance';
 
+// Parse số dư từ string/number, xử lý dấu phẩy và khoảng trắng (phòng ngừa API trả về '1,500,000').
 function parseBalance(value: unknown): number {
   const normalized = String(value ?? '0').replace(/,/g, '').replace(/\s/g, '');
   const parsed = Number(normalized);
@@ -12,17 +13,19 @@ function parseBalance(value: unknown): number {
 
 export function useWallets() {
   const queryClient = useQueryClient();
+  // filter local: 'all' | 'active' | 'locked' – lọc phía client, không gọi lại API
   const [filter, setFilter] = useState<'all' | 'active' | 'locked'>('all');
 
   const query = useQuery({
     queryKey: ['mobile-wallets'],
     queryFn: () => financeApi.getWallets(),
-    staleTime: 60_000,
+    staleTime: 60_000, // Cache 60 giây
     retry: 1,
   });
 
   const createMutation = useMutation({
     mutationFn: (input: CreateWalletInput) => financeApi.createWallet(input),
+    // Sau khi tạo ví thành công, invalidate cache để refetch danh sách mới
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['mobile-wallets'] });
     },
@@ -37,12 +40,14 @@ export function useWallets() {
   });
 
   const sourceWallets = query.data ?? [];
+  // useMemo: chỉ lọc lại khi filter hoặc danh sách gốc thay đổi
   const wallets = useMemo(() => {
     if (filter === 'active') return sourceWallets.filter((wallet) => wallet.status === 1);
     if (filter === 'locked') return sourceWallets.filter((wallet) => wallet.status !== 1);
     return sourceWallets;
   }, [filter, sourceWallets]);
 
+  // summary: thống kê nhanh tổng số dư, số ví hoạt động/khóa – hiển thị trên header Dashboard
   const summary = useMemo(() => {
     const totalBalance = sourceWallets.reduce((sum, wallet) => sum + parseBalance(wallet.balance), 0);
     const activeCount = sourceWallets.filter((wallet) => wallet.status === 1).length;

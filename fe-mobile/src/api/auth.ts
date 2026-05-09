@@ -44,6 +44,8 @@ export interface LoginResult {
   message?: string;
 }
 
+// Chuẩn hóa object user trả về từ API – backend có thể dùng các tên field khác nhau.
+// userId / id / _id đều được hỗ trợ; fullName fallback về email nếu không có.
 function normalizeUser(raw?: Record<string, any> | null): AuthUser | null {
   if (!raw) {
     return null;
@@ -70,6 +72,9 @@ function normalizeLoginResult(data: Record<string, any>): LoginResult {
   };
 }
 
+// Kiểm tra liệu lỗi này có nên retry không.
+// Retry các lỗi mạng tạm thời (timeout, network error, 502/503/504)
+// và bỏ qua lỗi xác thực (401, 400, ...).
 function shouldRetryAuthRequest(error: any) {
   const code = String(error?.code || '').toUpperCase();
   const status = Number(error?.status || error?.response?.status || 0);
@@ -86,6 +91,7 @@ function shouldRetryAuthRequest(error: any) {
   return status === 502 || status === 503 || status === 504;
 }
 
+// Wrapper thực hiện request và tự động retry 1 lần nếu gặp lỗi tạm thời.
 async function withAuthRetry<T>(run: () => Promise<T>) {
   try {
     return await run();

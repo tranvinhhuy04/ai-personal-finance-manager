@@ -40,6 +40,8 @@ export interface AnalyticsDashboardResponse {
   trend: TrendPoint[];
 }
 
+// Gọi API analytics-dashboard qua API Gateway.
+// Tham số month (YYYY-MM) và wallet_id đều optional – nếu bỏ qua thì lấy dữ liệu toàn thời gian.
 async function fetchAnalytics(filters?: AnalyticsFilter): Promise<AnalyticsDashboardResponse> {
   const params: Record<string, string> = {};
 
@@ -59,12 +61,14 @@ async function fetchAnalytics(filters?: AnalyticsFilter): Promise<AnalyticsDashb
 }
 
 export function useAnalytics(filters?: AnalyticsFilter) {
+  // React Query cache key bao gồm cả filter – thay đổi filter sẽ tự động refetch
   const query = useQuery({
     queryKey: ['analytics-dashboard', filters?.month ?? 'all', filters?.walletId ?? 'all'],
     queryFn: () => fetchAnalytics(filters),
-    staleTime: 60 * 1000,
+    staleTime: 60 * 1000, // Cache 60 giây trước khi refetch
   });
 
+  // useMemo – chỉ tính toán lại khi data thay đổi, tránh render lại không cần thiết
   const chartData = useMemo(() => {
     const dashboard = query.data;
     if (!dashboard) {

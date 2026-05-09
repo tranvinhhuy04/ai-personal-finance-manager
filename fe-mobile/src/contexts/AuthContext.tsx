@@ -17,6 +17,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+// Đọc user đã lưu trong AsyncStorage (tồn tại sau khi reload app).
 async function readStoredUser() {
   const raw = await AsyncStorage.getItem(AUTH_STORAGE_KEYS.user);
 
@@ -27,6 +28,7 @@ async function readStoredUser() {
   try {
     return JSON.parse(raw) as AuthUser;
   } catch {
+    // JSON bị hỏng → trả null, buộc user đăng nhập lại
     return null;
   }
 }

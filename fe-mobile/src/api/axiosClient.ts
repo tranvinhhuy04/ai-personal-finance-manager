@@ -15,6 +15,8 @@ const expoExtra = (Constants.expoConfig?.extra ?? {}) as {
   aiTimeoutMs?: string | number;
 };
 
+// Token tạm dùng cho dev/test – dán JWT thật vào đây để bỏ qua màn Login.
+// KHÔNG commit giá trị thật lên git; để trống ('') trong production.
 const TEMP_ACCESS_TOKEN = '';
 // Dán JWT thật vào `TEMP_ACCESS_TOKEN` hoặc `EXPO_PUBLIC_ACCESS_TOKEN` để test nhanh khi chưa có màn Login.
 
@@ -80,12 +82,20 @@ function readTimeoutMs(...values: Array<unknown>) {
   return undefined;
 }
 
+// Địa chỉ fallback theo từng nền tảng:
+// - Android Emulator dùng 10.0.2.2 (alias trỏ về localhost của máy host)
+// - iOS Simulator / máy thật dùng 127.0.0.1
 const fallbackBaseUrl = Platform.select({
   android: 'http://10.0.2.2:3000',
   ios: 'http://127.0.0.1:3000',
   default: 'http://127.0.0.1:3000',
 });
 
+// Thứ tự ưu tiên chọn base URL:
+// 1. Biến môi trường EXPO_PUBLIC_API_BASE_URL (.env)
+// 2. IP LAN tự suy ra từ Expo debugger host (khi dùng Expo Go trên thiết bị thật)
+// 3. Giá trị trong app.config.js extra.apiBaseUrl
+// 4. Fallback theo platform (android/ios/default)
 const apiBaseCandidatesRaw = [
   normalizeBaseUrl(expoEnv.EXPO_PUBLIC_API_BASE_URL),
   normalizeBaseUrl(inferredLanBaseUrl),
@@ -125,6 +135,8 @@ function normalizeToken(value: unknown) {
   return trimmed || null;
 }
 
+// Đọc token từ chuỗi JSON đã được persist (tương thích cả Zustand và format tùy chỉnh).
+// Hỗ trợ 2 cấu trúc: { state: { token } } (Zustand persist) và { token } (flat).
 function readPersistedStateToken(raw: string | null) {
   if (!raw) {
     return null;
@@ -144,10 +156,16 @@ function readPersistedStateToken(raw: string | null) {
       normalizeToken(parsed.accessToken)
     );
   } catch {
+    // JSON bị corrupt → bỏ qua và coi như chưa đăng nhập
     return null;
   }
 }
 
+// Đọc JWT access token từ AsyncStorage theo thứ tự ưu tiên:
+// 1. Key 'accessToken' (backend trả về)
+// 2. Key 'token' (legacy key)
+// 3. JSON persist 'auth-storage' (Zustand)
+// 4. TEMP_ACCESS_TOKEN / biến env dev (chỉ dùng khi test, không có màn Login)
 async function readAccessToken() {
   const directToken =
     normalizeToken(await AsyncStorage.getItem(AUTH_STORAGE_KEYS.token)) ||
@@ -162,6 +180,8 @@ async function readAccessToken() {
   return directToken || fallbackToken;
 }
 
+// Xóa toàn bộ dữ liệu xác thực khỏi AsyncStorage.
+// Được gọi khi logout hoặc khi server trả về 401 Unauthorized.
 async function clearAuthData() {
   await Promise.all([
     AsyncStorage.removeItem(AUTH_STORAGE_KEYS.token),
@@ -172,6 +192,8 @@ async function clearAuthData() {
   ]);
 }
 
+// Request interceptor: tự động đính kèm Bearer token vào mọi request.
+// Async vì AsyncStorage.getItem là bất đồng bộ trên React Native.
 async function attachAuthToken(config: InternalAxiosRequestConfig) {
   const token = await readAccessToken();
 

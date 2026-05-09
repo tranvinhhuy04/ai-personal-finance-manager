@@ -1,7 +1,11 @@
 import axios, { AxiosHeaders } from 'axios';
 
+// Đọc JWT token đang được lưu trong localStorage.
+// Ưu tiên key 'accessToken' / 'token' (backend trả về trực tiếp),
+// nếu không có thì fallback vào object 'auth-storage' do Zustand persist lưu.
 function readPersistedAuthToken(): string | null {
   if (typeof window === 'undefined') {
+    // SSR guard – không truy cập localStorage ngoài browser
     return null;
   }
 
@@ -10,6 +14,7 @@ function readPersistedAuthToken(): string | null {
     return directToken;
   }
 
+  // Fallback: Zustand persist lưu toàn bộ state dưới dạng JSON string
   const authStorage = localStorage.getItem('auth-storage');
   if (!authStorage) {
     return null;
@@ -19,10 +24,13 @@ function readPersistedAuthToken(): string | null {
     const parsed = JSON.parse(authStorage) as { state?: { token?: string | null } };
     return parsed?.state?.token ?? null;
   } catch {
+    // JSON parse lỗi (dữ liệu bị corrupt) → coi như chưa đăng nhập
     return null;
   }
 }
 
+// Xóa toàn bộ thông tin xác thực khỏi localStorage.
+// Được gọi khi người dùng logout hoặc khi server trả về 401.
 function clearAuthStorage() {
   if (typeof window === 'undefined') {
     return;
@@ -34,7 +42,10 @@ function clearAuthStorage() {
   localStorage.removeItem('auth-storage');
 }
 
+// Endpoint API Gateway – đọc từ biến môi trường VITE_API_BASE_URL (.env)
+// Mặc định trỏ về localhost:3000 khi chạy dev
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3000';
+// AI Service có thể chạy trên port riêng; nếu không khai báo thì dùng chung API Gateway
 const AI_SERVICE_BASE_URL = import.meta.env.VITE_AI_SERVICE_URL || API_BASE_URL;
 
 export const axiosClient = axios.create({
@@ -50,6 +61,8 @@ export const aiAxiosClient = axios.create({
   timeout: 120000,
 });
 
+// Request interceptor: tự động đính kèm header Authorization vào mọi request.
+// Không cần truyền token thủ công tại từng API call.
 function attachAuthToken(config: any) {
   const token = readPersistedAuthToken();
 

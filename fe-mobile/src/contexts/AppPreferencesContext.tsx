@@ -57,6 +57,8 @@ export function AppPreferencesProvider({ children }: { children: React.ReactNode
     };
   }, []);
 
+  // Cập nhật một preference key và persist ngay vào AsyncStorage.
+  // set state trước (optimistic update), sau đó ghi AsyncStorage bất đồng bộ không chặn UI.
   const updatePreference = async <K extends keyof Preferences>(key: K, value: Preferences[K]) => {
     setPreferences((current) => {
       const next = { ...current, [key]: value };
@@ -65,6 +67,7 @@ export function AppPreferencesProvider({ children }: { children: React.ReactNode
     });
   };
 
+  // useMemo – tránh tạo object mới mỗi render, chỉ tính lại khi preferences hoặc isLoading thay đổi
   const value = useMemo<AppPreferencesContextValue>(
     () => ({
       preferences,

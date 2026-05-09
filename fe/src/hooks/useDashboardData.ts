@@ -39,6 +39,9 @@ export interface DashboardData {
   };
 }
 
+// Hook trả về dữ liệu tĩnh (mock) cho Dashboard.
+// Dữ liệu này hiện không gọi API – dùng để fallback hoặc hiển thị UI mẫu.
+// Nếu muốn dữ liệu thật, thay bằng useQuery gọi /api/v1/wallets + /api/v1/analytics.
 export const useDashboardData = () => {
   const data: DashboardData = {
     overview: {
