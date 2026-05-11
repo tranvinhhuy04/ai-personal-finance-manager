@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-_PROMPT_DIR = Path(__file__).parent.parent.parent.parent / "prompts"
+_PROMPT_DIR = Path(__file__).parent.parent.parent / "prompts"
 
 def _load(name: str) -> str:
     return (_PROMPT_DIR / name).read_text(encoding="utf-8")
