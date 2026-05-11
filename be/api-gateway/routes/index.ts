@@ -24,6 +24,7 @@ const NOTIFICATION_STREAM_TIMEOUT_MS = Number(process.env.NOTIFICATION_STREAM_TI
 const AUTH_LOGIN_RATE_LIMIT_WINDOW_MS = Number(process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_MS ?? 60_000);
 const AUTH_LOGIN_RATE_LIMIT_MAX = Number(process.env.AUTH_LOGIN_RATE_LIMIT_MAX ?? 10);
 
+// rate limit cho login để tránh brute force, cấu hình qua ENV
 const authLoginLimiter = rateLimit({
   windowMs: AUTH_LOGIN_RATE_LIMIT_WINDOW_MS,
   max: Math.max(1, AUTH_LOGIN_RATE_LIMIT_MAX),
@@ -35,18 +36,18 @@ const authLoginLimiter = rateLimit({
     return `${req.ip}:${email}`;
   },
   message: {
-    message: 'Too many failed login attempts, please try again later.',
+    message: 'Quá nhiều lần đăng nhập thất bại, thử lại sau.',
   },
 });
 
-/** Shared error handler — returns 504 when upstream is unreachable or times out */
+// trả 504 khi upstream không phản hồi kịp thời
 function onProxyError(err: Error, req: IncomingMessage, res: ServerResponse) {
-  console.error('[api-gateway] proxy error:', err.message);
+  console.error('[api-gateway] proxy lỗi:', err.message);
   if (!res.headersSent) {
     res.statusCode = 504;
     res.setHeader('Content-Type', 'application/json');
     const payload = {
-      message: 'Gateway Timeout: upstream service did not respond in time.',
+      message: 'Service không phản hồi kịp, thử lại sau.',
       path: req.url,
     };
     res.end(JSON.stringify(payload));
@@ -59,25 +60,23 @@ function onProxyRes(proxyRes: IncomingMessage, req: IncomingMessage) {
 }
 
 function onProxyReq(proxyReq: ClientRequest, req: IncomingMessage) {
-  console.log(`[api-gateway] proxyReq ${req.method} ${req.url}`);
+  console.log(`[api-gateway] proxyReq ${req.method} ${req.url}`)
 
-  // When body-parser runs before proxy (e.g. /auth/login), we must re-stream the body.
-  const body = (req as any).body;
-  if (!body || typeof body !== 'object') {
-    return;
+  const body = (req as any).body
+  if (body && typeof body === 'object') {
+    const bodyData = JSON.stringify(body)
+    proxyReq.setHeader('Content-Type', 'application/json')
+    proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData))
+    proxyReq.write(bodyData)
   }
-
-  const bodyData = JSON.stringify(body);
-  proxyReq.setHeader('Content-Type', 'application/json');
-  proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-  proxyReq.write(bodyData);
 }
 
 function rewriteAuthPath(_path: string, req: IncomingMessage) {
-  const originalUrl = (req as any).originalUrl as string | undefined;
-  const sourcePath = originalUrl ?? _path;
-  const rewritten = sourcePath.replace(/^\/api\/v1\/auth/, '');
-  return rewritten.length > 0 ? rewritten : '/';
+  const originalUrl = (req as any).originalUrl as string | undefined
+  const sourcePath = originalUrl ?? _path
+  const rewritten = sourcePath.replace(/^\/api\/v1\/auth/, '')
+  if (rewritten.length > 0) return rewritten
+  return '/'
 }
 
 function rewriteSettingsPath(_path: string, req: IncomingMessage) {
@@ -113,7 +112,7 @@ router.use(
   createProxyMiddleware({
     target: IDENTITY_SERVICE_URL,
     changeOrigin: true,
-    // Strip /api/v1/auth prefix because identity-service exposes /login, /register, etc.
+    // Strip /api/v1/auth prefix vì identity-service expose /login, /register trực tiếp
     pathRewrite: rewriteAuthPath,
     proxyTimeout: PROXY_TIMEOUT_MS,
     timeout: PROXY_TIMEOUT_MS,
@@ -123,18 +122,18 @@ router.use(
   })
 );
 
-// Block internal settings sub-routes from public clients.
+// Block các route nội bộ khỏi direct access từ client
 router.all('/settings/runtime-ai', verifyToken, (_req, res) => {
-  return res.status(403).json({ message: 'Forbidden' });
+  return res.status(403).json({ message: 'Không có quyền truy cập' });
 });
 
 router.all('/settings/usage/append', verifyToken, (_req, res) => {
-  return res.status(403).json({ message: 'Forbidden' });
+  return res.status(403).json({ message: 'Không có quyền truy cập' });
 });
 
-// /settings/api-keys/mark-exhausted is called internally by BFF — block direct public access
+// mark-exhausted gọi bởi BFF nội bộ, block public
 router.all('/settings/api-keys/mark-exhausted', verifyToken, (_req, res) => {
-  return res.status(403).json({ message: 'Forbidden' });
+  return res.status(403).json({ message: 'Không có quyền truy cập' });
 });
 
 // /api/v1/settings -> service-identity /settings (JWT required)

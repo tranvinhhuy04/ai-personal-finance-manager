@@ -15,11 +15,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / '.env')
 
 
 def _parse_cors_origins() -> list[str]:
-    """Cho phép FE React gọi trực tiếp vào AI service.
-
-    Có thể override bằng biến môi trường CORS_ORIGINS theo format:
-    http://localhost:5173,http://127.0.0.1:5173
-    """
+    # move to .env later, hien tai hardcode cho dev local
     raw_value = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
     return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
 
@@ -43,11 +39,7 @@ app.include_router(ai_router, prefix="/api/v1/ai", tags=["AI"])
 
 @app.on_event("startup")
 async def warm_up_models() -> None:
-    """Warm-up model theo nhu cầu để tránh tốn RAM ngay khi container boot.
-
-    Set AI_SERVICE_PRELOAD_MODELS=true nếu muốn tải model từ lúc startup.
-    Mặc định để false nhằm giảm peak memory trong Docker.
-    """
+    # preload model neu can, mac dinh tat vi docker bi OOM
     preload = os.getenv("AI_SERVICE_PRELOAD_MODELS", "false").lower() == "true"
     if not preload:
         return

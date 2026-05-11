@@ -1,12 +1,7 @@
-/**
- * invoice-extraction.service.ts
- *
- * LUỒNG MỚI (kể từ 2026-05-01):
- *   Node.js nhận file từ FE → đọc buffer → gọi nội bộ Python ai-service (PaddleOCR)
- *   → trả về { merchantName, totalAmount, transactionDate } chuẩn hóa về FE.
- *
- * Luồng OCR cloud cũ đã được loại bỏ khỏi runtime hiện tại.
- */
+// invoice-extraction.service.ts
+// LUỒNG (kể từ 2026-05-01):
+//   Node.js nhận file từ FE → đọc buffer → gọi nội bộ Python ai-service (PaddleOCR)
+//   → trả về { merchantName, totalAmount, transactionDate } chuẩn hoá về FE
 
 import { readFile } from 'fs/promises';
 import { AppError } from '../errors/AppError';
@@ -22,24 +17,27 @@ const AI_SERVICE_OCR_URL =
   process.env.AI_SERVICE_OCR_URL ?? 'http://ai-service:8000/api/v1/ai/ocr';
 
 class InvoiceExtractionService {
-  /**
-   * Đọc file ảnh từ disk rồi gọi Python PaddleOCR service qua mạng nội bộ Docker.
-   * Trả về 3 trường chuẩn hoá: merchantName, totalAmount, transactionDate.
-   */
+  // gọi python service, đọc buffer, trả 3 trường chuẩn hoá
   async extractFromImage(filePath: string): Promise<ExtractedInvoiceData> {
-    // 1. Đọc file buffer từ disk (multer đã lưu vào /public/uploads/)
+    // đọc buffer từ disk (multer lưu ở /public/uploads/)
     let fileBuffer: Buffer;
     try {
       fileBuffer = await readFile(filePath);
     } catch {
-      throw new AppError(`Cannot read uploaded invoice file: ${filePath}`, 500);
+      throw new AppError(`Không đọc được file ảnh: ${filePath}`, 500);
     }
 
-    // 2. Tạo multipart/form-data payload dùng FormData của Node 18+ built-in
+    // tạo multipart/form-data payload cho Python service
     const formData = new FormData();
-    const ext = filePath.split('.').pop()?.toLowerCase() ?? 'jpg';
-    const mimeType =
-      ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+    const ext = filePath.split('.').pop()?.toLowerCase() ?? 'jpg'
+    let mimeType: string
+    if (ext === 'png') {
+      mimeType = 'image/png'
+    } else if (ext === 'webp') {
+      mimeType = 'image/webp'
+    } else {
+      mimeType = 'image/jpeg'
+    }
 
     formData.append(
       'file',
@@ -47,13 +45,13 @@ class InvoiceExtractionService {
       `invoice.${ext}`
     );
 
-    // 3. Gọi Python ai-service qua mạng nội bộ Docker
+    // gọi Python ai-service qua mạng nội bộ Docker
     let response: Response;
     try {
       response = await fetch(AI_SERVICE_OCR_URL, {
         method: 'POST',
         body: formData,
-        signal: AbortSignal.timeout(120_000), // 120s — PaddleOCR cold start lần đầu ~30s
+        signal: AbortSignal.timeout(120_000), // PaddleOCR cold start lần đầu ~30s
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -63,7 +61,7 @@ class InvoiceExtractionService {
       );
     }
 
-    // 4. Parse response
+    // parse response
     if (!response.ok) {
       let detail = '';
       try {
@@ -94,7 +92,7 @@ class InvoiceExtractionService {
     };
   }
 
-  // ─── helpers ──────────────────────────────────────────────────────────────
+  // helpers
 
   private normalizeAmount(value: unknown): number | null {
     if (typeof value === 'number' && Number.isFinite(value) && value > 0) {

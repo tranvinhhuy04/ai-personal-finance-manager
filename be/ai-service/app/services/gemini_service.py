@@ -10,23 +10,19 @@ import httpx
 GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
 
 
-# ---------------------------------------------------------------------------
-# Helper: kiểm tra xem HTTP status / body có phải lỗi quota/rate-limit không
-# ---------------------------------------------------------------------------
+# helper: kiểm tra xem HTTP status / body có phải lỗi quota/rate-limit không
 
 def _is_quota_error(status_code: int, body: str) -> bool:
     """Trả về True nếu lỗi là 429 hoặc 403 quota/rate-limit."""
-    if status_code == 429:
+    if 429 == status_code:
         return True
-    if status_code == 403:
+    if 403 == status_code:
         lowered = body.lower()
         return 'quota' in lowered or 'rate limit' in lowered or 'rateLimitExceeded' in body
     return False
 
 
-# ---------------------------------------------------------------------------
 # Auto-Rotation: thử lần lượt từng key trong pool, bỏ qua key bị quota
-# ---------------------------------------------------------------------------
 
 async def call_gemini_with_rotation(
     *,
@@ -36,15 +32,8 @@ async def call_gemini_with_rotation(
     timeout: float = 20.0,
     connect_timeout: float = 5.0,
 ) -> tuple[dict[str, Any], list[int]]:
-    """Gọi Gemini API với cơ chế auto-rotate qua pool keys.
-
-    Returns:
-        (response_data, exhausted_indices)  — response_data là JSON đã parse,
-        exhausted_indices là danh sách index của các keys bị quota.
-
-    Raises:
-        RuntimeError: khi tất cả keys đều bị quota hoặc không có key nào.
-    """
+    # trả về (response_data, exhausted_indices)
+    # exhausted_indices: danh sách index key bị quota, để FE mark lại
     if not api_keys:
         raise RuntimeError('Vui lòng cập nhật API Key để sử dụng tính năng này.')
 
@@ -55,34 +44,32 @@ async def call_gemini_with_rotation(
         key = str(entry.get('key') or '').strip()
         key_index = int(entry.get('index', -1))
 
-        if not key:
-            continue
+        if key:
+            url = GeminiService._build_url(model, key)
+            try:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(timeout, connect=connect_timeout)) as client:
+                    response = await client.post(url, json=payload)
 
-        url = GeminiService._build_url(model, key)
-        try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout, connect=connect_timeout)) as client:
-                response = await client.post(url, json=payload)
+                    if _is_quota_error(response.status_code, response.text):
+                        exhausted_indices.append(key_index)
+                        last_error = f'Key index={key_index}: quota/rate-limit ({response.status_code})'
+                        continue  # thử key tiếp theo
 
-                if _is_quota_error(response.status_code, response.text):
+                    response.raise_for_status()
+                    return response.json(), exhausted_indices
+
+            except httpx.HTTPStatusError as exc:
+                body = exc.response.text[:500] if exc.response is not None else str(exc)
+                status = exc.response.status_code if exc.response is not None else 0
+                if _is_quota_error(status, body):
                     exhausted_indices.append(key_index)
-                    last_error = f'Key index={key_index}: quota/rate-limit ({response.status_code})'
-                    continue  # thử key tiếp theo
+                    last_error = f'Key index={key_index}: quota/rate-limit ({status})'
+                    continue
+                # Lỗi thực sự (invalid key, server error…) — dừng ngay
+                raise RuntimeError(f'Gemini API HTTP error: {body}') from exc
 
-                response.raise_for_status()
-                return response.json(), exhausted_indices
-
-        except httpx.HTTPStatusError as exc:
-            body = exc.response.text[:500] if exc.response is not None else str(exc)
-            status = exc.response.status_code if exc.response is not None else 0
-            if _is_quota_error(status, body):
-                exhausted_indices.append(key_index)
-                last_error = f'Key index={key_index}: quota/rate-limit ({status})'
-                continue
-            # Lỗi thực sự (invalid key, server error…) — dừng ngay
-            raise RuntimeError(f'Gemini API HTTP error: {body}') from exc
-
-        except httpx.RequestError as exc:
-            raise RuntimeError(f'Unable to reach Gemini API: {exc}') from exc
+            except httpx.RequestError as exc:
+                raise RuntimeError(f'Unable to reach Gemini API: {exc}') from exc
 
     raise RuntimeError(
         f'Tất cả API Keys đã hết Quota. Vui lòng cập nhật API Key. Chi tiết: {last_error}'

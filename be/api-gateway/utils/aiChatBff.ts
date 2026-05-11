@@ -110,7 +110,7 @@ function normalizeType(value: unknown): 'expense' | 'income' {
   return String(value ?? '').trim().toLowerCase() === 'income' ? 'income' : 'expense';
 }
 
-function shouldRecordTransactions(message: string): boolean {
+function isRecordIntent(message: string): boolean {
   const normalized = normalizeText(message);
 
   if (!normalized || /\?|bao nhieu|tong chi|tong thu|thang truoc|thang nay|gia vang|ty gia|co phieu|chung khoan/.test(normalized)) {
@@ -122,7 +122,7 @@ function shouldRecordTransactions(message: string): boolean {
   return hasAmount && hasActionCue;
 }
 
-function shouldUseAnalyticsChat(message: string): boolean {
+function isAnalyticsQuery(message: string): boolean {
   const normalized = normalizeText(message);
   if (/(thu nhap|chi tieu|tong chi|tong thu|so du|vi tien|thang nay|thang truoc|giao dich gan nhat|giao dich)/.test(normalized)) {
     return true;
@@ -140,17 +140,17 @@ function shouldUseAnalyticsChat(message: string): boolean {
   const hasTimeCue = /(\\bthang\\b|\\bth\\b|\\bnay\\b|\\btruoc\\b|\\bquy\\b|\\bnam\\b|\\bmonth\\b|\\brecent\\b)/.test(coarse);
   return hasMetricCue && hasTimeCue;
 }
-function shouldUseMarketAdvisor(message: string): boolean {
+function isMarketQuery(message: string): boolean {
   const normalized = normalizeText(message);
   return /(gia vang|ty gia|usd|chung khoan|co phieu|crypto|bitcoin|eth|lai suat|lai suat ngan hang)/.test(normalized);
 }
 
-function applyRouteGuardrail(message: string, routePlan: ChatRoutePlan): ChatRoutePlan {
+function fixRoute(message: string, routePlan: ChatRoutePlan): ChatRoutePlan {
   if (routePlan.route === 'record_transactions') {
     return routePlan;
   }
 
-  if (shouldUseMarketAdvisor(message)) {
+  if (isMarketQuery(message)) {
     if (routePlan.route === 'advisor_chat') {
       return routePlan;
     }
@@ -162,7 +162,7 @@ function applyRouteGuardrail(message: string, routePlan: ChatRoutePlan): ChatRou
     };
   }
 
-  if (shouldUseAnalyticsChat(message) && routePlan.route === 'advisor_chat') {
+  if (isAnalyticsQuery(message) && routePlan.route === 'advisor_chat') {
     return {
       route: 'analytics_chat',
       confidence: Math.max(routePlan.confidence, 0.76),
@@ -174,8 +174,8 @@ function applyRouteGuardrail(message: string, routePlan: ChatRoutePlan): ChatRou
   return routePlan;
 }
 
-function buildFallbackRoutePlan(message: string): ChatRoutePlan {
-  if (shouldRecordTransactions(message)) {
+function getFallbackRoute(message: string): ChatRoutePlan {
+  if (isRecordIntent(message)) {
     return {
       route: 'record_transactions',
       confidence: 0.72,
@@ -184,7 +184,7 @@ function buildFallbackRoutePlan(message: string): ChatRoutePlan {
     };
   }
 
-  if (shouldUseAnalyticsChat(message)) {
+  if (isAnalyticsQuery(message)) {
     return {
       route: 'analytics_chat',
       confidence: 0.7,
@@ -262,7 +262,7 @@ function parseRawText(rawText: string): Record<string, unknown> {
   }
 }
 
-async function routeMessageWithLlm(
+async function getRoute(
   message: string,
   runtimeAiConfig: RuntimeAiConfig | null,
 ): Promise<ChatRoutePlan> {
@@ -270,7 +270,7 @@ async function routeMessageWithLlm(
   const model = String(runtimeAiConfig?.selected_ai_model ?? 'gemini-2.0-flash').trim() || 'gemini-2.0-flash';
 
   if (!apiKey) {
-    return buildFallbackRoutePlan(message);
+    return getFallbackRoute(message);
   }
 
   const routerPrompt = [
@@ -307,7 +307,7 @@ async function routeMessageWithLlm(
   });
 
   if (!response.ok) {
-    return buildFallbackRoutePlan(message);
+    return getFallbackRoute(message);
   }
 
   const rawData = (await response.json()) as Record<string, unknown>;
@@ -321,7 +321,7 @@ async function routeMessageWithLlm(
     .trim();
 
   if (!text) {
-    return buildFallbackRoutePlan(message);
+    return getFallbackRoute(message);
   }
 
   try {
@@ -347,11 +347,11 @@ async function routeMessageWithLlm(
       rationale,
     };
   } catch {
-    return buildFallbackRoutePlan(message);
+    return getFallbackRoute(message);
   }
 }
 
-async function callAnalyticsChatPipeline(
+async function doAnalyticsChat(
   message: string,
   runtimeAiConfig: RuntimeAiConfig | null,
   financialContext: FinancialContext,
@@ -480,7 +480,7 @@ function mapAdvisorIntent(intent: string, message: string): string {
     return 'general_knowledge';
   }
 
-  if ((normalizedIntent === 'out_of_scope' || normalizedIntent === 'unknown') && shouldUseMarketAdvisor(message)) {
+  if ((normalizedIntent === 'out_of_scope' || normalizedIntent === 'unknown') && isMarketQuery(message)) {
     return 'general_knowledge';
   }
 
@@ -584,7 +584,7 @@ async function createTransactionRecord(
   return data;
 }
 
-async function tryRecordTransactions(
+async function tryRecord(
   req: Request,
   message: string,
   runtimeAiConfig: RuntimeAiConfig | null,
@@ -697,7 +697,7 @@ async function tryRecordTransactions(
   };
 }
 
-async function callAdvisorPipeline(
+async function doAdvisorChat(
   req: Request,
   message: string,
   runtimeAiConfig: RuntimeAiConfig | null,
@@ -787,7 +787,7 @@ async function callAdvisorPipeline(
   };
 }
 
-function buildFinancialContext(dashboard: DashboardResponse): FinancialContext {
+function toFinCtx(dashboard: DashboardResponse): FinancialContext {
   const totalIncome = toNumber(dashboard.summary?.totalIncome);
   const totalExpense = toNumber(dashboard.summary?.totalExpense);
   const netCashFlow = toNumber(dashboard.summary?.netCashFlow ?? dashboard.summary?.net ?? totalIncome - totalExpense);
@@ -805,7 +805,7 @@ function buildFinancialContext(dashboard: DashboardResponse): FinancialContext {
   };
 }
 
-async function fetchAnalyticsDashboard(req: Request): Promise<FinancialContext> {
+async function getFinCtx(req: Request): Promise<FinancialContext> {
   const userId = String((req as any).userId ?? 'anonymous');
   const body = (req.body ?? {}) as Record<string, unknown>;
   const month = typeof body.month === 'string' && body.month.trim() ? body.month.trim() : 'current';
@@ -852,7 +852,7 @@ async function fetchAnalyticsDashboard(req: Request): Promise<FinancialContext> 
   }
 
   const dashboard = (await response.json()) as DashboardResponse;
-  const financialContext = buildFinancialContext(dashboard);
+  const financialContext = toFinCtx(dashboard);
   financialContextCache.set(cacheKey, {
     expiresAt: Date.now() + AI_CONTEXT_CACHE_TTL_MS,
     value: financialContext,
@@ -965,13 +965,15 @@ export async function handleAiChat(req: Request, res: Response) {
   }
 
   const runtimeAiConfig = await fetchRuntimeAiConfig(req);
+  // TODO: cache runtimeAiConfig per user sau nay
+  console.log('[ai-chat] route msg len:', message.length);
 
   try {
-    const plannedRoute = await routeMessageWithLlm(message, runtimeAiConfig);
-    const routePlan = applyRouteGuardrail(message, plannedRoute);
+    const plannedRoute = await getRoute(message, runtimeAiConfig);
+    const routePlan = fixRoute(message, plannedRoute);
 
     if (routePlan.route === 'record_transactions') {
-      const actionResponse = await tryRecordTransactions(req, message, runtimeAiConfig);
+      const actionResponse = await tryRecord(req, message, runtimeAiConfig);
       if (actionResponse) {
         actionResponse.query_plan = {
           ...(typeof actionResponse.query_plan === 'object' && actionResponse.query_plan !== null ? actionResponse.query_plan as Record<string, unknown> : {}),
@@ -993,14 +995,14 @@ export async function handleAiChat(req: Request, res: Response) {
     };
 
     try {
-      financialContext = await fetchAnalyticsDashboard(req);
+      financialContext = await getFinCtx(req);
     } catch (error) {
       console.warn('[api-gateway] failed to enrich agentic chat context from analytics-service:', error);
     }
 
     const chatResponse = routePlan.route === 'analytics_chat'
-      ? await callAnalyticsChatPipeline(message, runtimeAiConfig, financialContext, body)
-      : await callAdvisorPipeline(req, message, runtimeAiConfig, financialContext, body);
+      ? await doAnalyticsChat(message, runtimeAiConfig, financialContext, body)
+      : await doAdvisorChat(req, message, runtimeAiConfig, financialContext, body);
     chatResponse.query_plan = {
       ...(typeof chatResponse.query_plan === 'object' && chatResponse.query_plan !== null ? chatResponse.query_plan as Record<string, unknown> : {}),
       router: routePlan,

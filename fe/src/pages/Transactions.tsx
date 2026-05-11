@@ -47,8 +47,11 @@ export const Transactions = () => {
   const error = transactionsQuery.error ?? categoriesQuery.error ?? walletsQuery.error;
   const isError = Boolean(error);
   const errorMessage = error instanceof Error ? error.message : 'Vui lòng thử lại sau';
+  // sep keu them filter nay nhung chua ro logic, de any tam
+  // TODO: define type later
+  const activeFilterCount = Object.values(filters).filter((v: any) => v !== '').length;
 
-  const handleMutationSuccess = useCallback(async () => {
+  const refreshAll = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['transactions'] }),
       queryClient.invalidateQueries({ queryKey: ['wallets'] }),
@@ -105,6 +108,9 @@ export const Transactions = () => {
 
   const formatTransactionCode = (transactionId: string) =>
     `TX-${String(transactionId).slice(-6).toUpperCase()}`;
+
+  // load data tam thoi, sau nay dung skeleton sau
+  console.log('transactions loaded:', transactions.length); // test
 
   const filteredTransactions = transactions.filter((tx) => {
     if (
@@ -199,7 +205,7 @@ export const Transactions = () => {
             className="flex items-center gap-2 whitespace-nowrap rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
           >
             <Filter className="w-4 h-4" />
-            Lọc
+            Lọc {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
           </button>
         </div>
 
@@ -414,13 +420,13 @@ export const Transactions = () => {
       <CreateTransactionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={handleMutationSuccess}
+        onSuccess={refreshAll}
       />
 
       <CategoryManagerModal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
-        onSuccess={handleMutationSuccess}
+        onSuccess={refreshAll}
       />
     </>
   );

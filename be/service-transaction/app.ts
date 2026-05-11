@@ -17,7 +17,6 @@ const app = express();
 const PORT = Number(process.env.TRANSACTION_PORT ?? process.env.PORT) || 3003;
 const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
 
-// Middleware
 app.use(cors());
 app.use(morgan('combined'));
 app.use(express.json({ limit: '2mb' }));
@@ -29,42 +28,28 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'transaction-service' });
 });
 
-// Routes
 app.use('/api/v1', transactionRoutes);
 
 app.use(errorHandler);
 
-// Initialize and start server
 async function start() {
   try {
-    // Connect to MongoDB
     await connectDB();
-
-    // Connect to RabbitMQ
     await connectRabbitMQ();
-
-    // Start Outbox Publisher (polls unpublished events)
-    await outboxPublisher.start(5000); // Poll every 5 seconds
-
-    // Start consuming wallet response events
+    await outboxPublisher.start(5000);
     await transactionConsumer.start();
-
-    // Start recurring transaction scheduler
     recurringTransactionsJob.start();
-
-    // Start Express server
     app.listen(PORT, () => {
-      console.log(`✓ Transaction Service running on port ${PORT}`);
+      console.log(`transaction-service running on port ${PORT}`);
     });
   } catch (err) {
-    console.error('Failed to start Transaction Service:', err);
+    console.error('Failed to start transaction-service:', err);
     process.exit(1);
   }
 }
 
-// Graceful shutdown
+// TODO: add graceful shutdown sau khi demo xong
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully...');
   await outboxPublisher.stop();
   await transactionConsumer.stop();
   recurringTransactionsJob.stop();
@@ -72,19 +57,10 @@ process.on('SIGTERM', async () => {
 });
 
 process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully...');
   await outboxPublisher.stop();
   await transactionConsumer.stop();
   recurringTransactionsJob.stop();
   process.exit(0);
-});
-
-process.on('unhandledRejection', (reason) => {
-  console.error('[transaction-service] Unhandled Rejection:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('[transaction-service] Uncaught Exception:', error);
 });
 
 start();

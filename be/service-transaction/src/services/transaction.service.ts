@@ -25,28 +25,31 @@ function parseOccurredAt(value?: string | Date) {
   if (!value) return new Date();
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
-    throw new AppError('occurred_at must be a valid ISO date', 400);
+    throw new AppError('occurred_at không phải ngày hợp lệ', 400);
   }
   return date;
 }
 
 class TransactionService {
   private async walletBelongsToUser(walletId: string, authorization?: string) {
-    if (!authorization) {
-      return true;
+    if (authorization) {
+      const wallets = await fetchUserWallets(authorization)
+      let found = false
+      for (const wallet of wallets) {
+        if (wallet.id === walletId) { found = true; break }
+      }
+      return found
     }
-
-    const wallets = await fetchUserWallets(authorization);
-    return wallets.some((wallet) => wallet.id === walletId);
+    return true
   }
 
   async createTransaction(input: CreateTransactionInput) {
-    if (!input.wallet_id) throw new AppError('wallet_id is required', 400);
-    if (!input.transaction_type) throw new AppError('transaction_type is required', 400);
+    if (!input.wallet_id) throw new AppError('wallet_id là bắt buộc', 400);
+    if (!input.transaction_type) throw new AppError('transaction_type là bắt buộc', 400);
 
     const walletOwned = await this.walletBelongsToUser(input.wallet_id, input.authorization);
     if (!walletOwned) {
-      throw new AppError('Wallet not found', 404);
+      throw new AppError('Không tìm thấy ví', 404);
     }
 
     const amount = parsePositiveAmount(input.amount);
@@ -99,8 +102,9 @@ class TransactionService {
 
       return this.toResponse(transaction);
     } catch (error: any) {
+      // duplicate idempotency_key = giao dịch bị gửi đôi
       if (error?.code === 11000) {
-        throw new AppError('idempotency_key already exists', 409);
+        throw new AppError('Giao dịch đã tồn tại (idempotency_key bị trùng)', 409);
       }
       throw error;
     }
@@ -133,9 +137,13 @@ class TransactionService {
       .sort({ occurred_at: -1, createdAt: -1 })
       .limit(Math.min(limit, 200))
       .skip(skip)
-      .lean();
+      .lean()
 
-    return items.map((item) => this.toResponse(item));
+    const out = []
+    for (const item of items) {
+      out.push(this.toResponse(item))
+    }
+    return out
   }
 
   private toResponse(transaction: any) {

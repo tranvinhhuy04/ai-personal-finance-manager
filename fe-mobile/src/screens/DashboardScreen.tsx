@@ -22,33 +22,15 @@ const RANGE_OPTIONS: Array<{ key: TimeRange; label: string }> = [
   { key: 'year', label: 'Năm nay' },
 ];
 
-function QuickStatCard({
-  icon,
-  title,
-  value,
-  hint,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <View className="w-[48%] rounded-2xl bg-white p-4 shadow-sm">
-      <View className="h-10 w-10 items-center justify-center rounded-full bg-emerald-50">{icon}</View>
-      <Text className="mt-4 text-sm font-medium text-slate-500">{title}</Text>
-      <Text className="mt-1 text-xl font-bold text-slate-900">{value}</Text>
-      <Text className="mt-1 text-xs text-slate-400">{hint}</Text>
-    </View>
-  );
-}
-
 export function DashboardScreen() {
   const { preferences } = useAppPreferences();
   const [range, setRange] = useState<TimeRange>('month');
   const overview = useDashboardOverview(range);
   const wallets = useWallets();
   const navigation = useNavigation<any>();
+
+  // debug xem data co ve khong
+  console.log('dashboard range:', range, 'loading:', overview.isLoading); // test
 
   const parseBalance = (value: unknown) => {
     const normalized = String(value ?? '0').replace(/,/g, '').replace(/\s/g, '');
@@ -122,19 +104,24 @@ export function DashboardScreen() {
             </View>
           </View>
 
+          {/* fix UI bi lech tren iPhone 13, padding bottom phai du 120 */}
           <View className="mt-6 flex-row justify-between">
-            <QuickStatCard
-              icon={<PiggyBank size={18} color="#059669" />}
-              title="Tiết kiệm"
-              value={formatCompactCurrency(overview.data.totalSavings)}
-              hint="Quỹ dự phòng hiện có"
-            />
-            <QuickStatCard
-              icon={<TrendingUp size={18} color="#059669" />}
-              title="Đầu tư"
-              value={formatCompactCurrency(overview.data.totalInvestments)}
-              hint="Giá trị tăng trưởng"
-            />
+            <View className="w-[48%] rounded-2xl bg-white p-4 shadow-sm" style={{ elevation: 2 }}>
+              <View className="h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
+                <PiggyBank size={18} color="#059669" />
+              </View>
+              <Text className="mt-4 text-sm font-medium text-slate-500">Tiết kiệm</Text>
+              <Text className="mt-1 text-xl font-bold text-slate-900">{formatCompactCurrency(overview.data.totalSavings)}</Text>
+              <Text className="mt-1 text-xs text-slate-400">Quỹ dự phòng hiện có</Text>
+            </View>
+            <View className="w-[48%] rounded-2xl bg-white p-4 shadow-sm" style={{ elevation: 2 }}>
+              <View className="h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
+                <TrendingUp size={18} color="#059669" />
+              </View>
+              <Text className="mt-4 text-sm font-medium text-slate-500">Đầu tư</Text>
+              <Text className="mt-1 text-xl font-bold text-slate-900">{formatCompactCurrency(overview.data.totalInvestments)}</Text>
+              <Text className="mt-1 text-xs text-slate-400">Giá trị tăng trưởng</Text>
+            </View>
           </View>
 
           <View className="mt-7">

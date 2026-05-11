@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import { AppError } from '../errors/AppError';
 import { MonthlyAggregateModel } from '../models/monthlyAggregate.model';
 
+// TODO: tách các helper function ra utils/ sau khi ổn định
+
 type AnalyticsRange = 'month' | 'quarter' | 'year' | 'custom';
 
 type DashboardFilters = {
@@ -83,7 +85,7 @@ function parseMonthKey(monthKey?: string) {
   if (monthKey !== undefined && monthKey !== null && String(monthKey).trim().length > 0) {
     const parsed = normalizeMonthKey(monthKey);
     if (!parsed) {
-      throw new AppError('month must be in YYYY-MM or MM/YYYY format', 400);
+      throw new AppError('month phải theo định dạng YYYY-MM hoặc MM/YYYY', 400);
     }
     normalized = parsed;
   } else {
@@ -95,7 +97,7 @@ function parseMonthKey(monthKey?: string) {
   const monthIndex = Number(monthText) - 1;
 
   if (!Number.isInteger(year) || !Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 11) {
-    throw new AppError('month must be in YYYY-MM or MM/YYYY format', 400);
+    throw new AppError('month phải theo định dạng YYYY-MM hoặc MM/YYYY', 400);
   }
 
   return { normalized, year, monthIndex };
@@ -143,6 +145,7 @@ function roundPercent(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+// làm tròn lên theo bước step (mặc định 50k), dùng cho budget suggestion
 function roundToStep(value: number, step = 50000): number {
   const safeValue = Math.max(step, Number.isFinite(value) ? value : step);
   return Math.ceil(safeValue / step) * step;
@@ -187,7 +190,8 @@ function calculatePercentChange(current: number, previous: number) {
 
 function getTransactionDb() {
   if (mongoose.connection.readyState !== 1) {
-    throw new AppError('Analytics database is not connected', 500);
+    // Note: đôi khi mongo chưa connect xong nếu service khởi động chậm, retry sau
+    throw new AppError('Analytics: chưa kết nối database', 500);
   }
 
   const configuredUri = process.env.MONGO_URI_TRANSACTION;
@@ -275,7 +279,7 @@ function getPeriodWindow(filters: DashboardFilters): PeriodWindow {
   const range = normalizeRange(filters.range, filters.type);
 
   if (range === 'custom' && (!filters.from || !filters.to)) {
-    throw new AppError('from and to are required when range=custom', 400);
+    throw new AppError('Cần truyền from và to khi range=custom', 400);
   }
 
   if (range === 'custom' && filters.from && filters.to) {
@@ -283,7 +287,7 @@ function getPeriodWindow(filters: DashboardFilters): PeriodWindow {
     const endDate = safeDate(filters.to);
 
     if (startDate.getTime() > endDate.getTime()) {
-      throw new AppError('from must be before or equal to to', 400);
+      throw new AppError('from phải trước hoặc bằng to', 400);
     }
 
     return {
@@ -348,9 +352,10 @@ function buildComparisonData(transactions: DetailedTransaction[], window: Period
       current.setUTCMonth(current.getUTCMonth() + 1);
     }
 
-    const monthMap = new Map(
-      monthKeys.map((monthKey) => [monthKey, { label: formatMonthLabel(monthKey), income: 0, expense: 0 }])
-    );
+    const monthMap = new Map<string, { label: string; income: number; expense: number }>()
+    for (const monthKey of monthKeys) {
+      monthMap.set(monthKey, { label: formatMonthLabel(monthKey), income: 0, expense: 0 })
+    }
 
     transactions.forEach((transaction) => {
       const monthKey = toMonthKey(transaction.occurredAt);
@@ -502,21 +507,13 @@ function buildBudgetProgress(currentBreakdown: BreakdownItem[], previousBreakdow
   });
 }
 function buildSavingsMetrics(summary: SummaryResult, transactions: DetailedTransaction[]): SavingsMetrics {
-  const savingsDeposits = transactions.reduce((sum, transaction) => {
-    if (transaction.source !== 'SAVING' || transaction.transactionType !== 'EXPENSE') {
-      return sum;
-    }
+  let savingsDeposits = 0
+  let savingsWithdrawals = 0
 
-    return sum + transaction.amount;
-  }, 0);
-
-  const savingsWithdrawals = transactions.reduce((sum, transaction) => {
-    if (transaction.source !== 'SAVING' || transaction.transactionType !== 'INCOME') {
-      return sum;
-    }
-
-    return sum + transaction.amount;
-  }, 0);
+  for (const tx of transactions) {
+    if (tx.source === 'SAVING' && tx.transactionType === 'EXPENSE') savingsDeposits += tx.amount
+    if (tx.source === 'SAVING' && tx.transactionType === 'INCOME') savingsWithdrawals += tx.amount
+  }
 
   const retainedCash = Math.max(0, summary.totalIncome - savingsWithdrawals - summary.totalExpense);
   const netSavingsContribution = Math.max(0, savingsDeposits - savingsWithdrawals);
@@ -597,7 +594,8 @@ class AnalyticsService {
     occurredAt?: string;
   }) {
     if (!input.userId) {
-      throw new AppError('userId is required', 400);
+      // TODO: sau này thêm auth middleware ở tầng route cho gọn
+      throw new AppError('userId là bắt buộc', 400);
     }
 
     const monthKey = toMonthKey(input.occurredAt);
@@ -993,7 +991,7 @@ class AnalyticsService {
 
   async getDashboard(filters: DashboardFilters) {
     if (!filters.userId) {
-      throw new AppError('userId is required', 400);
+      throw new AppError('userId là bắt buộc', 400);
     }
 
     const transactionDb = getTransactionDb();

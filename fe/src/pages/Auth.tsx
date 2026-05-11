@@ -23,7 +23,7 @@ type AuthApiResponse = {
   message?: string;
 };
 
-export const Auth = () => {
+export function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,14 +34,16 @@ export const Auth = () => {
   const navigate = useNavigate();
 
   function normalizeUser(user?: ApiUser) {
-    if (!user) return null;
-    return {
-      id: user.id ?? user._id ?? user.userId ?? '',
-      // Backend may return fullName; map to the 'name' field expected by the auth store
-      name: user.fullName ?? user.email ?? 'Người dùng',
-      email: user.email ?? '',
-      avatar: undefined as string | undefined,
-    };
+    if (user) {
+      return {
+        id: user.id ?? user._id ?? user.userId ?? '',
+        // backend trả fullName, map sang field 'name' cho auth store
+        name: user.fullName ?? user.email ?? 'Người dùng',
+        email: user.email ?? '',
+        avatar: undefined as string | undefined,
+      }
+    }
+    return null
   }
 
   function persistAuth(token: string, user: ApiUser | null) {
@@ -89,7 +91,7 @@ export const Auth = () => {
     setIsLoading(true);
 
     try {
-      // REAL API REGISTER: call identity-service via API Gateway
+      // REAL API REGISTER: gọi identity-service qua API Gateway
       const response = await fetch(`${AUTH_API_BASE}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

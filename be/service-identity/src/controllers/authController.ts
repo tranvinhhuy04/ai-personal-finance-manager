@@ -106,10 +106,7 @@ export const appendUsageLogHandler = catchAsync(async (req: Request, res: Respon
   return res.status(200).json(result);
 });
 
-// ---------------------------------------------------------------------------
-// API Key Pool handlers
-// ---------------------------------------------------------------------------
-
+// handlers cho API key pool
 export const addApiKeyHandler = catchAsync(async (req: Request, res: Response) => {
   const userId = (req as any).userId as string;
   const { gemini_api_key } = req.body ?? {};

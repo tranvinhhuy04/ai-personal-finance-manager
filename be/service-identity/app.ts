@@ -13,7 +13,6 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const app = express();
 const PORT = Number(process.env.IDENTITY_PORT) || 3001;
 
-// Body parsers and CORS must be mounted before routes.
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
@@ -27,7 +26,6 @@ app.use((_req, _res, next) => {
   next(new AppError('Route not found', 404));
 });
 
-// Global error handler must be the final middleware.
 app.use(errorHandler);
 
 async function start() {

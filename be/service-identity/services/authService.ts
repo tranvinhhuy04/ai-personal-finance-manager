@@ -95,12 +95,15 @@ async function listGeminiModelsByApiKey(apiKey: string) {
       }>;
     };
 
-    const models = (payload.models ?? [])
-      .filter((item) => Array.isArray(item.supportedGenerationMethods) && item.supportedGenerationMethods.includes('generateContent'))
-      .map((item) => getModelId(String(item.name ?? '')))
-      .filter((name) => name.startsWith('gemini-'));
+    const models: string[] = []
+    for (const item of (payload.models ?? [])) {
+      if (!Array.isArray(item.supportedGenerationMethods)) continue
+      if (!item.supportedGenerationMethods.includes('generateContent')) continue
+      const id = getModelId(String(item.name ?? ''))
+      if (id.startsWith('gemini-')) models.push(id)
+    }
 
-    return Array.from(new Set(models));
+    return Array.from(new Set(models))
   } catch {
     return [] as string[];
   }
@@ -118,16 +121,17 @@ function encryptSettingValue(plainText: string) {
 }
 
 function decryptSettingValue(cipherText: string) {
-  const [ivHex, encryptedHex] = cipherText.split(':');
-  if (!ivHex || !encryptedHex) {
-    return null;
-  }
+  const parts = cipherText.split(':')
+  const ivHex = parts[0]
+  const encryptedHex = parts[1]
 
-  const iv = Buffer.from(ivHex, 'hex');
-  const encrypted = Buffer.from(encryptedHex, 'hex');
-  const decipher = crypto.createDecipheriv('aes-256-cbc', buildEncryptionKey(), iv);
-  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-  return decrypted.toString('utf8');
+  if (!ivHex || !encryptedHex) return null
+
+  const iv = Buffer.from(ivHex, 'hex')
+  const encrypted = Buffer.from(encryptedHex, 'hex')
+  const decipher = crypto.createDecipheriv('aes-256-cbc', buildEncryptionKey(), iv)
+  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()])
+  return decrypted.toString('utf8')
 }
 
 function maskApiKey(apiKey: string | null) {
@@ -150,43 +154,44 @@ function normalizeAiUsageLogs(rawLogs: unknown) {
     }>;
   }
 
-  return rawLogs
-    .map((item) => {
-      const row = item as Partial<AIUsageLogInput>;
-      // Corrupt data from DB is possible — validate only fields we depend on
-      if (!row || typeof row.model !== 'string') return null;
+  const result: Array<{ date: string; model: string; tokens_used: number; estimated_cost: number }> = []
 
-      const parsedDate = new Date(row.date as string | Date);
-      if (Number.isNaN(parsedDate.getTime())) return null;
+  for (const item of rawLogs) {
+    const row = item as Partial<AIUsageLogInput>
+    if (!row || typeof row.model !== 'string') continue
 
-      return {
-        date: parsedDate.toISOString(),
-        model: row.model.trim(),
-        tokens_used: Math.round(Math.max(0, Number(row.tokens_used ?? 0))),
-        estimated_cost: Number(Math.max(0, Number(row.estimated_cost ?? 0)).toFixed(6)),
-      };
+    const parsedDate = new Date(row.date as string | Date)
+    if (Number.isNaN(parsedDate.getTime())) continue
+
+    result.push({
+      date: parsedDate.toISOString(),
+      model: row.model.trim(),
+      tokens_used: Math.round(Math.max(0, Number(row.tokens_used ?? 0))),
+      estimated_cost: Number(Math.max(0, Number(row.estimated_cost ?? 0)).toFixed(6)),
     })
-    .filter((item): item is { date: string; model: string; tokens_used: number; estimated_cost: number } => Boolean(item));
+  }
+
+  return result
 }
 
 function requireString(value: unknown, fieldName: string) {
   if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new AppError(`${fieldName} is required`, 400);
+    throw new AppError(`${fieldName} không được để trống`, 400);
   }
 }
 
 function requireEmailFormat(email: string) {
   const normalized = email.trim().toLowerCase();
-  // RFC 5322 simplified — rejects missing TLD, consecutive dots, etc.
+  // regex email đơn giản thôi, không cần chuẩn RFC 5322 100%
   const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(normalized)) {
-    throw new AppError('email is invalid', 400);
+    throw new AppError('Email không đúng định dạng', 400);
   }
 }
 
 function requireMinLength(value: string, min: number, fieldName: string) {
   if (value.length < min) {
-    throw new AppError(`${fieldName} must be at least ${min} characters`, 400);
+    throw new AppError(`${fieldName} phải có ít nhất ${min} ký tự`, 400);
   }
 }
 
@@ -207,8 +212,9 @@ function issueTokenPair(userId: string) {
 
 async function findActiveUserByEmail(email: string) {
   const user = await findUserByEmail(email);
+  // trả về 401 chung chung, không nói rõ email có tồn tại không để tránh leak info
   if (!user || user.status !== 1) {
-    throw new AppError('Invalid credentials', 401);
+    throw new AppError('Sai email hoặc mật khẩu', 401);
   }
   return user;
 }
@@ -240,7 +246,7 @@ export async function register({ email, password, fullName, phone }: RegisterInp
 
   const existing = await findUserByEmail(emailNorm);
   if (existing) {
-    throw new AppError('Email already exists', 409);
+    throw new AppError('Email đã được đăng ký rồi', 409);
   }
 
   const passwordHash = await hashPassword(password);
@@ -265,7 +271,7 @@ export async function register({ email, password, fullName, phone }: RegisterInp
     };
   } catch (err: any) {
     if (err?.code === 11000) {
-      throw new AppError('Email already exists', 409);
+      throw new AppError('Email đã được đăng ký rồi', 409);
     }
     throw err;
   }
@@ -280,40 +286,40 @@ export async function login({ email, password, twoFactorCode }: LoginInput) {
   const userDoc = await findActiveUserByEmail(emailNorm);
 
   const ok = await verifyPassword(password, userDoc.passwordHash);
-  if (!ok) throw new AppError('Invalid credentials', 401);
+  if (!ok) throw new AppError('Sai email hoặc mật khẩu', 401);
 
   const settings = await findUserSettings(userDoc._id.toString());
   const twoFactorEnabled = Boolean(settings?.twoFactorEnabled);
 
-  if (twoFactorEnabled) {
-    if (!twoFactorCode || typeof twoFactorCode !== 'string') {
-      const twoFactorToken = signTwoFactorPendingToken(userDoc._id.toString());
-      return {
-        requires2FA: true,
-        twoFactorToken,
-        user: toSafeUser(userDoc),
-        twoFactorEnabled: true,
-      };
-    }
-
-    const secret = settings?.twoFactorSecret;
-    if (!secret) throw new AppError('2FA not configured', 401);
-
-    const verified = verifyTotpCode(secret, twoFactorCode);
-    if (!verified) throw new AppError('Invalid 2FA code', 401);
-
+  if (!twoFactorEnabled) {
     return {
       user: toSafeUser(userDoc),
-      twoFactorEnabled: true,
+      twoFactorEnabled: false,
       ...issueTokenPair(userDoc._id.toString()),
-    };
+    }
   }
+
+  if (!twoFactorCode || typeof twoFactorCode !== 'string') {
+    const twoFactorToken = signTwoFactorPendingToken(userDoc._id.toString())
+    return {
+      requires2FA: true,
+      twoFactorToken,
+      user: toSafeUser(userDoc),
+      twoFactorEnabled: true,
+    }
+  }
+
+  const secret = settings?.twoFactorSecret
+  if (!secret) throw new AppError('Chưa cấu hình 2FA', 401)
+
+  const verified = verifyTotpCode(secret, twoFactorCode)
+  if (!verified) throw new AppError('Mã xác thực 2FA không đúng', 401)
 
   return {
     user: toSafeUser(userDoc),
-    twoFactorEnabled: false,
+    twoFactorEnabled: true,
     ...issueTokenPair(userDoc._id.toString()),
-  };
+  }
 }
 
 export async function loginWith2FA({ twoFactorToken, code }: LoginWith2FAInput) {
@@ -322,30 +328,30 @@ export async function loginWith2FA({ twoFactorToken, code }: LoginWith2FAInput) 
 
   let decoded: any;
   try {
-    decoded = verifyToken(twoFactorToken);
+    decoded = verifyToken(twoFactorToken)
   } catch {
-    throw new AppError('Invalid or expired 2FA token', 401);
+    throw new AppError('Token 2FA không hợp lệ hoặc đã hết hạn', 401)
   }
 
   if (decoded?.type !== '2fa_pending' || typeof decoded?.sub !== 'string') {
-    throw new AppError('Invalid or expired 2FA token', 401);
+    throw new AppError('Token 2FA không hợp lệ hoặc đã hết hạn', 401);
   }
 
   const userId = decoded.sub;
   if (!Types.ObjectId.isValid(userId)) {
-    throw new AppError('Invalid or expired 2FA token', 401);
+    throw new AppError('Token 2FA không hợp lệ hoặc đã hết hạn', 401);
   }
 
   const settings = await findUserSettings(userId);
   if (!settings?.twoFactorEnabled || !settings?.twoFactorSecret) {
-    throw new AppError('2FA not configured', 401);
+    throw new AppError('Chưa cấu hình 2FA', 401);
   }
 
   const verified = verifyTotpCode(settings.twoFactorSecret, code);
-  if (!verified) throw new AppError('Invalid 2FA code', 401);
+  if (!verified) throw new AppError('Mã xác thực 2FA không đúng', 401);
 
   const userDoc = await findUserById(userId);
-  if (!userDoc) throw new AppError('User not found', 401);
+  if (!userDoc) throw new AppError('Không tìm thấy tài khoản', 401);
 
   return {
     user: toSafeUser(userDoc),
@@ -361,20 +367,20 @@ export async function refreshTokens({ refreshToken }: RefreshInput) {
   try {
     decoded = verifyToken(refreshToken);
   } catch {
-    throw new AppError('Invalid or expired token', 401);
+    throw new AppError('Token không hợp lệ hoặc đã hết hạn', 401);
   }
 
   if (decoded?.type !== 'refresh' || typeof decoded?.sub !== 'string') {
-    throw new AppError('Invalid token', 401);
+    throw new AppError('Token không hợp lệ', 401);
   }
 
   const userId = decoded.sub;
   if (!Types.ObjectId.isValid(userId)) {
-    throw new AppError('Invalid token', 401);
+    throw new AppError('Token không hợp lệ', 401);
   }
 
   const userDoc = await findUserById(userId);
-  if (!userDoc) throw new AppError('Invalid token', 401);
+  if (!userDoc) throw new AppError('Token không hợp lệ', 401);
 
   return {
     user: toSafeUser(userDoc),
@@ -393,7 +399,7 @@ export async function getMe(userId: string) {
   }
 
   const userDoc = await findUserById(userId);
-  if (!userDoc) throw new AppError('User not found', 401);
+  if (!userDoc) throw new AppError('Không tìm thấy tài khoản', 401);
 
   const settings = await findUserSettings(userId);
   return {
@@ -411,7 +417,7 @@ export async function setup2FA(userId: string) {
   }
 
   const user = await findUserById(userId);
-  if (!user) throw new AppError('User not found', 401);
+  if (!user) throw new AppError('Không tìm thấy tài khoản', 401);
 
   const secret = generateTotpSecret();
   const otpauthUrl = buildOtpAuthUrl(secret, user.email, 'OripioFin');
@@ -431,10 +437,10 @@ export async function verify2FA(userId: string, code: unknown) {
   if (!Types.ObjectId.isValid(userId)) throw new AppError('User not found', 401);
 
   const settings = await findUserSettings(userId);
-  if (!settings?.twoFactorSecret) throw new AppError('2FA secret not configured', 400);
+  if (!settings?.twoFactorSecret) throw new AppError('Chưa cài đặt 2FA secret', 400);
 
   const verified = verifyTotpCode(settings.twoFactorSecret, code);
-  if (!verified) throw new AppError('Invalid 2FA code', 401);
+  if (!verified) throw new AppError('Mã xác thực 2FA không đúng', 401);
 
   await upsertUserSettings(userId, {
     twoFactorEnabled: true,
@@ -454,11 +460,8 @@ export async function get2FAStatus(userId: string) {
   return { twoFactorEnabled: Boolean(settings?.twoFactorEnabled) };
 }
 
-// ---------------------------------------------------------------------------
-// Helpers for key pool
-// ---------------------------------------------------------------------------
-
-/** Đọc settings và tự động migrate legacy `gemini_api_key` string → array. */
+// helpers cho key pool
+// TODO: tách ra file riêng sau khi demo xong
 async function getSettingsWithMigration(userId: string) {
   let settings = await findUserSettings(userId);
   if (!settings) {
@@ -478,7 +481,6 @@ async function getSettingsWithMigration(userId: string) {
   return settings;
 }
 
-/** Giải mã một entry trong pool. Trả về null nếu lỗi. */
 function decryptKeyEntry(entry: RawKeyEntry): string | null {
   if (typeof entry?.key !== 'string' || !entry.key) return null;
   try {
@@ -487,8 +489,6 @@ function decryptKeyEntry(entry: RawKeyEntry): string | null {
     return null;
   }
 }
-
-// ---------------------------------------------------------------------------
 
 export async function getSettings(userId: string) {
   requireString(userId, 'userId');
@@ -501,7 +501,7 @@ export async function getSettings(userId: string) {
 
   const apiKeysRaw: RawKeyEntry[] = Array.isArray(raw?.gemini_api_keys) ? raw.gemini_api_keys : [];
 
-  // Build masked list for the UI
+  // build danh sách masked để hiện UI, không trả raw key
   const geminiApiKeys = apiKeysRaw.map((entry) => ({
     key_masked: maskApiKey(decryptKeyEntry(entry)),
     status: (entry?.status as string) ?? 'active',

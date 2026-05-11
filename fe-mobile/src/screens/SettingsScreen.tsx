@@ -40,6 +40,7 @@ function SettingRow({
 export function SettingsScreen() {
   const { preferences, isLoading, setDarkMode, setNotifications, setBiometricLock } = useAppPreferences();
   const { user, signOut } = useAuth();
+  // TODO: thêm màn hình đổi mật khẩu và xóa tài khoản sau khi demo xong
 
   return (
     <SafeAreaView className={`flex-1 ${preferences.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`} edges={['top', 'left', 'right']}>

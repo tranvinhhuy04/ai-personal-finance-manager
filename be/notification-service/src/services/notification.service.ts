@@ -12,7 +12,7 @@ class NotificationService {
     createdAt?: string | Date;
   }) {
     if (!input.userId) {
-      throw new AppError('userId is required', 400);
+      throw new AppError('userId là bắt buộc', 400);
     }
 
     const notification = new NotificationModel({
@@ -35,21 +35,19 @@ class NotificationService {
     return payload;
   }
   async listNotifications(userId: string, page = 1, limit = 20) {
-    if (!userId) throw new AppError('user_id is required', 400);
+    if (!userId) throw new AppError('user_id là bắt buộc', 400)
 
-    const normalizedPage = Math.max(1, Number(page) || 1);
-    const normalizedLimit = Math.max(1, Math.min(100, Number(limit) || 20));
+    const normalizedPage = Math.max(1, Number(page) || 1)
+    const normalizedLimit = Math.max(1, Math.min(100, Number(limit) || 20))
+    const skip = (normalizedPage - 1) * normalizedLimit
 
-    const skip = (normalizedPage - 1) * normalizedLimit;
+    const items = await NotificationModel.find({ user_id: userId })
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(normalizedLimit)
+      .lean()
 
-    const [items, total] = await Promise.all([
-      NotificationModel.find({ user_id: userId })
-        .sort({ created_at: -1 })
-        .skip(skip)
-        .limit(normalizedLimit)
-        .lean(),
-      NotificationModel.countDocuments({ user_id: userId }),
-    ]);
+    const total = await NotificationModel.countDocuments({ user_id: userId })
 
     return {
       data: items,
@@ -69,7 +67,7 @@ class NotificationService {
     ).lean();
 
     if (!updated) {
-      throw new AppError('Notification not found', 404);
+      throw new AppError('Không tìm thấy thông báo', 404);
     }
 
     return updated;

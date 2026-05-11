@@ -10,48 +10,47 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# PaddleOCR Singleton
-# ---------------------------------------------------------------------------
+# PaddleOCR Singleton — khởi tạo 1 lần duy nhất khi gọi lần đầu
 _ocr_instance = None
 _ocr_lock = threading.Lock()
 
 def _get_paddle_ocr():
-    """Lazy-initialise PaddleOCR exactly once (thread-safe Singleton)."""
+    # lazy init, chỉ tạo 1 lần — lần đầu chậm ~30s do download model
     global _ocr_instance
     if _ocr_instance is None:
         with _ocr_lock:
             if _ocr_instance is None:
                 try:
                     from paddleocr import PaddleOCR
-                    logger.info("Initialising PaddleOCR (lang=vi) — first call only …")
+                    logger.info("Đang khởi tạo PaddleOCR (lang=vi), chỉ chạy lần đầu...")
                     _ocr_instance = PaddleOCR(
                         use_angle_cls=True,
                         lang="vi",
                         show_log=False,
                     )
-                    logger.info("PaddleOCR ready.")
+                    logger.info("PaddleOCR sẵn sàng.")
                 except Exception as exc:
-                    logger.error("Failed to initialise PaddleOCR: %s", exc)
-                    raise RuntimeError(f"PaddleOCR initialisation failed: {exc}") from exc
+                    logger.error("Khởi tạo PaddleOCR thất bại: %s", exc)
+                    raise RuntimeError(f"PaddleOCR khởi tạo lỗi: {exc}") from exc
     return _ocr_instance
 
-# ---------------------------------------------------------------------------
-# Helper Functions
-# ---------------------------------------------------------------------------
+# helper functions
 def normalize_text(text: str) -> str:
-    """Lowercase, remove diacritics, remove special chars except alphanumeric."""
+    # bỏ dấu tiếng Việt, lowercase, xóa ký tự đặc biệt — dùng để so sánh
     if not text:
         return ""
     normalized = unicodedata.normalize("NFD", text)
-    stripped = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+    chars = []
+    for c in normalized:
+        if unicodedata.category(c) != "Mn":
+            chars.append(c)
+    stripped = "".join(chars)
     stripped = stripped.replace("đ", "d").replace("Đ", "d").lower()
-    # Remove everything except alphanumeric and space
     stripped = re.sub(r'[^a-z0-9\s]', '', stripped)
     return stripped.strip()
 
 def extract_currency_numbers(text: str) -> list[int]:
-    """Return a list of integers found in the text using currency regex. Ignore < 1000."""
+    # lấy các số tiền VND kiểu 1.000 / 50.000 từ text OCR, bỏ qua số < 1000
     pattern = re.compile(r"(\d{1,3}(?:[.,]\d{3})+)")
     results = []
     for raw in pattern.findall(text):
@@ -61,7 +60,7 @@ def extract_currency_numbers(text: str) -> list[int]:
     return results
 
 def extract_standard_date(text: str) -> str | None:
-    """Find DD/MM/YYYY and return ISO 8601 string."""
+    # tìm DD/MM/YYYY → trả về ISO 8601
     pattern = re.compile(r"\b(\d{2})[/\-](\d{2})[/\-](\d{4})\b")
     m = pattern.search(text)
     if m:
@@ -74,7 +73,7 @@ def extract_standard_date(text: str) -> str | None:
     return None
 
 def extract_vietnamese_date(text: str) -> str | None:
-    """Find 'DD tháng MM năm YYYY' and return ISO 8601 string."""
+    # tìm "DD tháng MM năm YYYY" dạng đọc được bằng tiếng Việt
     pattern = re.compile(r"(\d{1,2})\s*thang\s*(\d{1,2})\s*(?:nam\s*)?(\d{4})", re.IGNORECASE)
     m = pattern.search(normalize_text(text))
     if m:
@@ -86,11 +85,9 @@ def extract_vietnamese_date(text: str) -> str | None:
             pass
     return None
 
-# ---------------------------------------------------------------------------
-# Strategies
-# ---------------------------------------------------------------------------
+# ─── Strategies
 def extract_digital(blocks: list[dict], img_height: float) -> dict:
-    """Strategy 1: For ShopeePay/Digital Wallets"""
+    # Strategy 1: ShopeePay / ví điện tử
     merchant = "Hóa đơn điện tử / App"
     amount = 0
     date = None
@@ -110,7 +107,7 @@ def extract_digital(blocks: list[dict], img_height: float) -> dict:
     return {"merchantName": merchant, "totalAmount": amount, "transactionDate": date}
 
 def extract_tabular(blocks: list[dict], img_height: float) -> dict:
-    """Strategy 2: For EVN / VAT invoices"""
+    # Strategy 2: hóa đơn EVN / VAT dạng bảng
     merchant = ""
     amount = 0
     date = None
@@ -213,17 +210,14 @@ def extract_retail(blocks: list[dict], img_height: float) -> dict:
 
     return {"merchantName": merchant, "totalAmount": amount, "transactionDate": date}
 
-# ---------------------------------------------------------------------------
-# Main Execution / Router
-# ---------------------------------------------------------------------------
+# router chính — nhận bytes ảnh, chạy OCR, chọn strategy phù hợp
 def process_invoice_image(image_bytes: bytes) -> dict[str, Any]:
-    """Decodes image, runs PaddleOCR, creates block dicts, and routes to correct strategy."""
     try:
         import cv2
         arr = np.frombuffer(image_bytes, dtype=np.uint8)
         img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
         if img is None:
-            raise ValueError("Could not decode image.")
+            raise ValueError("Không decode được ảnh, thử upload lại.")
 
         ocr = _get_paddle_ocr()
         result = ocr.ocr(img, cls=True)

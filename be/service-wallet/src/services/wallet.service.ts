@@ -25,26 +25,28 @@ type ApplyTransactionInput = {
 function parseDecimal(amount: string, field: string, allowZero = false) {
   const value = Number(amount);
   if (!Number.isFinite(value) || (allowZero ? value < 0 : value <= 0)) {
-    const constraint = allowZero ? 'non-negative' : 'positive';
-    throw new AppError(`${field} must be a ${constraint} number`, 400);
+    const constraint = allowZero ? 'không âm' : 'dương';
+    throw new AppError(`${field} phải là số ${constraint}`, 400);
   }
   return value;
 }
 
 function sanitizeWalletName(value: string) {
-  const stripped = value.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  const noTags = value.replace(/<[^>]*>/g, '')
+  const stripped = noTags.replace(/\s+/g, ' ').trim()
+  // TODO: thêm kiểm tra profanity filter sau
   if (!stripped) {
-    throw new AppError('wallet_name is required', 400);
+    throw new AppError('Tên ví không được để trống', 400)
   }
-  return stripped;
+  return stripped
 }
 
 export class WalletService {
   async createWallet(input: CreateWalletInput) {
-    if (!input.user_id) throw new AppError('user_id is required', 400);
-    if (!input.wallet_type) throw new AppError('wallet_type is required', 400);
+    if (!input.user_id) throw new AppError('user_id là bắt buộc', 400);
+    if (!input.wallet_type) throw new AppError('wallet_type là bắt buộc', 400);
     if (!input.wallet_name || !input.wallet_name.trim()) {
-      throw new AppError('wallet_name is required', 400);
+      throw new AppError('Tên ví không được để trống', 400);
     }
 
     const initialBalance =
@@ -65,17 +67,21 @@ export class WalletService {
   }
 
   async listWalletsByUserId(userId: string) {
-    if (!userId) throw new AppError('user_id is required', 400);
-    const wallets = await walletRepository.findAllByUserId(userId);
-    return wallets.map((w) => this.toResponse(w));
+    if (!userId) throw new AppError('user_id là bắt buộc', 400)
+    const wallets = await walletRepository.findAllByUserId(userId)
+    const result = []
+    for (const w of wallets) {
+      result.push(this.toResponse(w))
+    }
+    return result
   }
 
   async updateWalletById(walletId: string, userId: string, payload: UpdateWalletInput) {
-    if (!mongoose.Types.ObjectId.isValid(walletId)) throw new AppError('wallet_id is invalid', 400);
-    if (!userId) throw new AppError('user_id is required', 400);
+    if (!mongoose.Types.ObjectId.isValid(walletId)) throw new AppError('wallet_id không hợp lệ', 400);
+    if (!userId) throw new AppError('user_id là bắt buộc', 400);
 
     const wallet = await walletRepository.findOwnedDoc(walletId, userId);
-    if (!wallet) throw new AppError('Wallet not found', 404);
+    if (!wallet) throw new AppError('Không tìm thấy ví', 404);
 
     if (payload.wallet_name !== undefined) {
       const walletName = sanitizeWalletName(String(payload.wallet_name));
@@ -96,21 +102,22 @@ export class WalletService {
   }
 
   async updateWalletStatus(walletId: string, userId: string, status: number) {
-    if (!mongoose.Types.ObjectId.isValid(walletId)) throw new AppError('wallet_id is invalid', 400);
-    if (!userId) throw new AppError('user_id is required', 400);
-    if (![0, 1, 2].includes(status)) throw new AppError('status must be 0, 1 or 2', 400);
+    if (!mongoose.Types.ObjectId.isValid(walletId)) throw new AppError('wallet_id không hợp lệ', 400);
+    if (!userId) throw new AppError('user_id là bắt buộc', 400);
+    // status: 0=ẩn, 1=hoạt động, 2=khóa
+    if (status !== 0 && status !== 1 && status !== 2) throw new AppError('status phải là 0, 1 hoặc 2', 400)
 
     const wallet = await walletRepository.updateStatus(walletId, userId, status);
-    if (!wallet) throw new AppError('Wallet not found', 404);
+    if (!wallet) throw new AppError('Không tìm thấy ví', 404);
     return this.toResponse(wallet);
   }
 
   async deleteWallet(walletId: string, userId: string) {
-    if (!mongoose.Types.ObjectId.isValid(walletId)) throw new AppError('wallet_id is invalid', 400);
-    if (!userId) throw new AppError('user_id is required', 400);
+    if (!mongoose.Types.ObjectId.isValid(walletId)) throw new AppError('wallet_id không hợp lệ', 400);
+    if (!userId) throw new AppError('user_id là bắt buộc', 400);
 
     const deleted = await walletRepository.deleteOwned(walletId, userId);
-    if (!deleted) throw new AppError('Wallet not found', 404);
+    if (!deleted) throw new AppError('Không tìm thấy ví', 404);
 
     return { success: true };
   }
@@ -121,7 +128,7 @@ export class WalletService {
     for (let retry = 0; retry < 3; retry += 1) {
       const current = await walletRepository.findById(input.wallet_id);
       if (!current) {
-        return { success: false, error: 'Wallet not found' };
+        return { success: false, error: 'Không tìm thấy ví' };
       }
 
       if (
@@ -141,7 +148,7 @@ export class WalletService {
       const nextBalance = currentBalance + signed;
 
       if (nextBalance < 0) {
-        return { success: false, error: 'Insufficient balance' };
+        return { success: false, error: 'Số dư không đủ' };
       }
 
       const updated = await walletRepository.atomicBalanceUpdate(
@@ -160,7 +167,8 @@ export class WalletService {
       }
     }
 
-    return { success: false, error: 'Optimistic lock conflict' };
+    // nếu retry 3 lần vẫn bị conflict thì thôi, trả lỗi, FE retry sau
+    return { success: false, error: 'Cố xữ lý cập nhật số dư, thử lại' };
   }
 
   private toResponse(wallet: IWallet | (IWallet & { _id: mongoose.Types.ObjectId })) {

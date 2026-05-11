@@ -45,6 +45,7 @@ function TypeToggle({
   onChange: (v: TransactionType) => void;
 }) {
   return (
+    // sep keu doi mau nut nay ma chua co ma mau chinh thuc
     <View className="flex-row overflow-hidden rounded-2xl bg-slate-100 p-1">
       <Pressable
         onPress={() => onChange('EXPENSE')}
@@ -86,7 +87,10 @@ export function TransactionScreen() {
   const totalIncome = transactions.filter((t) => t.transactionType === 'INCOME').reduce((s, t) => s + t.amount, 0);
   const totalExpense = transactions.filter((t) => t.transactionType === 'EXPENSE').reduce((s, t) => s + t.amount, 0);
 
-  const handleCreate = async () => {
+  // debug tong so giao dich load duoc
+  console.log('tx count:', transactions.length, 'income:', totalIncome, 'expense:', totalExpense); // test
+
+  const doCreate = async () => {
     if (!amount || Number(amount) <= 0) { setFeedback({ ok: false, msg: 'Vui lòng nhập số tiền hợp lệ.' }); return; }
     if (!selectedWallet) { setFeedback({ ok: false, msg: 'Vui lòng chọn ví.' }); return; }
     if (!description.trim()) { setFeedback({ ok: false, msg: 'Vui lòng nhập mô tả giao dịch.' }); return; }
@@ -348,7 +352,8 @@ export function TransactionScreen() {
           }
         >
           {showForm ? (
-            <View className="gap-4">
+            <View className="gap-4" style={{ paddingBottom: 4 }}>
+              {/* load data tam thoi, sau nay dung skeleton sau */}
               {/* Type toggle */}
               <TypeToggle value={txType} onChange={setTxType} />
 
@@ -434,7 +439,7 @@ export function TransactionScreen() {
 
               {/* Submit button - gradient, color by type */}
               <Pressable
-                onPress={() => void handleCreate()}
+                onPress={() => void doCreate()}
                 disabled={isCreating}
                 className={`min-h-[44px] overflow-hidden rounded-2xl ${isCreating ? 'opacity-60' : ''}`}
               >

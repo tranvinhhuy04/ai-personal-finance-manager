@@ -67,16 +67,20 @@ function mapWalletStatus(status: number): WalletCurrency['status'] {
   return status === 1 ? 'Hoạt động' : 'Tạm khóa';
 }
 
+// TODO: tách fetchCashflow ra hook riêng sau, bây giờ để đây cho tiện
 async function fetchCashflow(filter: 'monthly' | 'yearly' = 'yearly'): Promise<DashboardData['cashFlow']> {
-  const dashboard = await apiClient.getAnalyticsDashboard({ type: filter });
-  const trend = dashboard.trend ?? [];
+  const dashboard = await apiClient.getAnalyticsDashboard({ type: filter })
+  const trend = dashboard.trend ?? []
 
-  const data = trend.map((item) => ({
-    month: item.month,
-    cashflow: toNumber(item.income),
-    outflow: Math.abs(toNumber(item.expense)),
-    inflow: -Math.abs(toNumber(item.expense)),
-  }));
+  const data = []
+  for (const item of trend) {
+    data.push({
+      month: item.month,
+      cashflow: toNumber(item.income),
+      outflow: Math.abs(toNumber(item.expense)),
+      inflow: -Math.abs(toNumber(item.expense)),
+    })
+  }
 
   return {
     total: data.reduce((sum, item) => sum + item.cashflow, 0),

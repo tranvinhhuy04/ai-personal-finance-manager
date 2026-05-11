@@ -12,7 +12,7 @@ class NotificationConsumer {
     const channel = await getChannel();
     await channel.consume(QUEUES.NOTIFICATION_WALLET_EVENTS, (msg) => this.handleMessage(msg));
     this.isRunning = true;
-    console.log('Notification consumer started');
+    console.log('[notification] consumer đã start, đang lắng nghe queue');
   }
 
   async stop() {

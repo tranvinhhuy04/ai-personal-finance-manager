@@ -33,65 +33,65 @@ export function LoginScreen() {
 
   const requiresTwoFactor = Boolean(pendingTwoFactorToken);
 
-  const resetTransientState = () => {
-    setPendingTwoFactorToken(null);
-    setTwoFactorCode('');
-    setMessage(null);
-    setError(null);
-  };
+  function resetTransientState() {
+    setPendingTwoFactorToken(null)
+    setTwoFactorCode('')
+    setMessage(null)
+    setError(null)
+  }
 
-  const toggleMode = () => {
-    setIsRegisterMode((current) => !current);
-    setShowPassword(false);
-    resetTransientState();
-  };
+  function toggleMode() {
+    setIsRegisterMode((current) => !current)
+    setShowPassword(false)
+    resetTransientState()
+  }
 
-  const handleSubmit = async () => {
-    setError(null);
-    setMessage(null);
-    setIsSubmitting(true);
+  async function handleSubmit() {
+    setError(null)
+    setMessage(null)
+    setIsSubmitting(true)
 
     try {
-      if (requiresTwoFactor && pendingTwoFactorToken) {
-        if (!twoFactorCode.trim()) {
-          throw new Error('Vui lòng nhập mã xác thực 2FA gồm 6 số.');
+      if (!requiresTwoFactor || !pendingTwoFactorToken) {
+        if (!email.trim() || !password.trim()) {
+          throw new Error('Vui lòng nhập đầy đủ email và mật khẩu.')
         }
 
-        await verifyTwoFactor(pendingTwoFactorToken, twoFactorCode.trim());
-        setMessage('Đăng nhập thành công. Đang mở ứng dụng...');
-        return;
-      }
+        if (isRegisterMode) {
+          if (!fullName.trim()) {
+            throw new Error('Vui lòng nhập họ và tên.')
+          }
 
-      if (!email.trim() || !password.trim()) {
-        throw new Error('Vui lòng nhập đầy đủ email và mật khẩu.');
-      }
+          await authApi.register({
+            fullName: fullName.trim(),
+            email: email.trim(),
+            password,
+          })
 
-      if (isRegisterMode) {
-        if (!fullName.trim()) {
-          throw new Error('Vui lòng nhập họ và tên.');
+          setMessage('Đăng ký thành công. Hãy đăng nhập bằng tài khoản vừa tạo.')
+          setIsRegisterMode(false)
+          setPassword('')
+          return
         }
 
-        await authApi.register({
-          fullName: fullName.trim(),
-          email: email.trim(),
-          password,
-        });
+        const result = await signIn({ email: email.trim(), password })
 
-        setMessage('Đăng ký thành công. Hãy đăng nhập bằng tài khoản vừa tạo.');
-        setIsRegisterMode(false);
-        setPassword('');
-        return;
+        if (result.requires2FA && result.twoFactorToken) {
+          setPendingTwoFactorToken(result.twoFactorToken)
+          setMessage('Tài khoản này đã bật 2FA. Hãy nhập mã xác thực để hoàn tất đăng nhập.')
+          return
+        }
+
+        setMessage('Đăng nhập thành công. Đang mở ứng dụng...')
+        return
       }
 
-      const result = await signIn({ email: email.trim(), password });
-
-      if (result.requires2FA && result.twoFactorToken) {
-        setPendingTwoFactorToken(result.twoFactorToken);
-        setMessage('Tài khoản này đã bật 2FA. Hãy nhập mã xác thực để hoàn tất đăng nhập.');
-        return;
+      if (!twoFactorCode.trim()) {
+        throw new Error('Vui lòng nhập mã xác thực 2FA gồm 6 số.')
       }
 
-      setMessage('Đăng nhập thành công. Đang mở ứng dụng...');
+      await verifyTwoFactor(pendingTwoFactorToken, twoFactorCode.trim())
+      setMessage('Đăng nhập thành công. Đang mở ứng dụng...')
     } catch (err: any) {
       setError(err?.message || (isRegisterMode ? 'Không thể đăng ký lúc này.' : 'Không thể đăng nhập lúc này.'));
     } finally {

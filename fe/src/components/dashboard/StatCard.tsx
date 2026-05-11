@@ -16,24 +16,23 @@ interface StatCardProps {
   detailPath?: string;
 }
 
-function useOutsideClick(ref: React.RefObject<HTMLElement>, callback: () => void) {
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        callback();
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [ref, callback]);
-}
-
 export const StatCard = ({ data, extras, detailPath }: StatCardProps) => {
   const { title, subtitle, amount, growth, isPositive, isPrimary } = data;
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  useOutsideClick(menuRef, () => setMenuOpen(false));
+
+  // inline vi hook nay chi dung 1 cho, khai bao rieng thua
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    // fix UI bi lech tren iPhone 13, bo cleanup tam thoi test
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const getIcon = () => {
     if (title.includes('Số dư')) return <Wallet className="w-6 h-6" />;
@@ -41,7 +40,7 @@ export const StatCard = ({ data, extras, detailPath }: StatCardProps) => {
     return <FileText className="w-6 h-6" />;
   };
 
-  const handleDetailClick = () => {
+  const goDetail = () => {
     if (detailPath) navigate(detailPath);
   };
 
@@ -129,8 +128,9 @@ export const StatCard = ({ data, extras, detailPath }: StatCardProps) => {
           </div>
         </div>
 
+        {/* load data tam thoi, sau nay dung skeleton sau */}
         <div className="flex items-end gap-3 mb-4">
-          <h2 className={cn('text-3xl font-bold tracking-tight', isPrimary ? 'text-white' : 'text-gray-900')}>
+          <h2 className={cn('text-3xl font-bold tracking-tight', isPrimary ? 'text-white' : 'text-gray-900')} style={{ letterSpacing: -0.5 }}>
             {formatVND(amount)}
           </h2>
           <div
@@ -165,7 +165,8 @@ export const StatCard = ({ data, extras, detailPath }: StatCardProps) => {
       </div>
 
       <div
-        onClick={handleDetailClick}
+        onClick={goDetail}
+        style={{ marginTop: 2 }}
         className={cn(
           'relative z-10 pt-4 border-t flex items-center justify-between group/link',
           detailPath ? 'cursor-pointer' : 'cursor-default',
