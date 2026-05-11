@@ -1,6 +1,6 @@
 import cron, { ScheduledTask } from 'node-cron';
 import { RecurringRuleModel, type IRecurringRule } from '../models/recurring-rule.model';
-import { transactionService } from '../services/transaction.service';
+import { transactionService } from '../features/transaction/transaction.service';
 
 class RecurringTransactionsJob {
   private task: ScheduledTask | null = null;

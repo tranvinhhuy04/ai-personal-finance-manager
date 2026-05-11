@@ -4,7 +4,7 @@
 //   → trả về { merchantName, totalAmount, transactionDate } chuẩn hoá về FE
 
 import { readFile } from 'fs/promises';
-import { AppError } from '../errors/AppError';
+import { AppError } from '../../errors/AppError';
 
 export type ExtractedInvoiceData = {
   merchantName: string;

@@ -1,7 +1,3 @@
-/**
- * Strongly-typed event payload interfaces for the transaction service message bus.
- */
-
 export interface TransactionCreatedPayload {
   transactionId: string;
   walletId: string;

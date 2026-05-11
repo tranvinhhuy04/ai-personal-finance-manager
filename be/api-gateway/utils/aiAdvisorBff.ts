@@ -14,7 +14,7 @@ type RuntimeAiConfig = {
   available_models: string[];
 };
 
-async function fetchRuntimeAiConfig(req: Request): Promise<RuntimeAiConfig | null> {
+async function getAiConfig(req: Request): Promise<RuntimeAiConfig | null> {
   try {
     const response = await fetch(`${IDENTITY_SERVICE_URL}/settings/runtime-ai`, {
       method: 'GET',
@@ -31,7 +31,7 @@ async function fetchRuntimeAiConfig(req: Request): Promise<RuntimeAiConfig | nul
   }
 }
 
-function parseAdvisorUsageMeta(data: Record<string, unknown>) {
+function parseUsage(data: Record<string, unknown>) {
   const llm = typeof data.llm === 'object' && data.llm !== null
     ? (data.llm as Record<string, unknown>)
     : {};
@@ -48,7 +48,7 @@ function parseAdvisorUsageMeta(data: Record<string, unknown>) {
   };
 }
 
-async function appendUsageLog(req: Request, usage: { model: string; tokens_used: number; estimated_cost: number }) {
+async function logUsage(req: Request, usage: { model: string; tokens_used: number; estimated_cost: number }) {
   try {
     await fetch(`${IDENTITY_SERVICE_URL}/settings/usage/append`, {
       method: 'POST',
@@ -75,18 +75,18 @@ type AdvisorRequestBody = {
 
 const localCache = new Map<string, { expiresAt: number; value: unknown }>();
 
-function normalizeMessage(body: AdvisorRequestBody): string {
+function getMsg(body: AdvisorRequestBody): string {
   return typeof body.message === 'string' ? body.message.trim() : '';
 }
 
-function getSessionId(body: AdvisorRequestBody, userId: string): string {
+function getSession(body: AdvisorRequestBody, userId: string): string {
   if (typeof body.sessionId === 'string' && body.sessionId.trim()) {
     return body.sessionId.trim();
   }
   return `${userId}-default`;
 }
 
-function buildCacheKey(userId: string, sessionId: string, message: string, riskProfile?: string): string {
+function cacheKey(userId: string, sessionId: string, message: string, riskProfile?: string): string {
   const hash = crypto
     .createHash('sha256')
     .update(JSON.stringify({ userId, sessionId, message, riskProfile: riskProfile ?? null }))
@@ -130,16 +130,16 @@ async function writeCache(key: string, payload: unknown): Promise<void> {
 export async function handleAiAdvisorChat(req: Request, res: Response) {
   const userId = String((req as any).userId ?? 'anonymous');
   const body = (req.body ?? {}) as AdvisorRequestBody;
-  const message = normalizeMessage(body);
+  const message = getMsg(body);
 
   if (message.length < 2) {
     return res.status(400).json({ message: 'message là bắt buộc và cần >= 2 ký tự.' });
   }
 
-  const sessionId = getSessionId(body, userId);
-  const cacheKey = buildCacheKey(userId, sessionId, message, body.riskProfile);
+  const sessionId = getSession(body, userId);
+  const key = cacheKey(userId, sessionId, message, body.riskProfile);
 
-  const cached = await readCache(cacheKey);
+  const cached = await readCache(key);
   if (cached) {
     return res.status(200).json({
       ...(cached as Record<string, unknown>),
@@ -150,7 +150,7 @@ export async function handleAiAdvisorChat(req: Request, res: Response) {
     });
   }
 
-  const runtimeConfig = await fetchRuntimeAiConfig(req);
+  const runtimeConfig = await getAiConfig(req);
 
   const payload = {
     user_id: userId,
@@ -195,12 +195,12 @@ export async function handleAiAdvisorChat(req: Request, res: Response) {
       },
     };
 
-    const usage = parseAdvisorUsageMeta(data);
+    const usage = parseUsage(data);
     if (usage) {
-      void appendUsageLog(req, usage);
+      void logUsage(req, usage);
     }
 
-    await writeCache(cacheKey, enriched);
+    await writeCache(key, enriched);
     return res.status(200).json(enriched);
   } catch (error) {
     console.error('[api-gateway] AI advisor BFF error:', error);

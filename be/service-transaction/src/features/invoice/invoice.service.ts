@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
-import { AppError } from '../errors/AppError';
-import { InvoiceModel, IInvoice } from '../models/invoice.model';
-import { transactionService } from './transaction.service';
-import { outboxPublisher } from '../messaging/outbox.publisher';
+import { AppError } from '../../errors/AppError';
+import { InvoiceModel, IInvoice } from '../../models/invoice.model';
+import { transactionService } from '../transaction/transaction.service';
+import { outboxPublisher } from '../../messaging/outbox.publisher';
 
 export type CreateInvoiceInput = {
   user_id: string;

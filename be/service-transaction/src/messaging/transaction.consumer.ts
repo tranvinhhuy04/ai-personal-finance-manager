@@ -5,7 +5,7 @@ import {
   QUEUES,
   ROUTING_KEYS,
 } from '../config/rabbitmq';
-import { transactionService } from '../services/transaction.service';
+import { transactionService } from '../features/transaction/transaction.service';
 import { WalletResponseEvent } from '../types/events';
 
 class TransactionConsumer {

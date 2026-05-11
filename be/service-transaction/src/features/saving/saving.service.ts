@@ -1,11 +1,11 @@
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
-import { AppError } from '../errors/AppError';
-import { SavingModel, SavingType } from '../models/saving.model';
-import { transactionService } from './transaction.service';
-import { EXCHANGES, publishMessage, ROUTING_KEYS } from '../config/rabbitmq';
-import { parsePositiveAmount } from '../utils/parsers';
-import { requireOwnedWallet } from '../utils/walletUtils';
+import { AppError } from '../../errors/AppError';
+import { SavingModel, SavingType } from '../../models/saving.model';
+import { transactionService } from '../transaction/transaction.service';
+import { EXCHANGES, publishMessage, ROUTING_KEYS } from '../../config/rabbitmq';
+import { parsePositiveAmount } from '../../shared/parsers';
+import { requireOwnedWallet } from '../../shared/walletUtils';
 
 type CreateSavingInput = {
   user_id: string;

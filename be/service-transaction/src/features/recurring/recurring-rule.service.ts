@@ -1,5 +1,5 @@
-import { AppError } from '../errors/AppError';
-import { RecurringRuleModel } from '../models/recurring-rule.model';
+import { AppError } from '../../errors/AppError';
+import { RecurringRuleModel } from '../../models/recurring-rule.model';
 
 const RECURRING_STATUSES = ['ACTIVE', 'PAUSED'] as const;
 

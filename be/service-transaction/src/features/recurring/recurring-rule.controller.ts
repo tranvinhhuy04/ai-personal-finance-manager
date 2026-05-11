@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { catchAsync } from '../middlewares/catchAsync';
-import { recurringRuleService } from '../services/recurring-rule.service';
+import { catchAsync } from '../../middlewares/catchAsync';
+import { recurringRuleService } from './recurring-rule.service';
 
 export const listRecurringRules = catchAsync(async (req: Request, res: Response) => {
   const userId = String((req as any).userId ?? '');

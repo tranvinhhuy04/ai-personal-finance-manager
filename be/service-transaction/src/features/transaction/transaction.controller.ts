@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { transactionService } from '../services/transaction.service';
-import { outboxPublisher } from '../messaging/outbox.publisher';
-import { catchAsync } from '../middlewares/catchAsync';
+import { transactionService } from './transaction.service';
+import { outboxPublisher } from '../../messaging/outbox.publisher';
+import { catchAsync } from '../../middlewares/catchAsync';
 
 export const createTransaction = catchAsync(async (req: Request, res: Response) => {
   const userId = String((req as any).userId ?? '');

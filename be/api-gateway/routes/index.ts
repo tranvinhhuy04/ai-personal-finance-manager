@@ -42,7 +42,7 @@ const authLoginLimiter = rateLimit({
 
 // trả 504 khi upstream không phản hồi kịp thời
 function onProxyError(err: Error, req: IncomingMessage, res: ServerResponse) {
-  console.error('[api-gateway] proxy lỗi:', err.message);
+  console.error({ event: 'proxy_error', msg: err.message, path: req.url });
   if (!res.headersSent) {
     res.statusCode = 504;
     res.setHeader('Content-Type', 'application/json');
@@ -56,11 +56,11 @@ function onProxyError(err: Error, req: IncomingMessage, res: ServerResponse) {
 
 function onProxyRes(proxyRes: IncomingMessage, req: IncomingMessage) {
   const statusCode = proxyRes.statusCode ?? 'unknown';
-  console.log(`[api-gateway] proxyRes ${req.method} ${req.url} -> ${statusCode}`);
+  console.log({ event: 'proxy_res', method: req.method, url: req.url, status: statusCode });
 }
 
 function onProxyReq(proxyReq: ClientRequest, req: IncomingMessage) {
-  console.log(`[api-gateway] proxyReq ${req.method} ${req.url}`)
+  console.log({ event: 'proxy_req', method: req.method, url: req.url })
 
   const body = (req as any).body
   if (body && typeof body === 'object') {

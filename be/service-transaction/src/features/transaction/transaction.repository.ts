@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
-import CategoryModel, { ICategory } from '../models/category.model';
-import { OutboxModel, IOutboxEvent } from '../models/outbox.model';
-import { TransactionModel, ITransaction } from '../models/transaction.model';
+import CategoryModel, { ICategory } from '../../models/category.model';
+import { OutboxModel, IOutboxEvent } from '../../models/outbox.model';
+import { TransactionModel, ITransaction } from '../../models/transaction.model';
 
 export class CategoryRepository {
   async findById(categoryId: string) {

@@ -1,10 +1,10 @@
 import { unlink } from 'fs/promises';
 import { Request, Response } from 'express';
-import { AppError } from '../errors/AppError';
-import { catchAsync } from '../middlewares/catchAsync';
-import { resolveInvoiceImageUrl } from '../middlewares/upload.middleware';
-import { invoiceExtractionService } from '../services/invoice-extraction.service';
-import { invoiceService } from '../services/invoice.service';
+import { AppError } from '../../errors/AppError';
+import { catchAsync } from '../../middlewares/catchAsync';
+import { resolveInvoiceImageUrl } from '../../middlewares/upload.middleware';
+import { invoiceExtractionService } from './invoice-extraction.service';
+import { invoiceService } from './invoice.service';
 
 type InvoiceUploadRequest = Request & {
   file?: {

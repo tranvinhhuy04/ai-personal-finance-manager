@@ -1,5 +1,5 @@
-import { AppError } from '../errors/AppError';
-import CategoryModel from '../models/category.model';
+import { AppError } from '../../errors/AppError';
+import CategoryModel from '../../models/category.model';
 
 function normalizeCategoryType(input: unknown): 'INCOME' | 'EXPENSE' | undefined {
   if (input === undefined || input === null || input === '') {

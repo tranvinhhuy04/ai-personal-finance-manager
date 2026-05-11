@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { catchAsync } from '../middlewares/catchAsync';
-import { categoryService } from '../services/category.service';
+import { catchAsync } from '../../middlewares/catchAsync';
+import { categoryService } from './category.service';
 
 export const listCategories = catchAsync(async (req: Request, res: Response) => {
   const userId = String((req as any).userId ?? '');

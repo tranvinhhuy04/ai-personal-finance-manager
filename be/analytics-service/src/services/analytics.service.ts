@@ -204,7 +204,7 @@ function getTransactionDb() {
   return mongoose.connection.useDb(dbName, { useCache: true });
 }
 
-function buildTransactionPipeline(filters: {
+function txPipeline(filters: {
   userId: string;
   walletId?: string;
   startDate?: Date;
@@ -418,7 +418,7 @@ function getCumulativeAt(points: Array<{ time: number; value: number }>, targetT
   return roundMoney(latestValue);
 }
 
-function buildForecastData(transactions: DetailedTransaction[], window: PeriodWindow) {
+function forecastData(transactions: DetailedTransaction[], window: PeriodWindow) {
   const sortedTransactions = [...transactions].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
   const cumulativePoints: Array<{ time: number; value: number }> = [];
 
@@ -699,7 +699,7 @@ class AnalyticsService {
   ): Promise<SummaryResult> {
     const summaryRows = await transactions
       .aggregate([
-        ...buildTransactionPipeline(filters),
+        ...txPipeline(filters),
         {
           $group: {
             _id: null,
@@ -738,7 +738,7 @@ class AnalyticsService {
   ) {
     const trendRows = await transactions
       .aggregate([
-        ...buildTransactionPipeline({
+        ...txPipeline({
           userId: filters.userId,
           walletId: filters.walletId,
           startDate,
@@ -798,7 +798,7 @@ class AnalyticsService {
   ): Promise<BreakdownItem[]> {
     const breakdownRows = await transactions
       .aggregate([
-        ...buildTransactionPipeline(filters),
+        ...txPipeline(filters),
         {
           $match: {
             normalizedType: 'EXPENSE',
@@ -864,7 +864,7 @@ class AnalyticsService {
   ): Promise<DetailedTransaction[]> {
     const rows = await transactions
       .aggregate([
-        ...buildTransactionPipeline(filters),
+        ...txPipeline(filters),
         {
           $addFields: {
             categoryObjectId: {
@@ -1050,7 +1050,7 @@ class AnalyticsService {
     const comparison = buildComparisonData(detailedTransactions, currentWindow);
     const budgetProgress = buildBudgetProgress(breakdown, previousBreakdown);
     const topTransactions = buildTopTransactions(detailedTransactions);
-    const forecast = buildForecastData(detailedTransactions, currentWindow);
+    const forecast = forecastData(detailedTransactions, currentWindow);
     const recurringSpend = subscriptions
       .filter((item) => item.status === 'ACTIVE')
       .reduce((sum, item) => sum + item.amount, 0);

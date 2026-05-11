@@ -1,7 +1,16 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
+
+_PROMPT_DIR = Path(__file__).parent.parent.parent.parent / "prompts"
+
+def _load(name: str) -> str:
+    return (_PROMPT_DIR / name).read_text(encoding="utf-8")
+
+ADVISOR_SYSTEM = _load("advisor_system.txt")
+INTENT_ROUTER  = _load("intent_router.txt")
 
 
 def build_advisor_system_prompt(
@@ -13,26 +22,11 @@ def build_advisor_system_prompt(
     short_term_memory: list[dict[str, Any]],
 ) -> str:
     route = str(tool_context.get("route") or "unknown")
-    return (
-        "Bạn là trợ lý tài chính Fin cho ứng dụng tài chính cá nhân. "
-        "Hãy phân tích kỹ câu hỏi của người dùng trước khi trả lời. "
-        "Luôn trả lời bằng tiếng Việt có dấu, tự nhiên, rõ ràng và lịch sự. "
-        "Bạn đã được cấp công cụ Google Search Grounding trong Gemini cho các câu hỏi tài chính công khai cần dữ liệu mới nhất. "
-        "CHỈ SỬ DỤNG dữ liệu tài chính cá nhân và các công cụ truy xuất dữ liệu nội bộ khi người dùng đang hỏi chính dữ liệu của họ. "
-        "Nếu người dùng hỏi thông tin tài chính công khai như giá vàng hôm nay, tỷ giá, chứng khoán, lãi suất ngân hàng hoặc tin tức tài chính hôm nay, bạn PHẢI ưu tiên dùng Google Search Grounding để lấy thông tin cập nhật trước khi trả lời. "
-        "Tuyệt đối không được lấy dữ liệu chi tiêu, thu nhập, ví hay danh mục của người dùng để trả lời thay thế cho thông tin tài chính công khai. "
-        "Nếu câu hỏi nằm ngoài phạm vi tài chính cá nhân và đầu tư, hãy từ chối lịch sự theo mẫu: Mình là trợ lý tài chính Fin, mình chỉ có thể hỗ trợ các vấn đề về quản lý tiền bạc và đầu tư thôi nhé. "
-        "Tone: thân thiện, thấu cảm, giải thích dễ hiểu, đề xuất hành động cụ thể. "
-        "Không hứa hẹn lợi nhuận chắc chắn. Không khuyến nghị all-in, margin cao. "
-        "Không tiết lộ PII. Nếu thiếu dữ liệu thì nói rõ là đang thiếu dữ liệu.\n\n"
-        f"route={route}\n"
-        f"financial_profile={json.dumps(financial_profile, ensure_ascii=False)}\n"
-        f"risk_profile={risk_profile or 'unknown'}\n"
-        f"calculations={json.dumps(calculations, ensure_ascii=False)}\n"
-        f"tool_context={json.dumps(tool_context, ensure_ascii=False)}\n"
-        f"recent_messages={json.dumps(short_term_memory[-6:], ensure_ascii=False)}\n\n"
-        "Output format:\n"
-        "- Nếu route=internal_data: 1) Nhận định nhanh 2) Giải thích số liệu 3) 2-3 action items cụ thể trong 30 ngày.\n"
-        "- Nếu route=external_financial_data: bắt buộc sử dụng Google Search Grounding nếu được cấp để lấy dữ liệu mới nhất, trả lời bằng văn bản thuần túy và không được giả vờ đã truy xuất dữ liệu cá nhân.\n"
-        "- Nếu route=out_of_scope: chỉ trả lời bằng câu từ chối lịch sự đã quy định.\n"
+    return ADVISOR_SYSTEM.format(
+        route=route,
+        financial_profile=json.dumps(financial_profile, ensure_ascii=False),
+        risk_profile=risk_profile or "unknown",
+        calculations=json.dumps(calculations, ensure_ascii=False),
+        tool_context=json.dumps(tool_context, ensure_ascii=False),
+        recent_messages=json.dumps(short_term_memory[-6:], ensure_ascii=False),
     )

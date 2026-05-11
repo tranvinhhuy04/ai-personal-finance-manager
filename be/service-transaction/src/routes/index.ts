@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import requireAuth from '../middlewares/requireAuth';
-import { createTransaction, listTransactions } from '../controllers/transaction.controller';
-import { createCategory, deleteCategory, listCategories, updateCategory } from '../controllers/category.controller';
+import { createTransaction, listTransactions } from '../features/transaction/transaction.controller';
+import { createCategory, deleteCategory, listCategories, updateCategory } from '../features/category/category.controller';
 import {
   confirmInvoice,
   deleteInvoice,
@@ -9,14 +9,14 @@ import {
   listInvoices,
   updateInvoice,
   uploadInvoice,
-} from '../controllers/invoice.controller';
+} from '../features/invoice/invoice.controller';
 import {
   createRecurringRule,
   deleteRecurringRule,
   listRecurringRules,
   updateRecurringRule,
-} from '../controllers/recurring-rule.controller';
-import { createSaving, deleteSaving, depositSaving, listSavings, settleSaving } from '../controllers/saving.controller';
+} from '../features/recurring/recurring-rule.controller';
+import { createSaving, deleteSaving, depositSaving, listSavings, settleSaving } from '../features/saving/saving.controller';
 import { uploadInvoiceImage } from '../middlewares/upload.middleware';
 
 const router = Router();

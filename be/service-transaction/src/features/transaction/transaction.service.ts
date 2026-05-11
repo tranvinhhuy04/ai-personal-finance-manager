@@ -1,10 +1,10 @@
 import mongoose, { ClientSession } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
-import { AppError } from '../errors/AppError';
-import { OutboxModel } from '../models/outbox.model';
-import { TransactionModel } from '../models/transaction.model';
-import { parsePositiveAmount } from '../utils/parsers';
-import { fetchUserWallets } from '../utils/walletUtils';
+import { AppError } from '../../errors/AppError';
+import { OutboxModel } from '../../models/outbox.model';
+import { TransactionModel } from '../../models/transaction.model';
+import { parsePositiveAmount } from '../../shared/parsers';
+import { fetchUserWallets } from '../../shared/walletUtils';
 
 export type CreateTransactionInput = {
   user_id?: string;

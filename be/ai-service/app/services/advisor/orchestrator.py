@@ -10,18 +10,32 @@ from functools import lru_cache
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from app.services.advisor.financial_math import (
-    compute_roi,
-    compute_savings_rate,
-    compute_total_expense,
-    compute_total_income,
-)
 from app.services.advisor.guardrails import apply_output_guardrails
 from app.services.advisor.memory_cache import MemoryStore
 from app.services.advisor.prompts import build_advisor_system_prompt
 from app.services.advisor.retrieval import RetrievalLayer
 from app.services.advisor.schemas import AdvisorChatRequest, AdvisorMetrics, AdvisorResponse, AdvisorToolResult, ExtractedEntities, IntentExtraction
 from app.services.gemini_service import get_gemini_service
+
+
+def _to_float(value: object) -> float:
+    try:
+        parsed = float(value)  # type: ignore[arg-type]
+        return 0.0 if parsed != parsed else parsed  # NaN guard
+    except (TypeError, ValueError):
+        return 0.0
+
+def _total_income(transactions: list[dict]) -> float:
+    return round(sum(_to_float(t.get("amount")) for t in transactions if str(t.get("type", "")).upper() in {"INCOME", "THU"}), 2)
+
+def _total_expense(transactions: list[dict]) -> float:
+    return round(sum(_to_float(t.get("amount")) for t in transactions if str(t.get("type", "")).upper() in {"EXPENSE", "CHI"}), 2)
+
+def _savings_rate(income: float, expense: float) -> float:
+    return round(max(income - expense, 0.0) / income * 100.0, 2) if income > 0 else 0.0
+
+def _roi(current: float, invested: float) -> float:
+    return round((current - invested) / invested * 100.0, 2) if invested > 0 else 0.0
 
 
 ROUTE_INTERNAL_DATA = "internal_data"
@@ -62,26 +76,17 @@ class AdvisorOrchestrator:
         )
         return "advisor:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
-    async def _extract_intent_entities_with_llm(self, message: str) -> IntentExtraction | None:
+    async def _llm_intent(self, message: str) -> IntentExtraction | None:
         import httpx as _httpx
 
         api_key = os.getenv("GEMINI_API_KEY", "").strip()
         if not api_key:
             return None
 
-        sys_prompt = (
-            "You are the intent router for Fin, a personal finance assistant. "
-            "Classify the message carefully. "
-            "Use transaction_lookup, chart_analysis, or financial_advice ONLY when the user is explicitly asking about their own money, spending, income, savings, balance, budget, or portfolio. "
-            "If the user asks about public financial information like gold price, exchange rate, stock market, interest rate, or macro finance, classify as general_knowledge. "
-            "If the user asks about weather, cooking, entertainment, sports, or other non-finance topics, also classify as general_knowledge. "
-            "Valid intent: transaction_lookup | financial_advice | chart_analysis | general_knowledge. "
-            "Respond ONLY with valid JSON: "
-            '{\"intent\":\"...\",\"confidence\":0.9,\"time_range\":null,\"category\":null,\"amount\":null}'
-        )
+        from app.services.advisor.prompts import INTENT_ROUTER as _INTENT_ROUTER
 
         payload = {
-            "contents": [{"parts": [{"text": f"{sys_prompt}\n\nUser message: {message}"}]}],
+            "contents": [{"parts": [{"text": f"{_INTENT_ROUTER}\n\nUser message: {message}"}]}],
             "generationConfig": {
                 "temperature": 0.0,
                 "maxOutputTokens": 128,
@@ -171,7 +176,7 @@ class AdvisorOrchestrator:
 
     async def _extract_intent_entities(self, message: str, allow_llm: bool) -> IntentExtraction:
         if allow_llm:
-            llm_result = await self._extract_intent_entities_with_llm(message)
+            llm_result = await self._llm_intent(message)
             if llm_result is not None:
                 return llm_result
         return self._extract_intent_entities_rule_based(message)
@@ -427,12 +432,12 @@ class AdvisorOrchestrator:
     @staticmethod
     def _build_calculations(structured_data: dict[str, Any]) -> AdvisorMetrics:
         transactions = list(structured_data.get("transactions", []))
-        total_income = compute_total_income(transactions)
-        total_expense = compute_total_expense(transactions)
-        savings_rate = compute_savings_rate(total_income, total_expense)
+        total_income = _total_income(transactions)
+        total_expense = _total_expense(transactions)
+        savings = _savings_rate(total_income, total_expense)
 
         investment = dict(structured_data.get("investment", {}))
-        roi = compute_roi(
+        roi = _roi(
             float(investment.get("totalCurrentValue", 0) or 0),
             float(investment.get("totalInvested", 0) or 0),
         )
@@ -440,7 +445,7 @@ class AdvisorOrchestrator:
         return AdvisorMetrics(
             total_income=total_income,
             total_expense=total_expense,
-            savings_rate=savings_rate,
+            savings_rate=savings,
             roi=roi,
         )
 

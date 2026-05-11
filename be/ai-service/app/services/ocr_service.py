@@ -22,15 +22,15 @@ def _get_paddle_ocr():
             if _ocr_instance is None:
                 try:
                     from paddleocr import PaddleOCR
-                    logger.info("Đang khởi tạo PaddleOCR (lang=vi), chỉ chạy lần đầu...")
+                    logger.info({"event": "ocr_init", "lang": "vi"})
                     _ocr_instance = PaddleOCR(
                         use_angle_cls=True,
                         lang="vi",
                         show_log=False,
                     )
-                    logger.info("PaddleOCR sẵn sàng.")
+                    logger.info({"event": "ocr_ready"})
                 except Exception as exc:
-                    logger.error("Khởi tạo PaddleOCR thất bại: %s", exc)
+                    logger.error({"event": "ocr_init_failed", "err": str(exc)})
                     raise RuntimeError(f"PaddleOCR khởi tạo lỗi: {exc}") from exc
     return _ocr_instance
 
@@ -248,13 +248,13 @@ def process_invoice_image(image_bytes: bytes) -> dict[str, Any]:
 
         # Route Strategy
         if "chi tiet" in full_normalized_text or "giao dich" in full_normalized_text:
-            logger.info("Routing to Strategy 1: DIGITAL")
+            logger.info({"event": "ocr_route", "strategy": "DIGITAL"})
             data = extract_digital(blocks, img_height)
         elif "gtgt" in full_normalized_text or "dien luc" in full_normalized_text or "mau so" in full_normalized_text:
-            logger.info("Routing to Strategy 2: TABULAR")
+            logger.info({"event": "ocr_route", "strategy": "TABULAR"})
             data = extract_tabular(blocks, img_height)
         else:
-            logger.info("Routing to Strategy 3: RETAIL")
+            logger.info({"event": "ocr_route", "strategy": "RETAIL"})
             data = extract_retail(blocks, img_height)
 
         # Fallbacks for empty data
@@ -268,7 +268,7 @@ def process_invoice_image(image_bytes: bytes) -> dict[str, Any]:
         return data
 
     except Exception as e:
-        logger.error(f"OCR Extraction failed: {e}")
+        logger.error({"event": "ocr_failed", "err": str(e)})
         return {
             "merchantName": "Lỗi trích xuất",
             "totalAmount": 0,
