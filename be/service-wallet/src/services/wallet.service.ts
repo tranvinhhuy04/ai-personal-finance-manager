@@ -22,18 +22,11 @@ type ApplyTransactionInput = {
   transaction_id?: string;
 };
 
-function parsePositiveDecimal(amount: string, field: string) {
+function parseDecimal(amount: string, field: string, allowZero = false) {
   const value = Number(amount);
-  if (!Number.isFinite(value) || value <= 0) {
-    throw new AppError(field + ' must be a positive number', 400);
-  }
-  return value;
-}
-
-function parseNonNegativeDecimal(amount: string, field: string) {
-  const value = Number(amount);
-  if (!Number.isFinite(value) || value < 0) {
-    throw new AppError(field + ' must be a non-negative number', 400);
+  if (!Number.isFinite(value) || (allowZero ? value < 0 : value <= 0)) {
+    const constraint = allowZero ? 'non-negative' : 'positive';
+    throw new AppError(`${field} must be a ${constraint} number`, 400);
   }
   return value;
 }
@@ -56,7 +49,7 @@ export class WalletService {
 
     const initialBalance =
       input.balance !== undefined && input.balance !== null && input.balance !== ''
-        ? parseNonNegativeDecimal(String(input.balance), 'balance')
+        ? parseDecimal(String(input.balance), 'balance', true)
         : 0;
 
     const wallet = await walletRepository.create({
@@ -93,7 +86,7 @@ export class WalletService {
       const nextBalance =
         payload.balance === null || payload.balance === ''
           ? 0
-          : parseNonNegativeDecimal(String(payload.balance), 'balance');
+          : parseDecimal(String(payload.balance), 'balance', true);
 
       wallet.balance = mongoose.Types.Decimal128.fromString(String(nextBalance));
     }
@@ -123,7 +116,7 @@ export class WalletService {
   }
 
   async applyTransactionWithOptimisticLock(input: ApplyTransactionInput) {
-    const amountValue = parsePositiveDecimal(input.amount, 'amount');
+    const amountValue = parseDecimal(input.amount, 'amount');
 
     for (let retry = 0; retry < 3; retry += 1) {
       const current = await walletRepository.findById(input.wallet_id);

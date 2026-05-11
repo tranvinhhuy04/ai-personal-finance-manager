@@ -96,13 +96,7 @@ torch.set_num_threads(max(1, int(os.getenv("TORCH_NUM_THREADS", "1"))))
 
 
 class NLPService:
-    """Service NLP dùng PhoBERT để sinh embedding và đo độ giống ngữ nghĩa.
-
-    Đây là skeleton production-friendly:
-    - PhoBERT tạo embedding câu hỏi.
-    - So sánh cosine similarity với bộ intent mẫu.
-    - Sau đó route sang analytics-service / wallet-service hoặc gọi LLM.
-    """
+    """NLP service using PhoBERT embeddings and cosine similarity for intent routing."""
 
     def __init__(self) -> None:
         self.tokenizer = None

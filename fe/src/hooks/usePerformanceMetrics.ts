@@ -24,11 +24,6 @@ function daysBetween(start: string, end: string): number {
   return Math.max(1, Math.floor(ms / 86_400_000));
 }
 
-/**
- * @param savings       Active SAVING packages from the API.
- * @param cagrOverride  Optional annualised growth rate (%) computed by useSavingsGrowth.
- *                      When provided and valid, replaces the static fallback rate.
- */
 export function useSavingsMetrics(savings: SavingPackage[], cagrOverride?: number): SavingsMetrics {
   return useMemo(() => {
     const active = savings.filter((s) => s.type === 'SAVING');

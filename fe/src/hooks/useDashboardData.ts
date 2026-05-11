@@ -1,3 +1,8 @@
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/apiClient';
+import type { Wallet } from '@/types/finance';
+
 export interface StatData {
   title: string;
   subtitle: string;
@@ -18,9 +23,9 @@ export interface WalletCurrency {
 
 export interface CashFlowData {
   month: string;
-  cashflow: number; // income (inflow) — Bar
-  outflow: number;  // total expense (outflow) — Line (positive value)
-  inflow: number;   // kept for backward compat (negative expense)
+  cashflow: number;
+  outflow: number;
+  inflow: number;
 }
 
 export interface DashboardData {
@@ -39,57 +44,117 @@ export interface DashboardData {
   };
 }
 
-// Hook trả về dữ liệu tĩnh (mock) cho Dashboard.
-// Dữ liệu này hiện không gọi API – dùng để fallback hoặc hiển thị UI mẫu.
-// Nếu muốn dữ liệu thật, thay bằng useQuery gọi /api/v1/wallets + /api/v1/analytics.
-export const useDashboardData = () => {
-  const data: DashboardData = {
-    overview: {
-      balance: {
-        title: 'Số dư của tôi',
-        subtitle: 'Tổng quan ví & Chi tiêu',
-        amount: 513008000,
-        growth: 1.5,
-        isPositive: true,
-        isPrimary: true,
-      },
-      savings: {
-        title: 'Tài khoản tiết kiệm',
-        subtitle: 'Tiết kiệm tăng trưởng đều',
-        amount: 395011250,
-        growth: 3.2,
-        isPositive: true,
-      },
-      investment: {
-        title: 'Danh mục đầu tư',
-        subtitle: 'Theo dõi tăng trưởng tài sản',
-        amount: 1253019500,
-        growth: 4.7,
-        isPositive: true,
-      },
-    },
-    wallet: {
-      exchangeRate: 'Hôm nay 1 USD = 25.420 VNĐ',
-      currencies: [
-        { id: 'tcb', name: 'Techcombank', type: 'techcombank', amount: 150000000, limit: '250tr một tháng', status: 'Hoạt động' },
-        { id: 'momo', name: 'Ví MoMo', type: 'momo', amount: 5500000, limit: '50tr một tháng', status: 'Hoạt động' },
-        { id: 'zalo', name: 'ZaloPay', type: 'zalopay', amount: 2150000, limit: '50tr một tháng', status: 'Hoạt động' },
-        { id: 'cash', name: 'Tiền mặt', type: 'cash', amount: 15000000, limit: 'Không giới hạn', status: 'Tạm khóa' },
-      ],
-    },
-    cashFlow: {
-      total: 8558086000,
-      data: [
-        { month: 'Thg 1', cashflow: 750000000, outflow: 125000000, inflow: -125000000 },
-        { month: 'Thg 2', cashflow: 700000000, outflow: 100000000, inflow: -100000000 },
-        { month: 'Thg 3', cashflow: 1200000000, outflow: 186400000, inflow: -186400000 },
-        { month: 'Thg 4', cashflow: 625000000, outflow: 75000000, inflow: -75000000 },
-        { month: 'Thg 5', cashflow: 500000000, outflow: 50000000, inflow: -50000000 },
-        { month: 'Thg 6', cashflow: 750000000, outflow: 100000000, inflow: -100000000 },
-        { month: 'Thg 7', cashflow: 875000000, outflow: 150000000, inflow: -150000000 },
-      ],
-    },
-  };
+function toNumber(value: number | string | null | undefined) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
-  return { data, isLoading: false, error: null };
-};
+function resolveWalletType(wallet: Wallet): WalletCurrency['type'] {
+  const t = String(wallet.walletType ?? '').toUpperCase();
+  if (t === 'MOMO') return 'momo';
+  if (t === 'ZALOPAY') return 'zalopay';
+  if (t === 'CASH') return 'cash';
+  return 'techcombank';
+}
+
+export function useDashboardData(cashflowFilter: 'monthly' | 'yearly' = 'yearly') {
+  const walletsQuery = useQuery({
+    queryKey: ['wallets'],
+    queryFn: () => apiClient.getWallets(),
+    staleTime: 60_000,
+  });
+
+  const savingsQuery = useQuery({
+    queryKey: ['savings', 'SAVING'],
+    queryFn: () => apiClient.getSavings('SAVING'),
+    staleTime: 60_000,
+  });
+
+  const investmentsQuery = useQuery({
+    queryKey: ['savings', 'INVESTMENT'],
+    queryFn: () => apiClient.getSavings('INVESTMENT'),
+    staleTime: 60_000,
+  });
+
+  const cashflowQuery = useQuery({
+    queryKey: ['dashboard', 'cashflow', cashflowFilter],
+    queryFn: async () => {
+      const dashboard = await apiClient.getAnalyticsDashboard({ type: cashflowFilter });
+      const trend = dashboard.trend ?? [];
+      const data: CashFlowData[] = trend.map((item) => ({
+        month: item.month,
+        cashflow: toNumber(item.income),
+        outflow: Math.abs(toNumber(item.expense)),
+        inflow: -Math.abs(toNumber(item.expense)),
+      }));
+      return {
+        total: data.reduce((sum, item) => sum + item.cashflow, 0),
+        data,
+      };
+    },
+    staleTime: 30_000,
+  });
+
+  const wallets = walletsQuery.data ?? [];
+  const savings = savingsQuery.data ?? [];
+  const investments = investmentsQuery.data ?? [];
+
+  const data = useMemo<DashboardData>(() => {
+    const totalBalance = wallets.reduce((sum, w) => sum + toNumber(w.balance), 0);
+    const totalSavings = savings.reduce((sum, s) => sum + toNumber(s.currentAmount), 0);
+    const totalInvestment = investments.reduce((sum, i) => sum + toNumber(i.currentAmount), 0);
+
+    return {
+      overview: {
+        balance: {
+          title: 'Số dư của tôi',
+          subtitle: 'Tổng quan ví & Chi tiêu',
+          amount: totalBalance,
+          growth: 0,
+          isPositive: totalBalance >= 0,
+          isPrimary: true,
+        },
+        savings: {
+          title: 'Tài khoản tiết kiệm',
+          subtitle: 'Tiết kiệm tăng trưởng đều',
+          amount: totalSavings,
+          growth: 0,
+          isPositive: totalSavings >= 0,
+        },
+        investment: {
+          title: 'Danh mục đầu tư',
+          subtitle: 'Theo dõi tăng trưởng tài sản',
+          amount: totalInvestment,
+          growth: 0,
+          isPositive: totalInvestment >= 0,
+        },
+      },
+      wallet: {
+        exchangeRate:
+          wallets.length > 0
+            ? `Đã đồng bộ ${wallets.length} ví`
+            : 'Bạn chưa có ví nào trong hệ thống',
+        currencies: wallets.map((w) => ({
+          id: w.id,
+          name: w.walletName,
+          type: resolveWalletType(w),
+          amount: toNumber(w.balance),
+          limit: 'Không giới hạn',
+          status: w.status === 1 ? 'Hoạt động' : 'Tạm khóa',
+        })),
+      },
+      cashFlow: cashflowQuery.data ?? { total: 0, data: [] },
+    };
+  }, [wallets, savings, investments, cashflowQuery.data]);
+
+  const isLoading =
+    walletsQuery.isLoading ||
+    savingsQuery.isLoading ||
+    investmentsQuery.isLoading ||
+    cashflowQuery.isLoading;
+
+  const error =
+    walletsQuery.error ?? savingsQuery.error ?? investmentsQuery.error ?? cashflowQuery.error ?? null;
+
+  return { data, isLoading, error };
+}

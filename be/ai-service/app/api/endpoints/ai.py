@@ -59,20 +59,7 @@ class ProviderStatusRequest(BaseModel):
 
 @router.post("/ocr")
 async def ocr_invoice(file: UploadFile = File(...)) -> dict[str, Any]:
-    """Extract invoice data from an uploaded image using PaddleOCR (local, offline).
-
-    Accepts any image format supported by OpenCV (JPEG, PNG, WEBP, BMP …).
-    Returns the standard JSON expected by the frontend:
-
-        {
-            "success": true,
-            "data": {
-                "merchantName": "...",
-                "totalAmount": 58000,
-                "transactionDate": "2026-04-03T00:00:00.000Z"
-            }
-        }
-    """
+    """Extract invoice data from an uploaded image using PaddleOCR."""
     try:
         image_bytes = await file.read()
         if not image_bytes:

@@ -153,31 +153,17 @@ function normalizeAiUsageLogs(rawLogs: unknown) {
   return rawLogs
     .map((item) => {
       const row = item as Partial<AIUsageLogInput>;
-      if (!row || typeof row.model !== 'string') {
-        return null;
-      }
+      // Corrupt data from DB is possible — validate only fields we depend on
+      if (!row || typeof row.model !== 'string') return null;
 
       const parsedDate = new Date(row.date as string | Date);
-      if (Number.isNaN(parsedDate.getTime())) {
-        return null;
-      }
-
-      const tokensUsed = Number(row.tokens_used ?? 0);
-      const estimatedCost = Number(row.estimated_cost ?? 0);
-
-      if (!Number.isFinite(tokensUsed) || tokensUsed < 0) {
-        return null;
-      }
-
-      if (!Number.isFinite(estimatedCost) || estimatedCost < 0) {
-        return null;
-      }
+      if (Number.isNaN(parsedDate.getTime())) return null;
 
       return {
         date: parsedDate.toISOString(),
         model: row.model.trim(),
-        tokens_used: Math.round(tokensUsed),
-        estimated_cost: Number(estimatedCost.toFixed(6)),
+        tokens_used: Math.round(Math.max(0, Number(row.tokens_used ?? 0))),
+        estimated_cost: Number(Math.max(0, Number(row.estimated_cost ?? 0)).toFixed(6)),
       };
     })
     .filter((item): item is { date: string; model: string; tokens_used: number; estimated_cost: number } => Boolean(item));
@@ -191,7 +177,8 @@ function requireString(value: unknown, fieldName: string) {
 
 function requireEmailFormat(email: string) {
   const normalized = email.trim().toLowerCase();
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // RFC 5322 simplified — rejects missing TLD, consecutive dots, etc.
+  const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(normalized)) {
     throw new AppError('email is invalid', 400);
   }
@@ -234,7 +221,7 @@ function toSafeUser(row: any) {
     phone: row.phone ?? null,
     status: row.status ?? 1,
     createdAt: row.createdAt,
-    updatedAt: row.updatedAt ?? row.createdAt,
+    updatedAt: row.updatedAt ?? null,
   };
 }
 

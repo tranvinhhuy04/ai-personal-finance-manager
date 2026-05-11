@@ -151,7 +151,6 @@ export function MyWalletsScreen() {
     setFilter,
     isLoading,
     isRefreshing,
-    isDemoMode,
     errorMessage,
     refetch,
     createWallet,
@@ -205,10 +204,9 @@ export function MyWalletsScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void refetch()} />}
       >
-        {isDemoMode ? (
-          <View className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <Text className="text-sm font-medium text-amber-800">Đang hiển thị dữ liệu mô phỏng.</Text>
-            {errorMessage ? <Text className="mt-1 text-xs text-amber-700">{errorMessage}</Text> : null}
+        {errorMessage ? (
+          <View className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+            <Text className="mt-1 text-xs text-red-700">{errorMessage}</Text>
           </View>
         ) : null}
 

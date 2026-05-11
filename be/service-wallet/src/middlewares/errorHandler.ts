@@ -27,6 +27,6 @@ export function errorHandler(err: any, _req: Request, res: Response, _next: Next
 
   console.error('[wallet-service][UNHANDLED ERROR]', err);
   if (!res.headersSent) {
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: 'WALLET_ERROR' });
   }
 }

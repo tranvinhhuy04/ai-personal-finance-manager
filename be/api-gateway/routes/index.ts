@@ -87,44 +87,8 @@ function rewriteSettingsPath(_path: string, req: IncomingMessage) {
   return rewritten.length > 0 ? rewritten : '/settings';
 }
 
-function rewriteWalletPath(_path: string, req: IncomingMessage) {
-  const originalUrl = (req as any).originalUrl as string | undefined;
-  return originalUrl ?? _path;
-}
-
-function rewriteCategoryPath(_path: string, req: IncomingMessage) {
-  const originalUrl = (req as any).originalUrl as string | undefined;
-  return originalUrl ?? _path;
-}
-
-function rewriteTransactionPath(_path: string, req: IncomingMessage) {
-  const originalUrl = (req as any).originalUrl as string | undefined;
-  return originalUrl ?? _path;
-}
-
-function rewriteSavingsPath(_path: string, req: IncomingMessage) {
-  const originalUrl = (req as any).originalUrl as string | undefined;
-  return originalUrl ?? _path;
-}
-
-function rewriteInvoicePath(_path: string, req: IncomingMessage) {
-  const originalUrl = (req as any).originalUrl as string | undefined;
-  return originalUrl ?? _path;
-}
-
-function rewriteAnalyticsPath(_path: string, req: IncomingMessage) {
-  const originalUrl = (req as any).originalUrl as string | undefined;
-  return originalUrl ?? _path;
-}
-
-function rewriteNotificationPath(_path: string, req: IncomingMessage) {
-  const originalUrl = (req as any).originalUrl as string | undefined;
-  return originalUrl ?? _path;
-}
-
-function rewriteAiPath(_path: string, req: IncomingMessage) {
-  const originalUrl = (req as any).originalUrl as string | undefined;
-  return originalUrl ?? _path;
+function passthroughPath(_path: string, req: IncomingMessage) {
+  return (req as any).originalUrl ?? _path;
 }
 
 // /api/v1/auth/* -> service-identity (public, JWT not required)
@@ -196,8 +160,7 @@ router.use(
   createProxyMiddleware({
     target: WALLET_SERVICE_URL,
     changeOrigin: true,
-    // Keep full path unchanged so downstream wallet-service handles /api/v1/wallets.
-    pathRewrite: rewriteWalletPath,
+    pathRewrite: passthroughPath,
     proxyTimeout: PROXY_TIMEOUT_MS,
     timeout: PROXY_TIMEOUT_MS,
     onProxyReq,
@@ -213,7 +176,7 @@ router.use(
   createProxyMiddleware({
     target: TRANSACTION_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: rewriteCategoryPath,
+    pathRewrite: passthroughPath,
     proxyTimeout: PROXY_TIMEOUT_MS,
     timeout: PROXY_TIMEOUT_MS,
     onProxyReq,
@@ -229,8 +192,7 @@ router.use(
   createProxyMiddleware({
     target: TRANSACTION_SERVICE_URL,
     changeOrigin: true,
-    // Keep full path unchanged so downstream transaction-service handles /api/v1/transactions.
-    pathRewrite: rewriteTransactionPath,
+    pathRewrite: passthroughPath,
     proxyTimeout: PROXY_TIMEOUT_MS,
     timeout: PROXY_TIMEOUT_MS,
     onProxyReq,
@@ -246,7 +208,7 @@ router.use(
   createProxyMiddleware({
     target: TRANSACTION_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: rewriteSavingsPath,
+    pathRewrite: passthroughPath,
     proxyTimeout: PROXY_TIMEOUT_MS,
     timeout: PROXY_TIMEOUT_MS,
     onProxyReq,
@@ -262,7 +224,7 @@ router.use(
   createProxyMiddleware({
     target: TRANSACTION_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: rewriteInvoicePath,
+    pathRewrite: passthroughPath,
     proxyTimeout: INVOICE_PROXY_TIMEOUT_MS,
     timeout: INVOICE_PROXY_TIMEOUT_MS,
     onProxyReq,
@@ -278,7 +240,7 @@ router.use(
   createProxyMiddleware({
     target: ANALYTICS_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: rewriteAnalyticsPath,
+    pathRewrite: passthroughPath,
     proxyTimeout: PROXY_TIMEOUT_MS,
     timeout: PROXY_TIMEOUT_MS,
     onProxyReq,
@@ -294,7 +256,7 @@ router.use(
   createProxyMiddleware({
     target: NOTIFY_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: rewriteNotificationPath,
+    pathRewrite: passthroughPath,
     proxyTimeout: NOTIFICATION_STREAM_TIMEOUT_MS,
     timeout: NOTIFICATION_STREAM_TIMEOUT_MS,
     onProxyReq,
@@ -310,7 +272,7 @@ router.use(
   createProxyMiddleware({
     target: NOTIFY_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: rewriteNotificationPath,
+    pathRewrite: passthroughPath,
     proxyTimeout: PROXY_TIMEOUT_MS,
     timeout: PROXY_TIMEOUT_MS,
     onProxyReq,
@@ -338,7 +300,7 @@ router.use(
   createProxyMiddleware({
     target: AI_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: rewriteAiPath,
+    pathRewrite: passthroughPath,
     proxyTimeout: AI_PROXY_TIMEOUT_MS,
     timeout: AI_PROXY_TIMEOUT_MS,
     onProxyReq,
@@ -354,10 +316,7 @@ router.use(
   createProxyMiddleware({
     target: CLOUD_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: (_path, req) => {
-      const originalUrl = (req as any).originalUrl as string | undefined;
-      return originalUrl ?? _path;
-    },
+    pathRewrite: passthroughPath,
     proxyTimeout: PROXY_TIMEOUT_MS,
     timeout: PROXY_TIMEOUT_MS,
     onProxyReq,

@@ -19,13 +19,12 @@ export function useWallets() {
   const query = useQuery({
     queryKey: ['mobile-wallets'],
     queryFn: () => financeApi.getWallets(),
-    staleTime: 60_000, // Cache 60 giây
+    staleTime: 60_000,
     retry: 1,
   });
 
   const createMutation = useMutation({
     mutationFn: (input: CreateWalletInput) => financeApi.createWallet(input),
-    // Sau khi tạo ví thành công, invalidate cache để refetch danh sách mới
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['mobile-wallets'] });
     },
@@ -40,7 +39,6 @@ export function useWallets() {
   });
 
   const sourceWallets = query.data ?? [];
-  // useMemo: chỉ lọc lại khi filter hoặc danh sách gốc thay đổi
   const wallets = useMemo(() => {
     if (filter === 'active') return sourceWallets.filter((wallet) => wallet.status === 1);
     if (filter === 'locked') return sourceWallets.filter((wallet) => wallet.status !== 1);
@@ -68,7 +66,6 @@ export function useWallets() {
     setFilter,
     isLoading: query.isLoading,
     isRefreshing: query.isRefetching,
-    isDemoMode: false,
     errorMessage: query.error instanceof Error ? query.error.message : null,
     refetch: query.refetch,
     createWallet: createMutation.mutateAsync,

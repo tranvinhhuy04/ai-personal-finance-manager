@@ -16,5 +16,5 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
 
   console.error('[cloud-service] Unhandled error:', err);
-  return res.status(500).json({ success: false, message: 'Internal server error' });
+  return res.status(500).json({ success: false, message: 'CLOUD_ERROR' });
 }

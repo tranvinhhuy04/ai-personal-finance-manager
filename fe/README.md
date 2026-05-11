@@ -1,20 +1,23 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# FintechApp — Frontend Web
 
-# Run and deploy your AI Studio app
+Giao diện web cho ứng dụng quản lý tài chính cá nhân. Xây dựng bằng **React 18 + TypeScript + Vite**.
 
-This contains everything you need to run your app locally.
+## Tech stack
 
-View your app in AI Studio: https://ai.studio/apps/34cc270d-6fdc-4e09-a8ba-c99eee69498e
+- **Zustand** — global state (auth, user session)
+- **TanStack React Query** — data fetching & caching
+- **Tailwind CSS** — styling
+- **Recharts** — biểu đồ analytics
+- **React Router** — điều hướng
+- **Axios** — HTTP client với JWT interceptor
 
-## Run Locally
+## Chạy local
 
-**Prerequisites:**  Node.js
+Xem hướng dẫn chi tiết trong [RUN_FRONTEND.md](./RUN_FRONTEND.md).
 
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+cd fe
+npm install
+cp .env.example .env   # điền VITE_API_BASE_URL
+npm run dev
+```

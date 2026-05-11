@@ -4,9 +4,8 @@ import { AppError } from '../errors/AppError';
 import { SavingModel, SavingType } from '../models/saving.model';
 import { transactionService } from './transaction.service';
 import { EXCHANGES, publishMessage, ROUTING_KEYS } from '../config/rabbitmq';
-
-const WALLET_SERVICE_URL = process.env.WALLET_SERVICE_URL ?? 'http://service-wallet:3002';
-const INTERNAL_FETCH_TIMEOUT_MS = Number(process.env.INTERNAL_FETCH_TIMEOUT_MS ?? 8_000);
+import { parsePositiveAmount } from '../utils/parsers';
+import { requireOwnedWallet } from '../utils/walletUtils';
 
 type CreateSavingInput = {
   user_id: string;
@@ -35,21 +34,6 @@ type SettleSavingInput = {
   amount?: string | number | null;
   authorization?: string;
 };
-
-type WalletSnapshot = {
-  id: string;
-  balance: string;
-  wallet_name: string;
-  wallet_type: string;
-};
-
-function parsePositiveAmount(value: string | number, fieldName = 'amount'): number {
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    throw new AppError(`${fieldName} must be a positive number`, 400);
-  }
-  return amount;
-}
 
 function parseOptionalAmount(value: string | number | null | undefined, fieldName = 'target_amount'): number | null {
   if (value === undefined || value === null || value === '') {
@@ -141,7 +125,7 @@ class SavingService {
       }
     }
 
-    const wallet = await this.getWalletSnapshot(input.source_wallet_id, input.authorization);
+    const wallet = await requireOwnedWallet(input.source_wallet_id, input.authorization ?? '');
     const walletBalance = Number(wallet.balance ?? '0');
     if (walletBalance < amount) {
       throw new AppError('Số dư ví nguồn không đủ để nạp vào gói tiết kiệm/đầu tư', 400);
@@ -264,7 +248,7 @@ class SavingService {
       let transaction: Record<string, unknown> | null = null;
 
       if (input.destination_wallet_id && settleAmount > 0) {
-        await this.getWalletSnapshot(input.destination_wallet_id, input.authorization);
+        await requireOwnedWallet(input.destination_wallet_id, input.authorization ?? '');
 
         transaction = await transactionService.createTransaction({
           user_id: input.user_id,
@@ -333,34 +317,6 @@ class SavingService {
     return { success: true };
   }
 
-  private async getWalletSnapshot(walletId: string, authorization?: string): Promise<WalletSnapshot> {
-    if (!authorization) {
-      throw new AppError('Authorization header is required to validate wallet ownership', 401);
-    }
-
-    const response = await fetch(`${WALLET_SERVICE_URL}/api/v1/wallets`, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: authorization,
-      },
-      signal: AbortSignal.timeout(INTERNAL_FETCH_TIMEOUT_MS),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new AppError(`Không thể kiểm tra ví nguồn/đích: ${text || response.statusText}`, 502);
-    }
-
-    const wallets = (await response.json()) as WalletSnapshot[];
-    const matched = wallets.find((item) => item.id === walletId);
-    if (!matched) {
-      throw new AppError('Wallet not found or does not belong to current user', 404);
-    }
-
-    return matched;
-  }
-
   private async publishNotification(input: {
     userId: string;
     title: string;
@@ -392,17 +348,12 @@ class SavingService {
     return {
       id: item._id.toString(),
       userId: item.user_id,
-      user_id: item.user_id,
       name: item.name,
       type: item.type,
       targetAmount: targetAmount ? Number(targetAmount) : null,
-      target_amount: targetAmount ? Number(targetAmount) : null,
       currentAmount: Number(currentAmount),
-      current_amount: Number(currentAmount),
       startDate: item.start_date,
-      start_date: item.start_date,
       endDate: item.end_date,
-      end_date: item.end_date,
       status: item.status,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,

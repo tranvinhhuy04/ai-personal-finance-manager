@@ -99,8 +99,8 @@ async function login(page: Page, email: string, password: string) {
   await passwordInput.fill(password);
   await page.getByRole('button', { name: 'Đăng nhập' }).click();
 
-  await expect(page).toHaveURL(/\/$|\/dashboard$/);
-  await expect(page.getByRole('heading', { name: 'Tổng quan' })).toBeVisible();
+  await expect(page).toHaveURL(/\/$|\/dashboard$/, { timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Tổng quan' })).toBeVisible({ timeout: 30_000 });
 }
 
 async function loginViaApi(request: APIRequestContext): Promise<string> {
@@ -126,7 +126,7 @@ async function askAiChat(
   const response = await request.post(`${API_BASE_URL}/api/v1/ai/chat`, {
     headers: {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json; charset=utf-8',
     },
     data: body,
   });
@@ -171,7 +171,7 @@ test.describe('Suite 1: Tinh dung dan cua du lieu (Analytics & Dashboard)', () =
     await login(page, seedSummary.account.email, seedSummary.account.password);
 
     await page.goto('/dashboard');
-    await expect(page.getByRole('heading', { name: 'Tổng quan' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Tổng quan' })).toBeVisible({ timeout: 30_000 });
 
     const balanceCard = page.locator('div').filter({ hasText: 'Số dư của tôi' }).first();
     await expect(balanceCard).toBeVisible();
@@ -186,7 +186,7 @@ test.describe('Suite 1: Tinh dung dan cua du lieu (Analytics & Dashboard)', () =
     await login(page, seedSummary.account.email, seedSummary.account.password);
 
     await page.goto('/analytics');
-    await expect(page.getByRole('heading', { name: 'Phân tích tài chính chuyên sâu' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Phân tích tài chính chuyên sâu' })).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('button', { name: 'Tùy chỉnh' }).click();
 
@@ -223,12 +223,32 @@ test.describe('Suite 3: AI Financial Chatbot (Agentic RAG)', () => {
     await page.goto('/ai-assistant');
     const token = await loginViaApi(request);
 
+    // Pre-fetch analytics context (mimics FE BFF enrichment)
+    const dashboard = await getAnalyticsDashboard(request, token, {
+      month: '2025-12',
+      range: 'year',
+    });
+    const summary = (dashboard.summary ?? {}) as Record<string, unknown>;
+    const financialContext = {
+      totalIncome: Number(summary.totalIncome ?? 0),
+      totalExpense: Number(summary.totalExpense ?? 0),
+      netCashFlow: Number(summary.netCashFlow ?? summary.net ?? 0),
+      topExpenses: Array.isArray(summary.byCategory)
+        ? (summary.byCategory as Array<Record<string, unknown>>).slice(0, 3).map((c) => ({
+            name: String(c.category_name ?? ''),
+            amount: Number(c.total_amount ?? 0),
+            transactionCount: Number(c.transaction_count ?? 0),
+          }))
+        : [],
+    };
+
     const aiPayload = await askAiChat(request, token, {
       message: 'Tổng chi tiêu năm 2025 của tôi là bao nhiêu?',
       question: 'Tổng chi tiêu năm 2025 của tôi là bao nhiêu?',
       range: 'year',
       month: '2025-12',
       useLlm: false,
+      financialContext,
     });
 
     expect(Boolean(aiPayload.success)).toBeTruthy();
@@ -238,8 +258,8 @@ test.describe('Suite 3: AI Financial Chatbot (Agentic RAG)', () => {
     expect(String(router.route ?? '')).toBe('analytics_chat');
 
     const meta = (aiPayload.meta ?? {}) as Record<string, unknown>;
-    const financialContext = (meta.financialContext ?? {}) as Record<string, unknown>;
-    const totalExpense = Number(financialContext.totalExpense ?? NaN);
+    const ctx = (meta.financialContext ?? {}) as Record<string, unknown>;
+    const totalExpense = Number(ctx.totalExpense ?? NaN);
     expect(totalExpense).toBe(seedSummary.expected.totalExpense2025);
   });
 

@@ -37,6 +37,6 @@ export function errorHandler(err: any, _req: Request, res: Response, _next: Next
 
   console.error('[transaction-service][UNHANDLED ERROR]', err);
   if (!res.headersSent) {
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: 'TRANSACTION_ERROR' });
   }
 }

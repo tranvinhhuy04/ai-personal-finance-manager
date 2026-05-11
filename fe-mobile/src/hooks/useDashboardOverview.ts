@@ -73,7 +73,6 @@ export function useDashboardOverview(range: TimeRange = 'month') {
 
   const isLoading = walletsQuery.isLoading || savingsQuery.isLoading || analyticsQuery.isLoading;
   const isRefreshing = walletsQuery.isRefetching || savingsQuery.isRefetching || analyticsQuery.isRefetching;
-  const isDemoMode = false;
 
   const refetchAll = async () => {
     await Promise.all([walletsQuery.refetch(), savingsQuery.refetch(), analyticsQuery.refetch()]);
@@ -83,7 +82,6 @@ export function useDashboardOverview(range: TimeRange = 'month') {
     data,
     isLoading,
     isRefreshing,
-    isDemoMode,
     errorMessage:
       (walletsQuery.error instanceof Error && walletsQuery.error.message) ||
       (savingsQuery.error instanceof Error && savingsQuery.error.message) ||

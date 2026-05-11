@@ -185,38 +185,19 @@ function calculatePercentChange(current: number, previous: number) {
   return ((current - previous) / previous) * 100;
 }
 
-function getCategoryColor(name: string) {
-  const palette: Record<string, string> = {
-    'Ăn uống': '#f97316',
-    'Mua sắm': '#8b5cf6',
-    'Hóa đơn': '#ef4444',
-    'Di chuyển': '#0ea5e9',
-    'Lương': '#10b981',
-    'Thưởng': '#22c55e',
-    'Giải trí': '#14b8a6',
-    'Nhà ở': '#f43f5e',
-  };
-
-  return palette[name] ?? '#14b8a6';
-}
-
-function resolveTransactionDbName() {
-  const configuredUri = process.env.MONGO_URI_TRANSACTION;
-  if (configuredUri) {
-    const url = new URL(configuredUri);
-    const dbName = url.pathname.replace(/^\//, '').trim();
-    if (dbName) return dbName;
-  }
-
-  return process.env.TRANSACTION_DB_NAME ?? 'fintech_transaction-service';
-}
-
 function getTransactionDb() {
   if (mongoose.connection.readyState !== 1) {
     throw new AppError('Analytics database is not connected', 500);
   }
 
-  return mongoose.connection.useDb(resolveTransactionDbName(), { useCache: true });
+  const configuredUri = process.env.MONGO_URI_TRANSACTION;
+  let dbName = process.env.TRANSACTION_DB_NAME ?? 'fintech_transaction-service';
+  if (configuredUri) {
+    const pathSegment = new URL(configuredUri).pathname.replace(/^\//, '').trim();
+    if (pathSegment) dbName = pathSegment;
+  }
+
+  return mongoose.connection.useDb(dbName, { useCache: true });
 }
 
 function buildTransactionPipeline(filters: {
@@ -550,7 +531,7 @@ function buildSavingsMetrics(summary: SummaryResult, transactions: DetailedTrans
   };
 }
 
-function buildInsights(input: {
+type InsightsInput = {
   summary: SummaryResult;
   previousSummary: SummaryResult;
   budgetProgress: Array<{ category: string; percent: number }>;
@@ -558,7 +539,9 @@ function buildInsights(input: {
   transactionCount: number;
   periodDays: number;
   savingsMetrics: SavingsMetrics;
-}) {
+};
+
+function buildInsights(input: InsightsInput) {
   const spendingChangePercent = roundPercent(
     calculatePercentChange(input.summary.totalExpense, input.previousSummary.totalExpense)
   );
@@ -872,7 +855,7 @@ class AnalyticsService {
       categoryId: String(row._id ?? ''),
       name: String(row.name ?? 'Khác'),
       value: roundMoney(row.value),
-      color: row.color ? String(row.color) : getCategoryColor(String(row.name ?? 'Khác')),
+      color: row.color ? String(row.color) : '',
       transactionCount: Number(row.transactionCount ?? 0),
     }));
   }

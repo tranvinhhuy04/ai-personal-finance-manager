@@ -53,7 +53,7 @@ if (isDevelopment && disableRateLimitInDev) {
       message: {
         message: isDevelopment
           ? 'Dev rate limit reached. Please slow down a bit.'
-          : 'Too many requests, please try again later.',
+          : 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau.',
       },
     })
   );

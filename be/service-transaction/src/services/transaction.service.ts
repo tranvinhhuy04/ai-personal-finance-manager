@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { AppError } from '../errors/AppError';
 import { OutboxModel } from '../models/outbox.model';
 import { TransactionModel } from '../models/transaction.model';
+import { parsePositiveAmount } from '../utils/parsers';
+import { fetchUserWallets } from '../utils/walletUtils';
 
 export type CreateTransactionInput = {
   user_id?: string;
@@ -19,16 +21,6 @@ export type CreateTransactionInput = {
   session?: ClientSession;
 };
 
-const WALLET_SERVICE_URL = process.env.WALLET_SERVICE_URL ?? 'http://service-wallet:3002';
-
-function parsePositiveAmount(value: string | number) {
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    throw new AppError('amount must be a positive number', 400);
-  }
-  return amount;
-}
-
 function parseOccurredAt(value?: string | Date) {
   if (!value) return new Date();
   const date = value instanceof Date ? value : new Date(value);
@@ -44,25 +36,8 @@ class TransactionService {
       return true;
     }
 
-    const response = await fetch(`${WALLET_SERVICE_URL}/api/v1/wallets`, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: authorization,
-      },
-      signal: AbortSignal.timeout(8_000),
-    });
-
-    if (!response.ok) {
-      throw new AppError('Unable to validate wallet ownership', 502);
-    }
-
-    const payload = await response.json();
-    if (!Array.isArray(payload)) {
-      return false;
-    }
-
-    return payload.some((wallet: any) => String(wallet?.id ?? '') === walletId);
+    const wallets = await fetchUserWallets(authorization);
+    return wallets.some((wallet) => wallet.id === walletId);
   }
 
   async createTransaction(input: CreateTransactionInput) {

@@ -1,33 +1,28 @@
 import { AppError } from '../errors/AppError';
 import { RecurringRuleModel } from '../models/recurring-rule.model';
 
-function normalizeTransactionType(input: unknown): 'INCOME' | 'EXPENSE' {
-  const normalized = String(input ?? '').trim().toUpperCase();
-  if (normalized !== 'INCOME' && normalized !== 'EXPENSE') {
-    throw new AppError('transaction_type must be INCOME or EXPENSE', 400);
-  }
-  return normalized as 'INCOME' | 'EXPENSE';
+const RECURRING_STATUSES = ['ACTIVE', 'PAUSED'] as const;
+
+function normalizeStatus(input: unknown, fallback: string): 'ACTIVE' | 'PAUSED' {
+  return requireEnum<'ACTIVE' | 'PAUSED'>(input, RECURRING_STATUSES, 'status', fallback as 'ACTIVE' | 'PAUSED');
 }
 
-function normalizeFrequency(input: unknown): 'WEEKLY' | 'MONTHLY' {
-  const normalized = String(input ?? '').trim().toUpperCase();
-  if (normalized !== 'WEEKLY' && normalized !== 'MONTHLY') {
-    throw new AppError('frequency must be WEEKLY or MONTHLY', 400);
-  }
-  return normalized as 'WEEKLY' | 'MONTHLY';
-}
-
-function normalizeStatus(input: unknown, fallback: 'ACTIVE' | 'PAUSED' = 'ACTIVE') {
-  if (input === undefined || input === null || input === '') {
+function requireEnum<T extends string>(
+  input: unknown,
+  allowed: readonly T[],
+  field: string,
+  fallback?: T,
+): T {
+  if ((input === undefined || input === null || input === '') && fallback !== undefined) {
     return fallback;
   }
 
-  const normalized = String(input).trim().toUpperCase();
-  if (normalized !== 'ACTIVE' && normalized !== 'PAUSED') {
-    throw new AppError('status must be ACTIVE or PAUSED', 400);
+  const normalized = String(input ?? '').trim().toUpperCase() as T;
+  if (!allowed.includes(normalized)) {
+    throw new AppError(`${field} must be one of: ${allowed.join(', ')}`, 400);
   }
 
-  return normalized as 'ACTIVE' | 'PAUSED';
+  return normalized;
 }
 
 function parseAmount(input: unknown) {
@@ -79,26 +74,18 @@ function toRecurringRuleResponse(rule: any) {
 
   return {
     id: rule._id.toString(),
-    _id: rule._id.toString(),
     userId: String(rule.user_id ?? ''),
-    user_id: String(rule.user_id ?? ''),
     walletId,
-    wallet_id: walletId,
     categoryId,
-    category_id: categoryId,
     transactionType,
-    transaction_type: transactionType,
     amount,
     currency: String(rule.currency ?? 'VND'),
     frequency,
     dayOfWeek,
-    day_of_week: dayOfWeek,
     dayOfMonth,
-    day_of_month: dayOfMonth,
     status,
     note,
     lastRunOn: rule.last_run_on ?? null,
-    last_run_on: rule.last_run_on ?? null,
     createdAt: rule.createdAt,
     updatedAt: rule.updatedAt,
   };
@@ -121,10 +108,10 @@ class RecurringRuleService {
     const walletId = String(payload.wallet_id ?? payload.walletId ?? '').trim();
     const categoryIdRaw = payload.category_id ?? payload.categoryId ?? null;
     const categoryId = categoryIdRaw ? String(categoryIdRaw).trim() : null;
-    const transactionType = normalizeTransactionType(payload.transaction_type ?? payload.transactionType);
+    const transactionType = requireEnum(payload.transaction_type ?? payload.transactionType, ['INCOME', 'EXPENSE'] as const, 'transaction_type');
     const amount = parseAmount(payload.amount);
-    const frequency = normalizeFrequency(payload.frequency);
-    const status = normalizeStatus(payload.status);
+    const frequency = requireEnum(payload.frequency, ['WEEKLY', 'MONTHLY'] as const, 'frequency');
+    const status = requireEnum(payload.status, ['ACTIVE', 'PAUSED'] as const, 'status', 'ACTIVE');
     const dayOfWeek = parseDayOfWeek(payload.day_of_week ?? payload.dayOfWeek, frequency === 'WEEKLY');
     const dayOfMonth = parseDayOfMonth(payload.day_of_month ?? payload.dayOfMonth, frequency === 'MONTHLY');
     const note = String(payload.note ?? '').trim() || null;
@@ -159,7 +146,7 @@ class RecurringRuleService {
     }
 
     const nextFrequency = payload.frequency !== undefined
-      ? normalizeFrequency(payload.frequency)
+      ? requireEnum(payload.frequency, ['WEEKLY', 'MONTHLY'] as const, 'frequency')
       : rule.frequency;
 
     if (payload.wallet_id !== undefined || payload.walletId !== undefined) {
@@ -174,7 +161,7 @@ class RecurringRuleService {
     }
 
     if (payload.transaction_type !== undefined || payload.transactionType !== undefined) {
-      rule.transaction_type = normalizeTransactionType(payload.transaction_type ?? payload.transactionType);
+      rule.transaction_type = requireEnum(payload.transaction_type ?? payload.transactionType, ['INCOME', 'EXPENSE'] as const, 'transaction_type');
     }
 
     if (payload.amount !== undefined) {

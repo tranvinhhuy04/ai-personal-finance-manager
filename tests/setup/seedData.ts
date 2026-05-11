@@ -464,8 +464,18 @@ function createTransactions(params: {
   };
 }
 
-export async function seedData(options?: { writeSummaryFile?: boolean }): Promise<SeedSummary> {
+export async function seedData(options?: { writeSummaryFile?: boolean; loadFromFile?: boolean }): Promise<SeedSummary> {
   const writeSummaryFile = options?.writeSummaryFile ?? true;
+  const loadFromFile = options?.loadFromFile ?? (process.env.SKIP_SEED === '1');
+
+  if (loadFromFile) {
+    if (!fs.existsSync(SUMMARY_PATH)) {
+      throw new Error(`SKIP_SEED=1 but no seed-summary.json found at ${SUMMARY_PATH}`);
+    }
+    const raw = fs.readFileSync(SUMMARY_PATH, 'utf8');
+    return JSON.parse(raw) as SeedSummary;
+  }
+
   const connections = await createConnections();
 
   const identityDb = connections.identityClient.db(connections.identityDbName);

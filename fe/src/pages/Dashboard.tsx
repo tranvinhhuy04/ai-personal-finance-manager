@@ -52,80 +52,19 @@ function toNumber(value: number | string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+const WALLET_TYPE_MAP: Record<string, WalletCurrency['type']> = {
+  MOMO: 'momo',
+  ZALOPAY: 'zalopay',
+  CASH: 'cash',
+  CARD: 'techcombank',
+};
+
 function mapWalletType(wallet: Wallet): WalletCurrency['type'] {
-  const walletType = String(wallet.walletType ?? '').toLowerCase();
-  const walletName = String(wallet.walletName ?? '').toLowerCase();
-
-  if (walletType.includes('momo') || walletName.includes('momo')) {
-    return 'momo';
-  }
-
-  if (walletType.includes('zalo') || walletName.includes('zalopay') || walletName.includes('zalo pay')) {
-    return 'zalopay';
-  }
-
-  if (walletType.includes('cash') || walletName.includes('tiền mặt') || walletName.includes('tien mat')) {
-    return 'cash';
-  }
-
-  return 'techcombank';
+  return WALLET_TYPE_MAP[String(wallet.walletType ?? '').toUpperCase()] ?? 'techcombank';
 }
 
 function mapWalletStatus(status: number): WalletCurrency['status'] {
   return status === 1 ? 'Hoạt động' : 'Tạm khóa';
-}
-
-async function fetchOverview(walletsPromise?: Promise<Wallet[]>): Promise<DashboardData['overview']> {
-  const [wallets, savings, investments] = await Promise.all([
-    walletsPromise ?? apiClient.getWallets(),
-    apiClient.getSavings('SAVING'),
-    apiClient.getSavings('INVESTMENT'),
-  ]);
-
-  const totalWalletBalance = wallets.reduce((sum, wallet) => sum + toNumber(wallet.balance), 0);
-  const totalSavings = savings
-    .filter((item) => item.status === 'ACTIVE')
-    .reduce((sum, item) => sum + toNumber(item.currentAmount), 0);
-  const totalInvestment = investments
-    .filter((item) => item.status === 'ACTIVE')
-    .reduce((sum, item) => sum + toNumber(item.currentAmount), 0);
-
-  return {
-    balance: {
-      ...DEFAULT_DASHBOARD_DATA.overview.balance,
-      amount: totalWalletBalance,
-      isPositive: totalWalletBalance >= 0,
-    },
-    savings: {
-      ...DEFAULT_DASHBOARD_DATA.overview.savings,
-      amount: totalSavings,
-      isPositive: totalSavings >= 0,
-    },
-    investment: {
-      ...DEFAULT_DASHBOARD_DATA.overview.investment,
-      amount: totalInvestment,
-      isPositive: totalInvestment >= 0,
-    },
-  };
-}
-
-async function fetchWallets(walletsPromise?: Promise<Wallet[]>): Promise<DashboardData['wallet']> {
-  const wallets = await (walletsPromise ?? apiClient.getWallets());
-
-  return {
-    exchangeRate:
-      wallets.length > 0
-        ? `Đã đồng bộ ${wallets.length} ví từ backend`
-        : 'Bạn chưa có ví nào trong hệ thống',
-    currencies: wallets.map((wallet) => ({
-      id: wallet.id,
-      name: wallet.walletName,
-      type: mapWalletType(wallet),
-      amount: toNumber(wallet.balance),
-      limit: 'Không giới hạn',
-      status: mapWalletStatus(wallet.status),
-    })),
-  };
 }
 
 async function fetchCashflow(filter: 'monthly' | 'yearly' = 'yearly'): Promise<DashboardData['cashFlow']> {
