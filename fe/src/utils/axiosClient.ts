@@ -43,10 +43,10 @@ function clearAuthStorage() {
 }
 
 // Endpoint API Gateway – đọc từ biến môi trường VITE_API_BASE_URL (.env)
-// Mặc định trỏ về localhost:3000 khi chạy dev
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3000';
+// Mặc định trỏ về localhost:3000 khi chạy dev; để trống ('') cho Vercel (same-origin)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000';
 // AI Service có thể chạy trên port riêng; nếu không khai báo thì dùng chung API Gateway
-const AI_SERVICE_BASE_URL = import.meta.env.VITE_AI_SERVICE_URL || API_BASE_URL;
+const AI_SERVICE_BASE_URL = import.meta.env.VITE_AI_SERVICE_URL ?? API_BASE_URL;
 
 export const axiosClient = axios.create({
   baseURL: API_BASE_URL,

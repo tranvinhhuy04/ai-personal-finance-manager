@@ -214,6 +214,28 @@ export const Auth = () => {
                   {!isLoading && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
                 </button>
 
+                {isLogin && (
+                  <>
+                    <div className="relative flex items-center my-2">
+                      <div className="flex-grow border-t border-white/10" />
+                      <span className="mx-3 text-xs text-gray-500">hoặc</span>
+                      <div className="flex-grow border-t border-white/10" />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => {
+                        const setMockLogin = useAuthStore.getState().setMockLogin;
+                        setMockLogin();
+                        navigate('/dashboard');
+                      }}
+                      className="w-full py-3 px-4 rounded-xl font-semibold text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/10 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Xem Demo (mock data)
+                    </button>
+                  </>
+                )}
 
               </form>
 
