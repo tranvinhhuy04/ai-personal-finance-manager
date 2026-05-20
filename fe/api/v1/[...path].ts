@@ -1,5 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
-
 // ==================== CONSTANTS ====================
 const MOCK_USER_ID = 'demo-user-001';
 const DEMO_TOKEN = 'demo-token-vercel-mock';
@@ -57,6 +55,9 @@ const INITIAL_SAVINGS = [
   { id: 'saving-001', userId: MOCK_USER_ID, name: 'Mua laptop mới', type: 'SAVING', targetAmount: 20000000, currentAmount: 8500000, startDate: '2026-01-01T00:00:00.000Z', endDate: '2026-12-31T00:00:00.000Z', status: 'ACTIVE', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-05-20T00:00:00.000Z' },
   { id: 'saving-002', userId: MOCK_USER_ID, name: 'Du lịch Nhật Bản', type: 'SAVING', targetAmount: 50000000, currentAmount: 15000000, startDate: '2026-02-01T00:00:00.000Z', endDate: '2027-03-01T00:00:00.000Z', status: 'ACTIVE', createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-05-20T00:00:00.000Z' },
   { id: 'saving-003', userId: MOCK_USER_ID, name: 'Quỹ khẩn cấp', type: 'SAVING', targetAmount: null, currentAmount: 10000000, startDate: '2025-06-01T00:00:00.000Z', endDate: null, status: 'ACTIVE', createdAt: '2025-06-01T00:00:00.000Z', updatedAt: '2026-05-20T00:00:00.000Z' },
+  { id: 'invest-001', userId: MOCK_USER_ID, name: 'Cổ phiếu VIC', type: 'INVESTMENT', targetAmount: 100000000, currentAmount: 32000000, startDate: '2025-10-01T00:00:00.000Z', endDate: null, status: 'ACTIVE', createdAt: '2025-10-01T00:00:00.000Z', updatedAt: '2026-05-20T00:00:00.000Z' },
+  { id: 'invest-002', userId: MOCK_USER_ID, name: 'Quỹ ETF SSIAM', type: 'INVESTMENT', targetAmount: 50000000, currentAmount: 18500000, startDate: '2026-01-01T00:00:00.000Z', endDate: null, status: 'ACTIVE', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-05-20T00:00:00.000Z' },
+  { id: 'invest-003', userId: MOCK_USER_ID, name: 'Trái phiếu chính phủ', type: 'INVESTMENT', targetAmount: 30000000, currentAmount: 30000000, startDate: '2025-07-01T00:00:00.000Z', endDate: '2028-07-01T00:00:00.000Z', status: 'ACTIVE', createdAt: '2025-07-01T00:00:00.000Z', updatedAt: '2026-05-20T00:00:00.000Z' },
 ];
 
 const INITIAL_RECURRING_RULES = [
@@ -126,6 +127,21 @@ CHI ĐỊNH KỲ:
 ${state.recurringRules.map(r => `- ${r.note}: ${Number(r.amount).toLocaleString('vi-VN')} VND/${r.frequency === 'MONTHLY' ? 'tháng' : 'tuần'}`).join('\n')}
 
 Hãy trả lời câu hỏi bằng tiếng Việt, ngắn gọn, cụ thể với số liệu chính xác từ dữ liệu trên.`;
+}
+
+// ==================== GEMINI DIRECT API ====================
+async function callGemini(prompt: string, apiKey: string): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    }
+  );
+  if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
+  const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'Không thể trả lời lúc này.';
 }
 
 // ==================== HELPERS ====================
@@ -401,18 +417,15 @@ async function route(path: string, method: string, body: any, query: any, req: a
     const geminiKey = process.env.GEMINI_API_KEY;
     if (!geminiKey) {
       // Fallback mock AI when no API key
-      if (segs[1] === 'chat') return { status: 200, data: { success: true, question: body.question || body.message || '', intent: 'general', confidence: 0.9, scores: {}, answer: 'Xin lỗi, AI chat chưa được cấu hình. Vui lòng thêm GEMINI_API_KEY vào Vercel Environment Variables.', llmUsed: false, queryPlan: {}, meta: {} } };
+      if (segs[1] === 'chat') return { status: 200, data: { success: true, question: body.question || body.message || '', intent: 'general', confidence: 0.9, scores: {}, answer: 'AI chat chưa được cấu hình. Vui lòng thêm GEMINI_API_KEY vào Vercel Environment Variables để sử dụng tính năng này.', llmUsed: false, queryPlan: {}, meta: {} } };
       if (segs[1] === 'extract-text') return { status: 200, data: { success: true, input: body.input_text || '', rawOutput: JSON.stringify([{ title: 'Giao dịch demo', amount: 50000, type: 'expense', category: 'Ăn uống' }]), model: 'mock' } };
     }
-
-    const genAI = new GoogleGenAI({ apiKey: geminiKey! });
 
     if (segs[1] === 'chat') {
       const question: string = body.question || body.message || '';
       const systemContext = buildFinancialContext();
       const prompt = `${systemContext}\n\nCâu hỏi: ${question}`;
-      const result = await genAI.models.generateContent({ model: 'gemini-2.0-flash', contents: prompt });
-      const answer = result.text || 'Không thể trả lời lúc này.';
+      const answer = await callGemini(prompt, geminiKey!);
       return { status: 200, data: { success: true, question, intent: 'general', confidence: 0.95, scores: {}, answer, llmUsed: true, queryPlan: {}, meta: {} } };
     }
 
@@ -422,8 +435,7 @@ async function route(path: string, method: string, body: any, query: any, req: a
 [{"title": "tên giao dịch", "amount": số_tiền_VND, "type": "expense|income", "category": "tên danh mục"}]
 Chỉ trả về JSON array thuần túy, không có markdown code fence.
 Văn bản: "${inputText}"`;
-      const result = await genAI.models.generateContent({ model: 'gemini-2.0-flash', contents: prompt });
-      const rawOutput = result.text || '[]';
+      const rawOutput = await callGemini(prompt, geminiKey!);
       return { status: 200, data: { success: true, input: inputText, rawOutput, model: 'gemini-2.0-flash' } };
     }
   }
