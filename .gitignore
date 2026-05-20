@@ -21,11 +21,15 @@
 **/*.swp
 **/*.swo
 
-# Keep env/config files so others can clone and run immediately
-!.env
-!.env.example
-!**/.env
+# Environment files - use .env.example as template
+**/.env
+**/.env.local
+**/.env.*.local
 !**/.env.example
+
+# Documentation and development-only folders
+Finance-docs/
+be/seeds/
 
 # Keep placeholder upload directory
 !be/service-transaction/public/uploads/.gitkeep
